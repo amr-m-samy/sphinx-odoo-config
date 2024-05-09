@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.service.model &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.service.model</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.service.model</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">IntegrityError</span><span class="p">,</span> <span class="n">OperationalError</span><span class="p">,</span> <span class="n">errorcodes</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span><span class="p">,</span> <span class="n">ValidationError</span>
+<span class="kn">from</span> <span class="nn">odoo.http</span> <span class="kn">import</span> <span class="n">request</span>
+<span class="kn">from</span> <span class="nn">odoo.models</span> <span class="kn">import</span> <span class="n">check_method_name</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">DotDict</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.translate</span> <span class="kn">import</span> <span class="n">_</span><span class="p">,</span> <span class="n">translate_sql_constraint</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">security</span>
+<span class="kn">from</span> <span class="nn">..tools</span> <span class="kn">import</span> <span class="n">lazy</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">PG_CONCURRENCY_ERRORS_TO_RETRY</span> <span class="o">=</span> <span class="p">(</span><span class="n">errorcodes</span><span class="o">.</span><span class="n">LOCK_NOT_AVAILABLE</span><span class="p">,</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">SERIALIZATION_FAILURE</span><span class="p">,</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">DEADLOCK_DETECTED</span><span class="p">)</span>
+<span class="n">MAX_TRIES_ON_CONCURRENCY_FAILURE</span> <span class="o">=</span> <span class="mi">5</span>
+
+
+<div class="viewcode-block" id="dispatch">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.model.dispatch">[docs]</a>
+<span class="k">def</span> <span class="nf">dispatch</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+    <span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">passwd</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">int</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">params</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">security</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">passwd</span><span class="p">)</span>
+
+    <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">dbname</span> <span class="o">=</span> <span class="n">db</span>
+    <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">uid</span> <span class="o">=</span> <span class="n">uid</span>
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span><span class="n">db</span><span class="p">)</span><span class="o">.</span><span class="n">check_signaling</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">manage_changes</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;execute&#39;</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">execute</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">[</span><span class="mi">3</span><span class="p">:])</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;execute_kw&#39;</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">execute_kw</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">[</span><span class="mi">3</span><span class="p">:])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NameError</span><span class="p">(</span><span class="s2">&quot;Method not available </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+
+<div class="viewcode-block" id="execute_cr">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.model.execute_cr">[docs]</a>
+<span class="k">def</span> <span class="nf">execute_cr</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+    <span class="c1"># clean cache etc if we retry the same transaction</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">recs</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">recs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Object </span><span class="si">%s</span><span class="s2"> doesn&#39;t exist&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">))</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">retrying</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">call_kw</span><span class="p">,</span> <span class="n">recs</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kw</span><span class="p">),</span> <span class="n">env</span><span class="p">)</span>
+    <span class="c1"># force evaluation of lazy values before the cursor is closed, as it would</span>
+    <span class="c1"># error afterwards if the lazy isn&#39;t already evaluated (and cached)</span>
+    <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">_traverse_containers</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">lazy</span><span class="p">):</span>
+        <span class="n">_0</span> <span class="o">=</span> <span class="n">l</span><span class="o">.</span><span class="n">_value</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="execute_kw">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.model.execute_kw">[docs]</a>
+<span class="k">def</span> <span class="nf">execute_kw</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kw</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">execute</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span> <span class="ow">or</span> <span class="p">{})</span></div>
+
+
+
+<div class="viewcode-block" id="execute">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.model.execute">[docs]</a>
+<span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">odoo</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span><span class="n">db</span><span class="p">)</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="n">check_method_name</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">execute_cr</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;The method </span><span class="si">%s</span><span class="s1"> of the object </span><span class="si">%s</span><span class="s1"> can not return `None`!&#39;</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_as_validation_error</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">exc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the IntegrityError encapsuled in a nice ValidationError &quot;&quot;&quot;</span>
+
+    <span class="n">unknown</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Unknown&#39;</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">DotDict</span><span class="p">({</span><span class="s1">&#39;_name&#39;</span><span class="p">:</span> <span class="n">unknown</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="s1">&#39;_description&#39;</span><span class="p">:</span> <span class="n">unknown</span><span class="p">})</span>
+    <span class="n">field</span> <span class="o">=</span> <span class="n">DotDict</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">unknown</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="s1">&#39;string&#39;</span><span class="p">:</span> <span class="n">unknown</span><span class="p">})</span>
+    <span class="k">for</span> <span class="n">_name</span><span class="p">,</span> <span class="n">rclass</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">diag</span><span class="o">.</span><span class="n">table_name</span> <span class="o">==</span> <span class="n">rclass</span><span class="o">.</span><span class="n">_table</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">rclass</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">diag</span><span class="o">.</span><span class="n">column_name</span><span class="p">)</span> <span class="ow">or</span> <span class="n">field</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">pgcode</span> <span class="o">==</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">NOT_NULL_VIOLATION</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+            <span class="s2">&quot;The operation cannot be completed:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Create/update: a mandatory field is not set.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Delete: another model requires the record being deleted.&quot;</span>
+            <span class="s2">&quot; If possible, archive it instead.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Model: </span><span class="si">%(model_name)s</span><span class="s2"> (</span><span class="si">%(model_tech_name)s</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Field: </span><span class="si">%(field_name)s</span><span class="s2"> (</span><span class="si">%(field_tech_name)s</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">model_name</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">_description</span><span class="p">,</span>
+            <span class="n">model_tech_name</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="n">field_name</span><span class="o">=</span><span class="n">field</span><span class="o">.</span><span class="n">string</span><span class="p">,</span>
+            <span class="n">field_tech_name</span><span class="o">=</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">pgcode</span> <span class="o">==</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">FOREIGN_KEY_VIOLATION</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+            <span class="s2">&quot;The operation cannot be completed: another model requires &quot;</span>
+            <span class="s2">&quot;the record being deleted. If possible, archive it instead.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Model: </span><span class="si">%(model_name)s</span><span class="s2"> (</span><span class="si">%(model_tech_name)s</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Constraint: </span><span class="si">%(constraint)s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">model_name</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">_description</span><span class="p">,</span>
+            <span class="n">model_tech_name</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="n">constraint</span><span class="o">=</span><span class="n">exc</span><span class="o">.</span><span class="n">diag</span><span class="o">.</span><span class="n">constraint_name</span><span class="p">,</span>
+        <span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">diag</span><span class="o">.</span><span class="n">constraint_name</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">_sql_constraints</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+            <span class="s2">&quot;The operation cannot be completed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">translate_sql_constraint</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">diag</span><span class="o">.</span><span class="n">constraint_name</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="s1">&#39;en_US&#39;</span><span class="p">))</span>
+        <span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The operation cannot be completed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+
+<div class="viewcode-block" id="retrying">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.model.retrying">[docs]</a>
+<span class="k">def</span> <span class="nf">retrying</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Call ``func`` until the function returns without serialisation</span>
+<span class="sd">    error. A serialisation error occurs when two requests in independent</span>
+<span class="sd">    cursors perform incompatible changes (such as writing different</span>
+<span class="sd">    values on a same record). By default, it retries up to 5 times.</span>
+
+<span class="sd">    :param callable func: The function to call, you can pass arguments</span>
+<span class="sd">        using :func:`functools.partial`:.</span>
+<span class="sd">    :param odoo.api.Environment env: The environment where the registry</span>
+<span class="sd">        and the cursor are taken.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">tryno</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">MAX_TRIES_ON_CONCURRENCY_FAILURE</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">tryleft</span> <span class="o">=</span> <span class="n">MAX_TRIES_ON_CONCURRENCY_FAILURE</span> <span class="o">-</span> <span class="n">tryno</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+                    <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>  <span class="c1"># submit the changes to the database</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">IntegrityError</span><span class="p">,</span> <span class="n">OperationalError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+                    <span class="k">raise</span>
+                <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+                <span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+                <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">reset_changes</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">request</span><span class="p">:</span>
+                    <span class="n">request</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">_get_session_and_dbname</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="c1"># Rewind files in case of failure</span>
+                    <span class="k">for</span> <span class="n">filename</span><span class="p">,</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">request</span><span class="o">.</span><span class="n">httprequest</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="s2">&quot;seekable&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">file</span><span class="o">.</span><span class="n">seekable</span><span class="p">():</span>
+                            <span class="n">file</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot retry request on input file </span><span class="si">{</span><span class="n">filename</span><span class="si">!r}</span><span class="s2"> after serialization failure&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">IntegrityError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">_as_validation_error</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+                <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">pgcode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PG_CONCURRENCY_ERRORS_TO_RETRY</span><span class="p">:</span>
+                    <span class="k">raise</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">tryleft</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">, maximum number of tries reached!&quot;</span><span class="p">,</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">lookup</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">pgcode</span><span class="p">))</span>
+                    <span class="k">raise</span>
+
+                <span class="n">wait_time</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">tryno</span><span class="p">)</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2"> tries left, try again in </span><span class="si">%.04f</span><span class="s2"> sec...&quot;</span><span class="p">,</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">lookup</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">pgcode</span><span class="p">),</span> <span class="n">tryleft</span><span class="p">,</span> <span class="n">wait_time</span><span class="p">)</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">wait_time</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># handled in the &quot;if not tryleft&quot; case</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;unreachable&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">reset_changes</span><span class="p">()</span>
+        <span class="k">raise</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>  <span class="c1"># effectively commits and execute post-commits</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">signal_changes</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_traverse_containers</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Yields atoms filtered by specified ``type_`` (or type tuple), traverses</span>
+<span class="sd">    through standard containers (non-string mappings or sequences) *unless*</span>
+<span class="sd">    they&#39;re selected by the type filter</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">odoo.models</span> <span class="kn">import</span> <span class="n">BaseModel</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="n">val</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)):</span>
+        <span class="k">return</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">val</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">yield from</span> <span class="n">_traverse_containers</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">type_</span><span class="p">)</span>
+            <span class="k">yield from</span> <span class="n">_traverse_containers</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">type_</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">_traverse_containers</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">type_</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

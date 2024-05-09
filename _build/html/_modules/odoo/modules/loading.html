@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.loading &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.loading</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.loading</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot; Modules (also called addons) management.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.modules.db</span>
+<span class="kn">import</span> <span class="nn">odoo.modules.graph</span>
+<span class="kn">import</span> <span class="nn">odoo.modules.migration</span>
+<span class="kn">import</span> <span class="nn">odoo.modules.registry</span>
+<span class="kn">from</span> <span class="nn">..</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">api</span><span class="p">,</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">.module</span> <span class="kn">import</span> <span class="n">adapt_version</span><span class="p">,</span> <span class="n">initialize_sys_path</span><span class="p">,</span> <span class="n">load_openerp_module</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_test_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.tests&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="load_data">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.load_data">[docs]</a>
+<span class="k">def</span> <span class="nf">load_data</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="n">package</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    kind: data, demo, test, init_xml, update_xml, demo_xml.</span>
+
+<span class="sd">    noupdate is False, unless it is demo data or it is csv data in</span>
+<span class="sd">    init mode.</span>
+
+<span class="sd">    :returns: Whether a file was loaded</span>
+<span class="sd">    :rtype: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_get_files_of_kind</span><span class="p">(</span><span class="n">kind</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">&#39;demo&#39;</span><span class="p">:</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;demo_xml&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">&#39;data&#39;</span><span class="p">:</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;init_xml&#39;</span><span class="p">,</span> <span class="s1">&#39;update_xml&#39;</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">kind</span><span class="p">]</span>
+        <span class="n">files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">package</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;File </span><span class="si">%s</span><span class="s2"> is imported twice in module </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
+                <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;_xml&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;init_xml&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.xml&#39;</span><span class="p">)):</span>
+                    <span class="c1"># init_xml, update_xml and demo_xml are deprecated except</span>
+                    <span class="c1"># for the case of init_xml with csv and sql files as</span>
+                    <span class="c1"># we can&#39;t specify noupdate for those file.</span>
+                    <span class="n">correct_key</span> <span class="o">=</span> <span class="s1">&#39;demo&#39;</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="s1">&#39;data&#39;</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;module </span><span class="si">%s</span><span class="s2">: key &#39;</span><span class="si">%s</span><span class="s2">&#39; is deprecated in favor of &#39;</span><span class="si">%s</span><span class="s2">&#39; for file &#39;</span><span class="si">%s</span><span class="s2">&#39;.&quot;</span><span class="p">,</span>
+                        <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">correct_key</span><span class="p">,</span> <span class="n">f</span>
+                    <span class="p">)</span>
+        <span class="k">return</span> <span class="n">files</span>
+
+    <span class="n">filename</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;test&#39;</span><span class="p">):</span>
+            <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">testing</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">_get_files_of_kind</span><span class="p">(</span><span class="n">kind</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;loading </span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+            <span class="n">noupdate</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;demo_xml&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.csv&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;init_xml&#39;</span><span class="p">)):</span>
+                <span class="n">noupdate</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">convert_file</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">noupdate</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;test&#39;</span><span class="p">):</span>
+            <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">testing</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_demo">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.load_demo">[docs]</a>
+<span class="k">def</span> <span class="nf">load_demo</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">package</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads demo data for the specified package.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">package</span><span class="o">.</span><span class="n">should_have_demo</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">package</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;demo_xml&#39;</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Module </span><span class="si">%s</span><span class="s2">: loading demo&quot;</span><span class="p">,</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                <span class="n">load_data</span><span class="p">(</span><span class="n">env</span><span class="p">(</span><span class="n">su</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="n">package</span><span class="o">=</span><span class="n">package</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># If we could not install demo data for this module</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Module </span><span class="si">%s</span><span class="s2"> demo data failed to install, installed without demo data&quot;</span><span class="p">,</span>
+            <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">todo</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.demo_failure_todo&#39;</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">Failure</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ir.demo_failure&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">todo</span> <span class="ow">and</span> <span class="n">Failure</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">todo</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="s1">&#39;open&#39;</span>
+            <span class="n">Failure</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;module_id&#39;</span><span class="p">:</span> <span class="n">package</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)})</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="force_demo">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.force_demo">[docs]</a>
+<span class="k">def</span> <span class="nf">force_demo</span><span class="p">(</span><span class="n">env</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Forces the `demo` flag on all modules, and installs demo data for all installed modules.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;UPDATE ir_module_module SET demo=True&#39;</span><span class="p">)</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+        <span class="s2">&quot;SELECT name FROM ir_module_module WHERE state IN (&#39;installed&#39;, &#39;to upgrade&#39;, &#39;to remove&#39;)&quot;</span>
+    <span class="p">)</span>
+    <span class="n">module_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,)</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+    <span class="n">graph</span><span class="o">.</span><span class="n">add_modules</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">module_list</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;demo&#39;</span><span class="p">])</span>
+
+    <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">load_demo</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">package</span><span class="p">,</span> <span class="p">{},</span> <span class="s1">&#39;init&#39;</span><span class="p">)</span>
+
+    <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">([</span><span class="s1">&#39;demo&#39;</span><span class="p">])</span>
+    <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_update_user_groups_view</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="load_module_graph">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.load_module_graph">[docs]</a>
+<span class="k">def</span> <span class="nf">load_module_graph</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">perform_checks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                      <span class="n">skip_modules</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">models_to_check</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Migrates+Updates or Installs all module nodes from ``graph``</span>
+
+<span class="sd">       :param env:</span>
+<span class="sd">       :param graph: graph of module nodes to load</span>
+<span class="sd">       :param status: deprecated parameter, unused, left to avoid changing signature in 8.0</span>
+<span class="sd">       :param perform_checks: whether module descriptors should be checked for validity (prints warnings</span>
+<span class="sd">                              for same cases)</span>
+<span class="sd">       :param skip_modules: optional list of module names (packages) which have previously been loaded and can be skipped</span>
+<span class="sd">       :param report:</span>
+<span class="sd">       :param set models_to_check:</span>
+<span class="sd">       :return: list of modules that were installed or updated</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">models_to_check</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">models_to_check</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="n">processed_modules</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">loaded_modules</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span>
+    <span class="n">migrations</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">migration</span><span class="o">.</span><span class="n">MigrationManager</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">graph</span><span class="p">)</span>
+    <span class="n">module_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;loading </span><span class="si">%d</span><span class="s1"> modules...&#39;</span><span class="p">,</span> <span class="n">module_count</span><span class="p">)</span>
+
+    <span class="c1"># register, instantiate and initialize models for each modules</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">loading_extra_query_count</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span>
+    <span class="n">loading_cursor_query_count</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span>
+
+    <span class="n">models_updated</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">package</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">module_name</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">module_id</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="k">if</span> <span class="n">skip_modules</span> <span class="ow">and</span> <span class="n">module_name</span> <span class="ow">in</span> <span class="n">skip_modules</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">module_t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">module_cursor_query_count</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span>
+        <span class="n">module_extra_query_count</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span>
+
+        <span class="n">needs_update</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">hasattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s2">&quot;init&quot;</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s2">&quot;update&quot;</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;to install&quot;</span><span class="p">,</span> <span class="s2">&quot;to upgrade&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">module_log_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span>
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="n">module_log_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">module_log_level</span><span class="p">,</span> <span class="s1">&#39;Loading module </span><span class="si">%s</span><span class="s1"> (</span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">module_count</span><span class="p">)</span>
+
+        <span class="n">new_install</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to install&#39;</span>
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">new_install</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;base&#39;</span><span class="p">:</span>
+                    <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+                <span class="n">migrations</span><span class="o">.</span><span class="n">migrate_module</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s1">&#39;pre&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;base&#39;</span><span class="p">:</span>
+                <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="n">load_openerp_module</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">new_install</span><span class="p">:</span>
+            <span class="n">py_module</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s1">&#39;odoo.addons.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">module_name</span><span class="p">,)]</span>
+            <span class="n">pre_init</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;pre_init_hook&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">pre_init</span><span class="p">:</span>
+                <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">py_module</span><span class="p">,</span> <span class="n">pre_init</span><span class="p">)(</span><span class="n">env</span><span class="p">)</span>
+
+        <span class="n">model_names</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">package</span><span class="p">)</span>
+
+        <span class="n">mode</span> <span class="o">=</span> <span class="s1">&#39;update&#39;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s1">&#39;init&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to install&#39;</span><span class="p">:</span>
+            <span class="n">mode</span> <span class="o">=</span> <span class="s1">&#39;init&#39;</span>
+
+        <span class="n">loaded_modules</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="n">models_updated</span> <span class="o">|=</span> <span class="nb">set</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">models_to_check</span> <span class="o">-=</span> <span class="nb">set</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">init_models</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">model_names</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;module&#39;</span><span class="p">:</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">},</span> <span class="n">new_install</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="o">!=</span> <span class="s1">&#39;to remove&#39;</span><span class="p">:</span>
+            <span class="c1"># The current module has simply been loaded. The models extended by this module</span>
+            <span class="c1"># and for which we updated the schema, must have their schema checked again.</span>
+            <span class="c1"># This is because the extension may have changed the model,</span>
+            <span class="c1"># e.g. adding required=True to an existing field, but the schema has not been</span>
+            <span class="c1"># updated by this module because it&#39;s not marked as &#39;to upgrade/to install&#39;.</span>
+            <span class="n">models_to_check</span> <span class="o">|=</span> <span class="nb">set</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">models_updated</span>
+
+        <span class="n">idref</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="c1"># Can&#39;t put this line out of the loop: ir.module.module will be</span>
+            <span class="c1"># registered by init_models() above.</span>
+            <span class="n">module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">module_id</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">perform_checks</span><span class="p">:</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">_check</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">:</span>
+                <span class="c1"># upgrading the module information</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">get_values_from_terp</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+            <span class="n">load_data</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;data&#39;</span><span class="p">,</span> <span class="n">package</span><span class="o">=</span><span class="n">package</span><span class="p">)</span>
+            <span class="n">demo_loaded</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">dbdemo</span> <span class="o">=</span> <span class="n">load_demo</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">package</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">)</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;update ir_module_module set demo=</span><span class="si">%s</span><span class="s1"> where id=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">demo_loaded</span><span class="p">,</span> <span class="n">module_id</span><span class="p">))</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">([</span><span class="s1">&#39;demo&#39;</span><span class="p">])</span>
+
+            <span class="n">migrations</span><span class="o">.</span><span class="n">migrate_module</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Update translations for all installed languages</span>
+            <span class="n">overwrite</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;overwrite_existing_translations&quot;</span><span class="p">]</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">_update_translations</span><span class="p">(</span><span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">_init_modules</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">new_install</span><span class="p">:</span>
+                <span class="n">post_init</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;post_init_hook&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">post_init</span><span class="p">:</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">py_module</span><span class="p">,</span> <span class="n">post_init</span><span class="p">)(</span><span class="n">env</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;update&#39;</span><span class="p">:</span>
+                <span class="c1"># validate the views that have not been checked yet</span>
+                <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_validate_module_views</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+
+            <span class="c1"># need to commit any modification the module&#39;s installation or</span>
+            <span class="c1"># update made to the schema or data so the tests can run</span>
+            <span class="c1"># (separately in their own transaction)</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="n">concrete_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">model</span> <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">model_names</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">registry</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_abstract</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">concrete_models</span><span class="p">:</span>
+                <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    SELECT model FROM ir_model </span>
+<span class="s2">                    WHERE id NOT IN (SELECT DISTINCT model_id FROM ir_model_access) AND model IN </span><span class="si">%s</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">concrete_models</span><span class="p">)])</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="p">[</span><span class="n">model</span> <span class="k">for</span> <span class="p">[</span><span class="n">model</span><span class="p">]</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+                <span class="k">if</span> <span class="n">models</span><span class="p">:</span>
+                    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="sa">f</span><span class="s2">&quot;The models </span><span class="si">{</span><span class="n">models</span><span class="si">}</span><span class="s2"> have no access rules in module </span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">, consider adding some, like:&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink&quot;</span>
+                    <span class="p">]</span>
+                    <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+                        <span class="n">xmlid</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">)</span>
+                        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">.access_</span><span class="si">{</span><span class="n">xmlid</span><span class="si">}</span><span class="s2">,access_</span><span class="si">{</span><span class="n">xmlid</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">.model_</span><span class="si">{</span><span class="n">xmlid</span><span class="si">}</span><span class="s2">,base.group_user,1,0,0,0&quot;</span><span class="p">)</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+
+        <span class="n">updating</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]</span>
+        <span class="n">test_time</span> <span class="o">=</span> <span class="n">test_queries</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">test_results</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;test_enable&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">needs_update</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">updating</span><span class="p">):</span>
+            <span class="n">loader</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">loader</span>
+            <span class="n">suite</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">make_suite</span><span class="p">([</span><span class="n">module_name</span><span class="p">],</span> <span class="s1">&#39;at_install&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">suite</span><span class="o">.</span><span class="n">countTestCases</span><span class="p">():</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">needs_update</span><span class="p">:</span>
+                    <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+                <span class="c1"># Python tests</span>
+                <span class="n">tests_t0</span><span class="p">,</span> <span class="n">tests_q0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span>
+                <span class="n">test_results</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">run_suite</span><span class="p">(</span><span class="n">suite</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">test_results</span><span class="p">)</span>
+                <span class="n">test_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">tests_t0</span>
+                <span class="n">test_queries</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span> <span class="o">-</span> <span class="n">tests_q0</span>
+
+                <span class="c1"># tests may have reset the environment</span>
+                <span class="n">module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">module_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">needs_update</span><span class="p">:</span>
+            <span class="n">processed_modules</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+            <span class="n">ver</span> <span class="o">=</span> <span class="n">adapt_version</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;version&#39;</span><span class="p">])</span>
+            <span class="c1"># Set new modules and dependencies</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;latest_version&#39;</span><span class="p">:</span> <span class="n">ver</span><span class="p">})</span>
+
+            <span class="n">package</span><span class="o">.</span><span class="n">load_state</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">state</span>
+            <span class="n">package</span><span class="o">.</span><span class="n">load_version</span> <span class="o">=</span> <span class="n">package</span><span class="o">.</span><span class="n">installed_version</span>
+            <span class="n">package</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="s1">&#39;installed&#39;</span>
+            <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="n">kind</span><span class="p">):</span>
+                    <span class="nb">delattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="n">extra_queries</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span> <span class="o">-</span> <span class="n">module_extra_query_count</span> <span class="o">-</span> <span class="n">test_queries</span>
+        <span class="n">extras</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">test_queries</span><span class="p">:</span>
+            <span class="n">extras</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;+</span><span class="si">{</span><span class="n">test_queries</span><span class="si">}</span><span class="s1"> test&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">extra_queries</span><span class="p">:</span>
+            <span class="n">extras</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;+</span><span class="si">{</span><span class="n">extra_queries</span><span class="si">}</span><span class="s1"> other&#39;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="n">module_log_level</span><span class="p">,</span> <span class="s2">&quot;Module </span><span class="si">%s</span><span class="s2"> loaded in </span><span class="si">%.2f</span><span class="s2">s</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2"> queries</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">module_name</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">module_t0</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39; (incl. </span><span class="si">{</span><span class="n">test_time</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">s test)&#39;</span> <span class="k">if</span> <span class="n">test_time</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">-</span> <span class="n">module_cursor_query_count</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39; (</span><span class="si">{</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span><span class="si">}</span><span class="s1">)&#39;</span> <span class="k">if</span> <span class="n">extras</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">test_results</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">test_results</span><span class="o">.</span><span class="n">wasSuccessful</span><span class="p">():</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Module </span><span class="si">%s</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> failures, </span><span class="si">%d</span><span class="s2"> errors of </span><span class="si">%d</span><span class="s2"> tests&quot;</span><span class="p">,</span>
+                <span class="n">module_name</span><span class="p">,</span> <span class="n">test_results</span><span class="o">.</span><span class="n">failures_count</span><span class="p">,</span> <span class="n">test_results</span><span class="o">.</span><span class="n">errors_count</span><span class="p">,</span>
+                <span class="n">test_results</span><span class="o">.</span><span class="n">testsRun</span>
+            <span class="p">)</span>
+
+    <span class="n">_logger</span><span class="o">.</span><span class="n">runbot</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> modules loaded in </span><span class="si">%.2f</span><span class="s2">s, </span><span class="si">%s</span><span class="s2"> queries (+</span><span class="si">%s</span><span class="s2"> extra)&quot;</span><span class="p">,</span>
+                   <span class="nb">len</span><span class="p">(</span><span class="n">graph</span><span class="p">),</span>
+                   <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">,</span>
+                   <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">-</span> <span class="n">loading_cursor_query_count</span><span class="p">,</span>
+                   <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">sql_counter</span> <span class="o">-</span> <span class="n">loading_extra_query_count</span><span class="p">)</span>  <span class="c1"># extra queries: testes, notify, any other closed cursor</span>
+
+    <span class="k">return</span> <span class="n">loaded_modules</span><span class="p">,</span> <span class="n">processed_modules</span></div>
+
+
+<span class="k">def</span> <span class="nf">_check_module_names</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">module_names</span><span class="p">):</span>
+    <span class="n">mod_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">module_names</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s1">&#39;base&#39;</span> <span class="ow">in</span> <span class="n">mod_names</span><span class="p">:</span>
+        <span class="c1"># ignore dummy &#39;all&#39; module</span>
+        <span class="k">if</span> <span class="s1">&#39;all&#39;</span> <span class="ow">in</span> <span class="n">mod_names</span><span class="p">:</span>
+            <span class="n">mod_names</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mod_names</span><span class="p">:</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT count(id) AS count FROM ir_module_module WHERE name in </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">mod_names</span><span class="p">),))</span>
+        <span class="k">if</span> <span class="n">cr</span><span class="o">.</span><span class="n">dictfetchone</span><span class="p">()[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">mod_names</span><span class="p">):</span>
+            <span class="c1"># find out what module name(s) are incorrect:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name FROM ir_module_module&quot;</span><span class="p">)</span>
+            <span class="n">incorrect_names</span> <span class="o">=</span> <span class="n">mod_names</span><span class="o">.</span><span class="n">difference</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">dictfetchall</span><span class="p">()])</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;invalid module names, ignored: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">incorrect_names</span><span class="p">))</span>
+
+<div class="viewcode-block" id="load_marked_modules">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.load_marked_modules">[docs]</a>
+<span class="k">def</span> <span class="nf">load_marked_modules</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">states</span><span class="p">,</span> <span class="n">force</span><span class="p">,</span> <span class="n">progressdict</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span>
+                        <span class="n">loaded_modules</span><span class="p">,</span> <span class="n">perform_checks</span><span class="p">,</span> <span class="n">models_to_check</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Loads modules marked with ``states``, adding them to ``graph`` and</span>
+<span class="sd">       ``loaded_modules`` and returns a list of installed/upgraded modules.&quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">models_to_check</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">models_to_check</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="n">processed_modules</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name from ir_module_module WHERE state IN </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">states</span><span class="p">),))</span>
+        <span class="n">module_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,)</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">graph</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">module_list</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">add_modules</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">module_list</span><span class="p">,</span> <span class="n">force</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Updating graph with </span><span class="si">%d</span><span class="s1"> more modules&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">module_list</span><span class="p">))</span>
+        <span class="n">loaded</span><span class="p">,</span> <span class="n">processed</span> <span class="o">=</span> <span class="n">load_module_graph</span><span class="p">(</span>
+            <span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">progressdict</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="n">report</span><span class="p">,</span> <span class="n">skip_modules</span><span class="o">=</span><span class="n">loaded_modules</span><span class="p">,</span>
+            <span class="n">perform_checks</span><span class="o">=</span><span class="n">perform_checks</span><span class="p">,</span> <span class="n">models_to_check</span><span class="o">=</span><span class="n">models_to_check</span>
+        <span class="p">)</span>
+        <span class="n">processed_modules</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">processed</span><span class="p">)</span>
+        <span class="n">loaded_modules</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">loaded</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">processed</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">processed_modules</span></div>
+
+
+<div class="viewcode-block" id="load_modules">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.load_modules">[docs]</a>
+<span class="k">def</span> <span class="nf">load_modules</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">force_demo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Load the modules for a registry object that has just been created.  This</span>
+<span class="sd">        function is part of Registry.new() and should not be used anywhere else.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">initialize_sys_path</span><span class="p">()</span>
+
+    <span class="n">force</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">force_demo</span><span class="p">:</span>
+        <span class="n">force</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+
+    <span class="n">models_to_check</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="c1"># prevent endless wait for locks on schema changes (during online</span>
+        <span class="c1"># installs) if a concurrent transaction has accessed the table;</span>
+        <span class="c1"># connection settings are automatically reset when the connection is</span>
+        <span class="c1"># borrowed from the pool</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SET SESSION lock_timeout = &#39;15s&#39;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">update_module</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Database </span><span class="si">%s</span><span class="s2"> not initialized, you can force it with `-i base`&quot;</span><span class="p">,</span> <span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;init db&quot;</span><span class="p">)</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="n">update_module</span> <span class="o">=</span> <span class="kc">True</span> <span class="c1"># process auto-installed modules</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;init&quot;</span><span class="p">][</span><span class="s2">&quot;all&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;without_demo&#39;</span><span class="p">]:</span>
+                <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;demo&quot;</span><span class="p">][</span><span class="s1">&#39;all&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="s1">&#39;base&#39;</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="s1">&#39;all&#39;</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;update ir_module_module set state=</span><span class="si">%s</span><span class="s2"> where name=</span><span class="si">%s</span><span class="s2"> and state=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;to upgrade&#39;</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">))</span>
+
+        <span class="c1"># STEP 1: LOAD BASE (must be done before module dependencies can be computed for later steps)</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">add_module</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="n">force</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="s1">&#39;module base cannot be loaded! (hint: verify addons-path)&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s1">&#39;Module `base` cannot be loaded! (hint: verify addons-path)&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">update_module</span> <span class="ow">and</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">table_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="s1">&#39;ir_model_fields&#39;</span><span class="p">):</span>
+            <span class="c1"># determine the fields which are currently translated in the database</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT model || &#39;.&#39; || name FROM ir_model_fields WHERE translate IS TRUE&quot;</span><span class="p">)</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">_database_translated_fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
+
+        <span class="c1"># processed_modules: for cleanup step after install</span>
+        <span class="c1"># loaded_modules: to avoid double loading</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">_assertion_report</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">loaded_modules</span><span class="p">,</span> <span class="n">processed_modules</span> <span class="o">=</span> <span class="n">load_module_graph</span><span class="p">(</span>
+            <span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span> <span class="n">perform_checks</span><span class="o">=</span><span class="n">update_module</span><span class="p">,</span>
+            <span class="n">report</span><span class="o">=</span><span class="n">report</span><span class="p">,</span> <span class="n">models_to_check</span><span class="o">=</span><span class="n">models_to_check</span><span class="p">)</span>
+
+        <span class="n">load_lang</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;load_language&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">load_lang</span> <span class="ow">or</span> <span class="n">update_module</span><span class="p">:</span>
+            <span class="c1"># some base models are used below, so make sure they are set up</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">load_lang</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="n">load_lang</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+                <span class="n">tools</span><span class="o">.</span><span class="n">load_language</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">lang</span><span class="p">)</span>
+
+        <span class="c1"># STEP 2: Mark other modules to be loaded/updated</span>
+        <span class="k">if</span> <span class="n">update_module</span><span class="p">:</span>
+            <span class="n">Module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;updating modules list&#39;</span><span class="p">)</span>
+            <span class="n">Module</span><span class="o">.</span><span class="n">update_list</span><span class="p">()</span>
+
+            <span class="n">_check_module_names</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">],</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]))</span>
+
+            <span class="n">module_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">module_names</span><span class="p">:</span>
+                <span class="n">modules</span> <span class="o">=</span> <span class="n">Module</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;uninstalled&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">module_names</span><span class="p">)])</span>
+                <span class="k">if</span> <span class="n">modules</span><span class="p">:</span>
+                    <span class="n">modules</span><span class="o">.</span><span class="n">button_install</span><span class="p">()</span>
+
+            <span class="n">module_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">module_names</span><span class="p">:</span>
+                <span class="n">modules</span> <span class="o">=</span> <span class="n">Module</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">)),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">module_names</span><span class="p">)])</span>
+                <span class="k">if</span> <span class="n">modules</span><span class="p">:</span>
+                    <span class="n">modules</span><span class="o">.</span><span class="n">button_upgrade</span><span class="p">()</span>
+
+            <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;update ir_module_module set state=</span><span class="si">%s</span><span class="s2"> where name=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">))</span>
+            <span class="n">Module</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">([</span><span class="s1">&#39;state&#39;</span><span class="p">])</span>
+
+        <span class="c1"># STEP 3: Load marked modules (skipping base which was done in STEP 1)</span>
+        <span class="c1"># IMPORTANT: this is done in two parts, first loading all installed or</span>
+        <span class="c1">#            partially installed modules (i.e. installed/to upgrade), to</span>
+        <span class="c1">#            offer a consistent system to the second part: installing</span>
+        <span class="c1">#            newly selected modules.</span>
+        <span class="c1">#            We include the modules &#39;to remove&#39; in the first step, because</span>
+        <span class="c1">#            they are part of the &quot;currently installed&quot; modules. They will</span>
+        <span class="c1">#            be dropped in STEP 6 later, before restarting the loading</span>
+        <span class="c1">#            process.</span>
+        <span class="c1"># IMPORTANT 2: We have to loop here until all relevant modules have been</span>
+        <span class="c1">#              processed, because in some rare cases the dependencies have</span>
+        <span class="c1">#              changed, and modules that depend on an uninstalled module</span>
+        <span class="c1">#              will not be processed on the first pass.</span>
+        <span class="c1">#              It&#39;s especially useful for migrations.</span>
+        <span class="n">previously_processed</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">while</span> <span class="n">previously_processed</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed_modules</span><span class="p">):</span>
+            <span class="n">previously_processed</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed_modules</span><span class="p">)</span>
+            <span class="n">processed_modules</span> <span class="o">+=</span> <span class="n">load_marked_modules</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">,</span> <span class="s1">&#39;to remove&#39;</span><span class="p">],</span>
+                <span class="n">force</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span> <span class="n">loaded_modules</span><span class="p">,</span> <span class="n">update_module</span><span class="p">,</span> <span class="n">models_to_check</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">update_module</span><span class="p">:</span>
+                <span class="n">processed_modules</span> <span class="o">+=</span> <span class="n">load_marked_modules</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span>
+                    <span class="p">[</span><span class="s1">&#39;to install&#39;</span><span class="p">],</span> <span class="n">force</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span>
+                    <span class="n">loaded_modules</span><span class="p">,</span> <span class="n">update_module</span><span class="p">,</span> <span class="n">models_to_check</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">update_module</span><span class="p">:</span>
+            <span class="c1"># set up the registry without the patch for translated fields</span>
+            <span class="n">database_translated_fields</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">_database_translated_fields</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">_database_translated_fields</span> <span class="o">=</span> <span class="p">()</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="c1"># determine which translated fields should no longer be translated,</span>
+            <span class="c1"># and make their model fix the database schema</span>
+            <span class="n">models_to_untranslate</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">full_name</span> <span class="ow">in</span> <span class="n">database_translated_fields</span><span class="p">:</span>
+                <span class="n">model_name</span><span class="p">,</span> <span class="n">field_name</span> <span class="o">=</span> <span class="n">full_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="n">registry</span><span class="p">:</span>
+                    <span class="n">field</span> <span class="o">=</span> <span class="n">registry</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">field</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">field</span><span class="o">.</span><span class="n">translate</span><span class="p">:</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Making field </span><span class="si">%s</span><span class="s2"> non-translated&quot;</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+                        <span class="n">models_to_untranslate</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">init_models</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">models_to_untranslate</span><span class="p">),</span> <span class="p">{</span><span class="s1">&#39;models_to_check&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+        <span class="n">registry</span><span class="o">.</span><span class="n">loaded</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+        <span class="c1"># check that all installed modules have been loaded by the registry</span>
+        <span class="n">Module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+        <span class="n">modules</span> <span class="o">=</span> <span class="n">Module</span><span class="o">.</span><span class="n">search_fetch</span><span class="p">(</span><span class="n">Module</span><span class="o">.</span><span class="n">_get_modules_to_load_domain</span><span class="p">(),</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">modules</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">graph</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Some modules are not loaded, some dependencies or manifest may be missing: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">missing</span><span class="p">)</span>
+
+        <span class="c1"># STEP 3.5: execute migration end-scripts</span>
+        <span class="n">migrations</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">migration</span><span class="o">.</span><span class="n">MigrationManager</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">graph</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">graph</span><span class="p">:</span>
+            <span class="n">migrations</span><span class="o">.</span><span class="n">migrate_module</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="s1">&#39;end&#39;</span><span class="p">)</span>
+
+        <span class="c1"># check that new module dependencies have been properly installed after a migration/upgrade</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name from ir_module_module WHERE state IN (&#39;to install&#39;, &#39;to upgrade&#39;)&quot;</span><span class="p">)</span>
+        <span class="n">module_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,)</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="n">module_list</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Some modules have inconsistent states, some dependencies may be missing: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">module_list</span><span class="p">))</span>
+
+        <span class="c1"># STEP 3.6: apply remaining constraints in case of an upgrade</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">finalize_constraints</span><span class="p">()</span>
+
+        <span class="c1"># STEP 4: Finish and cleanup installations</span>
+        <span class="k">if</span> <span class="n">processed_modules</span><span class="p">:</span>
+
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT model from ir_model&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">model</span><span class="p">,)</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">registry</span><span class="p">:</span>
+                    <span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_check_removed_columns</span><span class="p">(</span><span class="n">log</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">):</span>    <span class="c1"># more an info that a warning...</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">runbot</span><span class="p">(</span><span class="s2">&quot;Model </span><span class="si">%s</span><span class="s2"> is declared but cannot be loaded! (Perhaps a module was partially removed or renamed)&quot;</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+
+            <span class="c1"># Cleanup orphan records</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_end</span><span class="p">(</span><span class="n">processed_modules</span><span class="p">)</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">):</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># STEP 5: Uninstall modules to remove</span>
+        <span class="k">if</span> <span class="n">update_module</span><span class="p">:</span>
+            <span class="c1"># Remove records referenced from ir_model_data for modules to be</span>
+            <span class="c1"># removed (and removed the references from ir_model_data).</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name, id FROM ir_module_module WHERE state=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;to remove&#39;</span><span class="p">,))</span>
+            <span class="n">modules_to_remove</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">modules_to_remove</span><span class="p">:</span>
+                <span class="n">pkgs</span> <span class="o">=</span> <span class="nb">reversed</span><span class="p">([</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">graph</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">modules_to_remove</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">pkg</span> <span class="ow">in</span> <span class="n">pkgs</span><span class="p">:</span>
+                    <span class="n">uninstall_hook</span> <span class="o">=</span> <span class="n">pkg</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;uninstall_hook&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">uninstall_hook</span><span class="p">:</span>
+                        <span class="n">py_module</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s1">&#39;odoo.addons.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">,)]</span>
+                        <span class="nb">getattr</span><span class="p">(</span><span class="n">py_module</span><span class="p">,</span> <span class="n">uninstall_hook</span><span class="p">)(</span><span class="n">env</span><span class="p">)</span>
+                        <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+                <span class="n">Module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+                <span class="n">Module</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">modules_to_remove</span><span class="o">.</span><span class="n">values</span><span class="p">())</span><span class="o">.</span><span class="n">module_uninstall</span><span class="p">()</span>
+                <span class="c1"># Recursive reload, should only happen once, because there should be no</span>
+                <span class="c1"># modules to remove next time</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Reloading registry once more after uninstalling modules&#39;</span><span class="p">)</span>
+                <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+                    <span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="n">force_demo</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span> <span class="n">update_module</span>
+                <span class="p">)</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+                <span class="n">registry</span><span class="o">.</span><span class="n">check_tables_exist</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">registry</span>
+
+        <span class="c1"># STEP 5.5: Verify extended fields on every model</span>
+        <span class="c1"># This will fix the schema of all models in a situation such as:</span>
+        <span class="c1">#   - module A is loaded and defines model M;</span>
+        <span class="c1">#   - module B is installed/upgraded and extends model M;</span>
+        <span class="c1">#   - module C is loaded and extends model M;</span>
+        <span class="c1">#   - module B and C depend on A but not on each other;</span>
+        <span class="c1"># The changes introduced by module C are not taken into account by the upgrade of B.</span>
+        <span class="k">if</span> <span class="n">models_to_check</span><span class="p">:</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">init_models</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">models_to_check</span><span class="p">),</span> <span class="p">{</span><span class="s1">&#39;models_to_check&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+        <span class="c1"># STEP 6: verify custom views on every model</span>
+        <span class="k">if</span> <span class="n">update_module</span><span class="p">:</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_update_user_groups_view</span><span class="p">()</span>
+            <span class="n">View</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">registry</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">View</span><span class="o">.</span><span class="n">_validate_custom_views</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;invalid custom view(s) for model </span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">wasSuccessful</span><span class="p">():</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Modules loaded.&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;At least one test failed when loading the modules.&#39;</span><span class="p">)</span>
+
+
+        <span class="c1"># STEP 8: save installed/updated modules for post-install tests and _register_hook</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">updated_modules</span> <span class="o">+=</span> <span class="n">processed_modules</span>
+
+        <span class="c1"># STEP 9: call _register_hook on every model</span>
+        <span class="c1"># This is done *exactly once* when the registry is being loaded. See the</span>
+        <span class="c1"># management of those hooks in `Registry.setup_models`: all the calls to</span>
+        <span class="c1"># setup_models() done here do not mess up with hooks, as registry.ready</span>
+        <span class="c1"># is False.</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_register_hook</span><span class="p">()</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="reset_modules_state">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.loading.reset_modules_state">[docs]</a>
+<span class="k">def</span> <span class="nf">reset_modules_state</span><span class="p">(</span><span class="n">db_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Resets modules flagged as &quot;to x&quot; to their original state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Warning, this function was introduced in response to commit 763d714</span>
+    <span class="c1"># which locks cron jobs for dbs which have modules marked as &#39;to %&#39;.</span>
+    <span class="c1"># The goal of this function is to be called ONLY when module</span>
+    <span class="c1"># installation/upgrade/uninstallation fails, which is the only known case</span>
+    <span class="c1"># for which modules can stay marked as &#39;to %&#39; for an indefinite amount</span>
+    <span class="c1"># of time</span>
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT 1 FROM information_schema.tables WHERE table_name=&#39;ir_module_module&#39;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;skipping reset_modules_state, ir_module_module table does not exists&#39;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s2">&quot;UPDATE ir_module_module SET state=&#39;installed&#39; WHERE state IN (&#39;to remove&#39;, &#39;to upgrade&#39;)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s2">&quot;UPDATE ir_module_module SET state=&#39;uninstalled&#39; WHERE state=&#39;to install&#39;&quot;</span>
+        <span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Transient module states were reset&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

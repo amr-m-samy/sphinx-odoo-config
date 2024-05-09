@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.mimetypes &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.mimetypes</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.mimetypes</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Mimetypes-related utilities</span>
+
+<span class="sd"># TODO: reexport stdlib mimetypes?</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">mimetypes</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">zipfile</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;guess_mimetype&#39;</span><span class="p">]</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># We define our own guess_mimetype implementation and if magic is available we</span>
+<span class="c1"># use it instead.</span>
+
+<span class="c1"># discriminants for zip-based file formats</span>
+<span class="n">_ooxml_dirs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;word/&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;pt/&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.presentationml.presentation&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;xl/&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="k">def</span> <span class="nf">_check_ooxml</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">,</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">as</span> <span class="n">z</span><span class="p">:</span>
+        <span class="n">filenames</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">namelist</span><span class="p">()</span>
+        <span class="c1"># OOXML documents should have a [Content_Types].xml file for early</span>
+        <span class="c1"># check that we&#39;re interested in this thing at all</span>
+        <span class="k">if</span> <span class="s1">&#39;[Content_Types].xml&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># then there is a directory whose name denotes the type of the file:</span>
+        <span class="c1"># word, pt (powerpoint) or xl (excel)</span>
+        <span class="k">for</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">mime</span> <span class="ow">in</span> <span class="n">_ooxml_dirs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">dirname</span><span class="p">)</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">mime</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="c1"># checks that a string looks kinda sorta like a mimetype</span>
+<span class="n">_mime_validator</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    [\w-]+ # type-name</span>
+<span class="s2">    / # subtype separator</span>
+<span class="s2">    [\w-]+ # registration facet or subtype</span>
+<span class="s2">    (?:\.[\w-]+)* # optional faceted name</span>
+<span class="s2">    (?:\+[\w-]+)? # optional structured syntax specifier</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_check_open_container_format</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="c1"># Open Document Format for Office Applications (OpenDocument) Version 1.2</span>
+    <span class="c1">#</span>
+    <span class="c1"># Part 3: Packages</span>
+    <span class="c1"># 3 Packages</span>
+    <span class="c1"># 3.3 MIME Media Type</span>
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">,</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">as</span> <span class="n">z</span><span class="p">:</span>
+        <span class="c1"># If a MIME media type for a document exists, then an OpenDocument</span>
+        <span class="c1"># package should contain a file with name &quot;mimetype&quot;.</span>
+        <span class="k">if</span> <span class="s1">&#39;mimetype&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">z</span><span class="o">.</span><span class="n">namelist</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># The content of this file shall be the ASCII encoded MIME media type</span>
+        <span class="c1"># associated with the document.</span>
+        <span class="n">marcel</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s1">&#39;mimetype&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+        <span class="c1"># check that it&#39;s not too long (RFC6838 § 4.2 restricts type and</span>
+        <span class="c1"># subtype to 127 characters each + separator, strongly recommends</span>
+        <span class="c1"># limiting them to 64 but does not require it) and that it looks a lot</span>
+        <span class="c1"># like a valid mime type</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">marcel</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">256</span> <span class="ow">and</span> <span class="n">_mime_validator</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">marcel</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">marcel</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+<span class="n">_xls_pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    </span><span class="se">\x09\x08\x10\x00\x00\x06\x05\x00</span>
+<span class="s2">  | </span><span class="se">\xFD\xFF\xFF\xFF</span><span class="s2">(</span><span class="se">\x10</span><span class="s2">|</span><span class="se">\x1F</span><span class="s2">|</span><span class="se">\x20</span><span class="s2">|&quot;|</span><span class="se">\\</span><span class="s2">#|</span><span class="se">\\</span><span class="s2">(|</span><span class="se">\\</span><span class="s2">))</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+<span class="n">_ppt_pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    </span><span class="se">\x00\x6E\x1E\xF0</span>
+<span class="s2">  | </span><span class="se">\x0F\x00\xE8\x03</span>
+<span class="s2">  | </span><span class="se">\xA0\x46\x1D\xF0</span>
+<span class="s2">  | </span><span class="se">\xFD\xFF\xFF\xFF</span><span class="s2">(</span><span class="se">\x0E</span><span class="s2">|</span><span class="se">\x1C</span><span class="s2">|</span><span class="se">\x43</span><span class="s2">)</span><span class="se">\x00\x00\x00</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_check_olecf</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Pre-OOXML Office formats are OLE Compound Files which all use the same</span>
+<span class="sd">    file signature (&quot;magic bytes&quot;) and should have a subheader at offset 512</span>
+<span class="sd">    (0x200).</span>
+
+<span class="sd">    Subheaders taken from http://www.garykessler.net/library/file_sigs.html</span>
+<span class="sd">    according to which Mac office files *may* have different subheaders. We&#39;ll</span>
+<span class="sd">    ignore that.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">offset</span> <span class="o">=</span> <span class="mh">0x200</span>
+    <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xEC\xA5\xC1\x00</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">offset</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;application/msword&#39;</span>
+    <span class="c1"># the _xls_pattern stuff doesn&#39;t seem to work correctly (the test file</span>
+    <span class="c1"># only has a bunch of \xf* at offset 0x200), that apparently works</span>
+    <span class="k">elif</span> <span class="sa">b</span><span class="s1">&#39;Microsoft Excel&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;application/vnd.ms-excel&#39;</span>
+    <span class="k">elif</span> <span class="n">_ppt_pattern</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">offset</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;application/vnd.ms-powerpoint&#39;</span>
+    <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span> <span class="nf">_check_svg</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This simply checks the existence of the opening and ending SVG tags&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="sa">b</span><span class="s1">&#39;&lt;svg&#39;</span> <span class="ow">in</span> <span class="n">data</span> <span class="ow">and</span> <span class="sa">b</span><span class="s1">&#39;/svg&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;image/svg+xml&#39;</span>
+
+<span class="k">def</span> <span class="nf">_check_webp</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This checks the presence of the WEBP and VP8 in the RIFF&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;WEBPVP8&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;image/webp&#39;</span>
+
+<span class="c1"># for &quot;master&quot; formats with many subformats, discriminants is a list of</span>
+<span class="c1"># functions, tried in order and the first non-falsy value returned is the</span>
+<span class="c1"># selected mime type. If all functions return falsy values, the master</span>
+<span class="c1"># mimetype is returned.</span>
+<span class="n">_Entry</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;_Entry&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">,</span> <span class="s1">&#39;signatures&#39;</span><span class="p">,</span> <span class="s1">&#39;discriminants&#39;</span><span class="p">])</span>
+<span class="n">_mime_mappings</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="c1"># pdf</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;application/pdf&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;%PDF&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="c1"># jpg, jpeg, png, gif, bmp, jfif</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/jpeg&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xFF\xD8\xFF\xE0</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xFF\xD8\xFF\xE2</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xFF\xD8\xFF\xE3</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xFF\xD8\xFF\xE1</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xFF\xD8\xFF\xDB</span><span class="s1">&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/png&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x89</span><span class="s1">PNG</span><span class="se">\r\n\x1A\n</span><span class="s1">&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/gif&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;GIF87a&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;GIF89a&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/bmp&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;BM&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;application/xml&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;&lt;&#39;</span><span class="p">],</span> <span class="p">[</span>
+        <span class="n">_check_svg</span><span class="p">,</span>
+    <span class="p">]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/x-icon&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x00\x00\x01\x00</span><span class="s1">&#39;</span><span class="p">],</span> <span class="p">[]),</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;image/webp&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;RIFF&#39;</span><span class="p">],</span> <span class="p">[</span>
+        <span class="n">_check_webp</span><span class="p">,</span>
+    <span class="p">]),</span>
+    <span class="c1"># OLECF files in general (Word, Excel, PPT, default to word because why not?)</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;application/msword&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x0D\x44\x4F\x43</span><span class="s1">&#39;</span><span class="p">],</span> <span class="p">[</span>
+        <span class="n">_check_olecf</span>
+    <span class="p">]),</span>
+    <span class="c1"># zip, but will include jar, odt, ods, odp, docx, xlsx, pptx, apk</span>
+    <span class="n">_Entry</span><span class="p">(</span><span class="s1">&#39;application/zip&#39;</span><span class="p">,</span> <span class="p">[</span><span class="sa">b</span><span class="s1">&#39;PK</span><span class="se">\x03\x04</span><span class="s1">&#39;</span><span class="p">],</span> <span class="p">[</span><span class="n">_check_ooxml</span><span class="p">,</span> <span class="n">_check_open_container_format</span><span class="p">]),</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">_odoo_guess_mimetype</span><span class="p">(</span><span class="n">bin_data</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;application/octet-stream&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Attempts to guess the mime type of the provided binary data, similar</span>
+<span class="sd">    to but significantly more limited than libmagic</span>
+
+<span class="sd">    :param str bin_data: binary data to try and guess a mime type for</span>
+<span class="sd">    :returns: matched mimetype or ``application/octet-stream`` if none matched</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># by default, guess the type using the magic number of file hex signature (like magic, but more limited)</span>
+    <span class="c1"># see http://www.filesignatures.net/ for file signatures</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">_mime_mappings</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">signature</span> <span class="ow">in</span> <span class="n">entry</span><span class="o">.</span><span class="n">signatures</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">bin_data</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">signature</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">discriminant</span> <span class="ow">in</span> <span class="n">entry</span><span class="o">.</span><span class="n">discriminants</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">guess</span> <span class="o">=</span> <span class="n">discriminant</span><span class="p">(</span><span class="n">bin_data</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">guess</span><span class="p">:</span> <span class="k">return</span> <span class="n">guess</span>
+                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                        <span class="c1"># log-and-next</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;guess_mimetype&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                            <span class="s2">&quot;Sub-checker &#39;</span><span class="si">%s</span><span class="s2">&#39; of type &#39;</span><span class="si">%s</span><span class="s2">&#39; failed&quot;</span><span class="p">,</span>
+                            <span class="n">discriminant</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span>
+                            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+                        <span class="p">)</span>
+                <span class="c1"># if no discriminant or no discriminant matches, return</span>
+                <span class="c1"># primary mime type</span>
+                <span class="k">return</span> <span class="n">entry</span><span class="o">.</span><span class="n">mimetype</span>
+    <span class="k">return</span> <span class="n">default</span>
+
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">magic</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">magic</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">if</span> <span class="n">magic</span><span class="p">:</span>
+    <span class="c1"># There are 2 python libs named &#39;magic&#39; with incompatible api.</span>
+    <span class="c1"># magic from pypi https://pypi.python.org/pypi/python-magic/</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">magic</span><span class="p">,</span> <span class="s1">&#39;from_buffer&#39;</span><span class="p">):</span>
+        <span class="n">_guesser</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">magic</span><span class="o">.</span><span class="n">from_buffer</span><span class="p">,</span> <span class="n">mime</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># magic from file(1) https://packages.debian.org/squeeze/python-magic</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">magic</span><span class="p">,</span> <span class="s1">&#39;open&#39;</span><span class="p">):</span>
+        <span class="n">ms</span> <span class="o">=</span> <span class="n">magic</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">magic</span><span class="o">.</span><span class="n">MAGIC_MIME_TYPE</span><span class="p">)</span>
+        <span class="n">ms</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+        <span class="n">_guesser</span> <span class="o">=</span> <span class="n">ms</span><span class="o">.</span><span class="n">buffer</span>
+
+<div class="viewcode-block" id="guess_mimetype">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mimetypes.guess_mimetype">[docs]</a>
+    <span class="k">def</span> <span class="nf">guess_mimetype</span><span class="p">(</span><span class="n">bin_data</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">mimetype</span> <span class="o">=</span> <span class="n">_guesser</span><span class="p">(</span><span class="n">bin_data</span><span class="p">[:</span><span class="mi">1024</span><span class="p">])</span>
+        <span class="c1"># upgrade incorrect mimetype to official one, fixed upstream</span>
+        <span class="c1"># https://github.com/file/file/commit/1a08bb5c235700ba623ffa6f3c95938fe295b262</span>
+        <span class="k">if</span> <span class="n">mimetype</span> <span class="o">==</span> <span class="s1">&#39;image/svg&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;image/svg+xml&#39;</span>
+        <span class="k">return</span> <span class="n">mimetype</span></div>
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">guess_mimetype</span> <span class="o">=</span> <span class="n">_odoo_guess_mimetype</span>
+
+
+<span class="k">def</span> <span class="nf">neuter_mimetype</span><span class="p">(</span><span class="n">mimetype</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="n">wrong_type</span> <span class="o">=</span> <span class="s1">&#39;ht&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span> <span class="ow">or</span> <span class="s1">&#39;xml&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span> <span class="ow">or</span> <span class="s1">&#39;svg&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span>
+    <span class="k">if</span> <span class="n">wrong_type</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">user</span><span class="o">.</span><span class="n">_is_system</span><span class="p">():</span>
+        <span class="k">return</span> <span class="s1">&#39;text/plain&#39;</span>
+    <span class="k">return</span> <span class="n">mimetype</span>
+
+<span class="k">def</span> <span class="nf">get_extension</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+    <span class="c1"># A file has no extension if it has no dot (ignoring the leading one</span>
+    <span class="c1"># of hidden files) or that what follow the last dot is not a single</span>
+    <span class="c1"># word, e.g. &quot;Mr. Doe&quot;</span>
+    <span class="n">_stem</span><span class="p">,</span> <span class="n">dot</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dot</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">ext</span><span class="o">.</span><span class="n">isalnum</span><span class="p">():</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="c1"># Assume all 4-chars extensions to be valid extensions even if it is</span>
+    <span class="c1"># not known from the mimetypes database. In /etc/mime.types, only 7%</span>
+    <span class="c1"># known extensions are longer.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="c1"># Use the mimetype database to determine the extension of the file.</span>
+    <span class="n">guessed_mimetype</span><span class="p">,</span> <span class="n">guessed_ext</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">guessed_ext</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">guessed_ext</span>
+    <span class="k">if</span> <span class="n">guessed_mimetype</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="c1"># Unknown extension.</span>
+    <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.sourcemap_generator &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.sourcemap_generator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.sourcemap_generator</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
+<span class="kn">import</span> <span class="nn">json</span>
+
+
+<div class="viewcode-block" id="SourceMapGenerator">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sourcemap_generator.SourceMapGenerator">[docs]</a>
+<span class="k">class</span> <span class="nc">SourceMapGenerator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The SourceMapGenerator creates the sourcemap maps the asset bundle to the js/css files.</span>
+
+<span class="sd">    What is a sourcemap ? (https://developer.mozilla.org/en-US/docs/Tools/Debugger/How_to/Use_a_source_map)</span>
+<span class="sd">    In brief: a source map is what makes possible to debug your processed/compiled/minified code as if you were</span>
+<span class="sd">    debugging the original, non-altered source code. It is a file that provides a mapping original &lt;=&gt; processed for</span>
+<span class="sd">    the browser to read.</span>
+
+<span class="sd">    This implementation of the SourceMapGenerator is a translation and adaptation of this implementation</span>
+<span class="sd">    in js https://github.com/mozilla/source-map. For performance purposes, we have removed all unnecessary</span>
+<span class="sd">    functions/steps for our use case. This simpler version does a line by line mapping, with the ability to</span>
+<span class="sd">    add offsets at the start and end of a file. (when we have to add comments on top a transpiled file by example).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_root</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_file</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_source_root</span> <span class="o">=</span> <span class="n">source_root</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mappings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sources_contents</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_version</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">_serialize_mappings</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A source map mapping is encoded with the base 64 VLQ format.</span>
+<span class="sd">        This function encodes the readable source to the format.</span>
+
+<span class="sd">        :return the encoded content</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">previous_generated_line</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">previous_original_line</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">previous_source</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">encoded_column</span> <span class="o">=</span> <span class="n">base64vlq_encode</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mappings</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;generatedLine&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">previous_generated_line</span><span class="p">:</span>
+                <span class="k">while</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;generatedLine&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">previous_generated_line</span><span class="p">:</span>
+                    <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;;&quot;</span>
+                    <span class="n">previous_generated_line</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">sourceIdx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">[</span><span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]]</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">sourceIdx</span> <span class="o">-</span> <span class="n">previous_source</span>
+                <span class="n">previous_source</span> <span class="o">=</span> <span class="n">sourceIdx</span>
+
+                <span class="c1"># lines are stored 0-based in SourceMap spec version 3</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;originalLine&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">previous_original_line</span>
+                <span class="n">previous_original_line</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;originalLine&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[(</span><span class="n">source</span><span class="p">,</span> <span class="n">line</span><span class="p">)]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+                    <span class="n">encoded_column</span><span class="p">,</span>
+                    <span class="n">base64vlq_encode</span><span class="p">(</span><span class="n">source</span><span class="p">),</span>
+                    <span class="n">base64vlq_encode</span><span class="p">(</span><span class="n">line</span><span class="p">),</span>
+                    <span class="n">encoded_column</span><span class="p">,</span>
+                <span class="p">])</span>
+
+            <span class="n">result</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">source</span><span class="p">,</span> <span class="n">line</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="SourceMapGenerator.to_json">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sourcemap_generator.SourceMapGenerator.to_json">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates the json sourcemap.</span>
+<span class="sd">        It is the main function that assembles all the pieces.</span>
+
+<span class="sd">        :return {str} valid sourcemap in json format</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_version</span><span class="p">,</span>
+            <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+            <span class="s2">&quot;mappings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_serialize_mappings</span><span class="p">(),</span>
+            <span class="s2">&quot;sourcesContent&quot;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_sources_contents</span><span class="p">[</span><span class="n">source</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file</span><span class="p">:</span>
+            <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_source_root</span><span class="p">:</span>
+            <span class="n">mapping</span><span class="p">[</span><span class="s2">&quot;sourceRoot&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_source_root</span>
+
+        <span class="k">return</span> <span class="n">mapping</span></div>
+
+
+<div class="viewcode-block" id="SourceMapGenerator.get_content">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sourcemap_generator.SourceMapGenerator.get_content">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_content</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the content of the sourcemap.</span>
+
+<span class="sd">        :return the content of the sourcemap as a string encoded in UTF-8.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Store with XSSI-prevention prefix</span>
+        <span class="k">return</span> <span class="sa">b</span><span class="s2">&quot;)]}&#39;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf8&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SourceMapGenerator.add_source">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sourcemap_generator.SourceMapGenerator.add_source">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_name</span><span class="p">,</span> <span class="n">source_content</span><span class="p">,</span> <span class="n">last_index</span><span class="p">,</span> <span class="n">start_offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds a new source file in the sourcemap. All the lines of the source file will be mapped line by line</span>
+<span class="sd">        to the generated file from the (last_index + start_offset). All lines between</span>
+<span class="sd">        last_index and (last_index + start_offset) will</span>
+<span class="sd">        be mapped to line 1 of the source file.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            ls 1 = Line 1 from new source file</span>
+<span class="sd">            lg 1 = Line 1 from genereted file</span>
+<span class="sd">            ls 1 &lt;=&gt; lg 1 Line 1 from new source file is map to  Line 1 from genereted file</span>
+<span class="sd">            nb_ls = number of lines in the new source file</span>
+
+<span class="sd">            Step 1:</span>
+<span class="sd">            ls 1 &lt;=&gt; lg last_index + 1</span>
+
+<span class="sd">            Step 2:</span>
+<span class="sd">            ls 1 &lt;=&gt; lg last_index + start_offset + 1</span>
+<span class="sd">            ls 2 &lt;=&gt; lg last_index + start_offset + 2</span>
+<span class="sd">            ...</span>
+<span class="sd">            ls nb_ls &lt;=&gt; lg last_index + start_offset + nb_ls</span>
+
+
+<span class="sd">        :param source_name: name of the source to add</span>
+<span class="sd">        :param source_content: content of the source to add</span>
+<span class="sd">        :param last_index: Line where we start to map the new source</span>
+<span class="sd">        :param start_offset: Number of lines to pass in the generated file before starting mapping line by line</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">source_line_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">source_content</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">source_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sources_contents</span><span class="p">[</span><span class="n">source_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">source_content</span>
+        <span class="k">if</span> <span class="n">start_offset</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># adds a mapping between the first line of the source</span>
+            <span class="c1"># and the first line of the corresponding code in the generated file.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mappings</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;generatedLine&quot;</span><span class="p">:</span> <span class="n">last_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;originalLine&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source_name</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">source_line_count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mappings</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;generatedLine&quot;</span><span class="p">:</span> <span class="n">last_index</span> <span class="o">+</span> <span class="n">i</span> <span class="o">+</span> <span class="n">start_offset</span><span class="p">,</span>
+                <span class="s2">&quot;originalLine&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">,</span>
+                <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source_name</span><span class="p">,</span>
+            <span class="p">})</span></div>
+</div>
+
+
+
+<span class="n">B64CHARS</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/&quot;</span>
+<span class="n">SHIFTSIZE</span><span class="p">,</span> <span class="n">FLAG</span><span class="p">,</span> <span class="n">MASK</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">5</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">5</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="base64vlq_encode">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sourcemap_generator.base64vlq_encode">[docs]</a>
+<span class="nd">@lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">64</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">base64vlq_encode</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encode Base64 VLQ encoded sequences</span>
+<span class="sd">    https://gist.github.com/mjpieters/86b0d152bb51d5f5979346d11005588b</span>
+<span class="sd">    Base64 VLQ is used in source maps.</span>
+<span class="sd">    VLQ values consist of 6 bits (matching the 64 characters of the Base64</span>
+<span class="sd">    alphabet), with the most significant bit a *continuation* flag. If the</span>
+<span class="sd">    flag is set, then the next character in the input is part of the same</span>
+<span class="sd">    integer value. Multiple VLQ character sequences so form an unbounded</span>
+<span class="sd">    integer value, in little-endian order.</span>
+<span class="sd">    The *first* VLQ value consists of a continuation flag, 4 bits for the</span>
+<span class="sd">    value, and the last bit the *sign* of the integer:</span>
+<span class="sd">    +-----+-----+-----+-----+-----+-----+</span>
+<span class="sd">    |  c  |  b3 |  b2 |  b1 |  b0 |  s  |</span>
+<span class="sd">    +-----+-----+-----+-----+-----+-----+</span>
+<span class="sd">    while subsequent VLQ characters contain 5 bits of value:</span>
+<span class="sd">    +-----+-----+-----+-----+-----+-----+</span>
+<span class="sd">    |  c  |  b4 |  b3 |  b2 |  b1 |  b0 |</span>
+<span class="sd">    +-----+-----+-----+-----+-----+-----+</span>
+<span class="sd">    For source maps, Base64 VLQ sequences can contain 1, 4 or 5 elements.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">add</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">append</span>
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+        <span class="c1"># add sign bit</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">|</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">toencode</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">v</span> <span class="o">&amp;</span> <span class="n">MASK</span><span class="p">,</span> <span class="n">v</span> <span class="o">&gt;&gt;</span> <span class="n">SHIFTSIZE</span>
+            <span class="n">add</span><span class="p">(</span><span class="n">toencode</span> <span class="o">|</span> <span class="p">(</span><span class="n">v</span> <span class="ow">and</span> <span class="n">FLAG</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span><span class="p">:</span>
+                <span class="k">break</span>
+    <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">B64CHARS</span><span class="o">.</span><span class="fm">__getitem__</span><span class="p">,</span> <span class="n">results</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

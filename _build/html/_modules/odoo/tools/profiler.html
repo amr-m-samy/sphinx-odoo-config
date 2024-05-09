@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.profiler &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.profiler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.profiler</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">gc</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">sql</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">tools</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># ensure we have a non patched time for profiling times when using freezegun</span>
+<span class="n">real_datetime_now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span>
+<span class="n">real_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="o">.</span><span class="fm">__call__</span>
+
+<span class="k">def</span> <span class="nf">_format_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_code</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">co_filename</span><span class="p">,</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_lineno</span><span class="p">,</span> <span class="n">code</span><span class="o">.</span><span class="n">co_name</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_format_stack</span><span class="p">(</span><span class="n">stack</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="get_current_frame">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.get_current_frame">[docs]</a>
+<span class="k">def</span> <span class="nf">get_current_frame</span><span class="p">(</span><span class="n">thread</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">thread</span><span class="p">:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">_current_frames</span><span class="p">()[</span><span class="n">thread</span><span class="o">.</span><span class="n">ident</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">_getframe</span><span class="p">()</span>
+    <span class="k">while</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_filename</span> <span class="o">==</span> <span class="vm">__file__</span><span class="p">:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_back</span>
+    <span class="k">return</span> <span class="n">frame</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_get_stack_trace</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">limit_frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">stack</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">while</span> <span class="n">frame</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">frame</span> <span class="o">!=</span> <span class="n">limit_frame</span><span class="p">:</span>
+        <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_format_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">))</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_back</span>
+    <span class="k">if</span> <span class="n">frame</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">limit_frame</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Limit frame was not found&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">stack</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="stack_size">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.stack_size">[docs]</a>
+<span class="k">def</span> <span class="nf">stack_size</span><span class="p">():</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">get_current_frame</span><span class="p">()</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">frame</span><span class="p">:</span>
+        <span class="n">size</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_back</span>
+    <span class="k">return</span> <span class="n">size</span></div>
+
+
+
+<div class="viewcode-block" id="make_session">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.make_session">[docs]</a>
+<span class="k">def</span> <span class="nf">make_session</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">real_datetime_now</span><span class="p">()</span><span class="si">:</span><span class="s1">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span></div>
+
+
+
+<div class="viewcode-block" id="force_hook">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.force_hook">[docs]</a>
+<span class="k">def</span> <span class="nf">force_hook</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Force periodic profiling collectors to generate some stack trace.  This is</span>
+<span class="sd">    useful before long calls that do not release the GIL, so that the time</span>
+<span class="sd">    spent in those calls is attributed to a specific stack trace, instead of</span>
+<span class="sd">    some arbitrary former frame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thread</span><span class="p">,</span> <span class="s1">&#39;profile_hooks&#39;</span><span class="p">,</span> <span class="p">()):</span>
+        <span class="n">func</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="Collector">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector">[docs]</a>
+<span class="k">class</span> <span class="nc">Collector</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for objects that collect profiling data.</span>
+
+<span class="sd">    A collector object is used by a profiler to collect profiling data, most</span>
+<span class="sd">    likely a list of stack traces with time and some context information added</span>
+<span class="sd">    by ExecutionContext decorator on current thread.</span>
+
+<span class="sd">    This is a generic implementation of a basic collector, to be inherited.</span>
+<span class="sd">    It defines default behaviors for creating an entry in the collector.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="kc">None</span>                 <span class="c1"># symbolic name of the collector</span>
+    <span class="n">_registry</span> <span class="o">=</span> <span class="p">{}</span>              <span class="c1"># map collector names to their class</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>
+
+<div class="viewcode-block" id="Collector.make">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector.make">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">make</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Instantiate a collector corresponding to the given name. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_processed</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Collector.start">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Start the collector. &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Collector.stop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector.stop">[docs]</a>
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Stop the collector. &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Collector.add">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add an entry (dict) to this collector. &quot;&quot;&quot;</span>
+        <span class="c1"># todo add entry count limit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_stack_trace</span><span class="p">(</span><span class="n">frame</span><span class="p">),</span>
+            <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="p">,</span> <span class="s1">&#39;exec_context&#39;</span><span class="p">,</span> <span class="p">()),</span>
+            <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">real_time</span><span class="p">(),</span>
+            <span class="o">**</span><span class="p">(</span><span class="n">entry</span> <span class="ow">or</span> <span class="p">{}),</span>
+        <span class="p">})</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_stack_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the stack trace to be included in a given entry. &quot;&quot;&quot;</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span> <span class="ow">or</span> <span class="n">get_current_frame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_get_stack_trace</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_frame</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Collector.post_process">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Collector.post_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">post_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">:</span>
+            <span class="n">stack</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;stack&#39;</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">_add_file_lines</span><span class="p">(</span><span class="n">stack</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entries</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the entries of the collector after postprocessing. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">post_process</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_processed</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span></div>
+
+
+
+<div class="viewcode-block" id="SQLCollector">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SQLCollector">[docs]</a>
+<span class="k">class</span> <span class="nc">SQLCollector</span><span class="p">(</span><span class="n">Collector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Saves all executed queries in the current thread with the call stack.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;sql&#39;</span>
+
+<div class="viewcode-block" id="SQLCollector.start">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SQLCollector.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">init_thread</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">init_thread</span><span class="p">,</span> <span class="s1">&#39;query_hooks&#39;</span><span class="p">):</span>
+            <span class="n">init_thread</span><span class="o">.</span><span class="n">query_hooks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">init_thread</span><span class="o">.</span><span class="n">query_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hook</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SQLCollector.stop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SQLCollector.stop">[docs]</a>
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="o">.</span><span class="n">query_hooks</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hook</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SQLCollector.hook">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SQLCollector.hook">[docs]</a>
+    <span class="k">def</span> <span class="nf">hook</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">query_start</span><span class="p">,</span> <span class="n">query_time</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">({</span>
+            <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">query</span><span class="p">),</span>
+            <span class="s1">&#39;full_query&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">_format</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">)),</span>
+            <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">query_start</span><span class="p">,</span>
+            <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">query_time</span><span class="p">,</span>
+        <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PeriodicCollector">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.PeriodicCollector">[docs]</a>
+<span class="k">class</span> <span class="nc">PeriodicCollector</span><span class="p">(</span><span class="n">Collector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Record execution frames asynchronously at most every `interval` seconds.</span>
+
+<span class="sd">    :param interval (float): time to wait in seconds between two samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;traces_async&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mf">0.01</span><span class="p">):</span>  <span class="c1"># check duration. dynamic?</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame_interval</span> <span class="o">=</span> <span class="n">interval</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_frame</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="PeriodicCollector.run">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.PeriodicCollector.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">last_time</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>  <span class="c1"># maybe add a check on parent_thread state?</span>
+            <span class="n">duration</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span> <span class="o">-</span> <span class="n">last_time</span>
+            <span class="k">if</span> <span class="n">duration</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_interval</span> <span class="o">*</span> <span class="mi">10</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_frame</span><span class="p">:</span>
+                <span class="c1"># The profiler has unexpectedly slept for more than 10 frame intervals. This may</span>
+                <span class="c1"># happen when calling a C library without releasing the GIL. In that case, the</span>
+                <span class="c1"># last frame was taken before the call, and the next frame is after the call, and</span>
+                <span class="c1"># the call itself does not appear in any of those frames: the duration of the call</span>
+                <span class="c1"># is incorrectly attributed to the last frame.</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;stack&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;profiling&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;⚠ Profiler freezed for </span><span class="si">%s</span><span class="s1"> s&#39;</span> <span class="o">%</span> <span class="n">duration</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">last_frame</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># skip duplicate detection for the next frame.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">()</span>
+            <span class="n">last_time</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_interval</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[],</span> <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">real_time</span><span class="p">()})</span>  <span class="c1"># add final end frame</span></div>
+
+
+<div class="viewcode-block" id="PeriodicCollector.start">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.PeriodicCollector.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">interval</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;traces_async_interval&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">interval</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">frame_interval</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">interval</span><span class="p">),</span> <span class="mf">0.001</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">init_thread</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">init_thread</span><span class="p">,</span> <span class="s1">&#39;profile_hooks&#39;</span><span class="p">):</span>
+            <span class="n">init_thread</span><span class="o">.</span><span class="n">profile_hooks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">init_thread</span><span class="o">.</span><span class="n">profile_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PeriodicCollector.stop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.PeriodicCollector.stop">[docs]</a>
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="o">.</span><span class="n">profile_hooks</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PeriodicCollector.add">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.PeriodicCollector.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add an entry (dict) to this collector. &quot;&quot;&quot;</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span> <span class="ow">or</span> <span class="n">get_current_frame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">frame</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_frame</span><span class="p">:</span>
+            <span class="c1"># don&#39;t save if the frame is exactly the same as the previous one.</span>
+            <span class="c1"># maybe modify the last entry to add a last seen?</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_frame</span> <span class="o">=</span> <span class="n">frame</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">entry</span><span class="o">=</span><span class="n">entry</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="n">frame</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SyncCollector">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SyncCollector">[docs]</a>
+<span class="k">class</span> <span class="nc">SyncCollector</span><span class="p">(</span><span class="n">Collector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Record complete execution synchronously.</span>
+<span class="sd">    Note that --limit-memory-hard may need to be increased when launching Odoo.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;traces_sync&#39;</span>
+
+<div class="viewcode-block" id="SyncCollector.start">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SyncCollector.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processed</span><span class="p">,</span> <span class="s2">&quot;You cannot start SyncCollector after accessing entries.&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">settrace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hook</span><span class="p">)</span>  <span class="c1"># todo test setprofile, but maybe not multithread safe</span></div>
+
+
+<div class="viewcode-block" id="SyncCollector.stop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SyncCollector.stop">[docs]</a>
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">settrace</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SyncCollector.hook">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SyncCollector.hook">[docs]</a>
+    <span class="k">def</span> <span class="nf">hook</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_frame</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">_arg</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;line&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;event&#39;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span> <span class="s1">&#39;frame&#39;</span><span class="p">:</span> <span class="n">_format_frame</span><span class="p">(</span><span class="n">_frame</span><span class="p">)}</span>
+        <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;call&#39;</span> <span class="ow">and</span> <span class="n">_frame</span><span class="o">.</span><span class="n">f_back</span><span class="p">:</span>
+            <span class="c1"># we need the parent frame to determine the line number of the call</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s1">&#39;parent_frame&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_format_frame</span><span class="p">(</span><span class="n">_frame</span><span class="o">.</span><span class="n">f_back</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="n">_frame</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">hook</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_stack_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># Getting the full stack trace is slow, and not useful in this case.</span>
+        <span class="c1"># SyncCollector only saves the top frame and event at each call and</span>
+        <span class="c1"># recomputes the complete stack at the end.</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="SyncCollector.post_process">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.SyncCollector.post_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">post_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Transform the evented traces to full stack traces. This processing</span>
+        <span class="c1"># could be avoided since speedscope will transform that back to</span>
+        <span class="c1"># evented anyway, but it is actually simpler to integrate into the</span>
+        <span class="c1"># current speedscope logic, especially when mixed with SQLCollector.</span>
+        <span class="c1"># We could improve it by saving as evented and manage it later.</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">:</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;frame&#39;</span><span class="p">)</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;event&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;call&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">stack</span><span class="p">:</span>
+                    <span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;parent_frame&#39;</span><span class="p">)</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;return&#39;</span><span class="p">:</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s1">&#39;stack&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stack</span><span class="p">[:]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">post_process</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QwebTracker">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker">[docs]</a>
+<span class="k">class</span> <span class="nc">QwebTracker</span><span class="p">():</span>
+
+<div class="viewcode-block" id="QwebTracker.wrap_render">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker.wrap_render">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">wrap_render</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">method_render</span><span class="p">):</span>
+        <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">method_render</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">_tracked_method_render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">):</span>
+            <span class="n">current_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+            <span class="n">execution_context_enabled</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;profiler_params&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;execution_context_qweb&#39;</span><span class="p">)</span>
+            <span class="n">qweb_hooks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;qweb_hooks&#39;</span><span class="p">,</span> <span class="p">())</span>
+            <span class="k">if</span> <span class="n">execution_context_enabled</span> <span class="ow">or</span> <span class="n">qweb_hooks</span><span class="p">:</span>
+                <span class="c1"># To have the new compilation cached because the generated code will change.</span>
+                <span class="c1"># Therefore &#39;profile&#39; is a key to the cache.</span>
+                <span class="n">options</span><span class="p">[</span><span class="s1">&#39;profile&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">return</span> <span class="n">method_render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_tracked_method_render</span></div>
+
+
+<div class="viewcode-block" id="QwebTracker.wrap_compile">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker.wrap_compile">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">wrap_compile</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">method_compile</span><span class="p">):</span>
+        <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">method_compile</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">_tracked_compile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">method_compile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
+
+            <span class="n">template_functions</span><span class="p">,</span> <span class="n">def_name</span> <span class="o">=</span> <span class="n">method_compile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
+            <span class="n">render_template</span> <span class="o">=</span> <span class="n">template_functions</span><span class="p">[</span><span class="n">def_name</span><span class="p">]</span>
+
+            <span class="k">def</span> <span class="nf">profiled_method_compile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+                <span class="n">options</span> <span class="o">=</span> <span class="n">template_functions</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span>
+                <span class="n">ref</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ref&#39;</span><span class="p">)</span>
+                <span class="n">ref_xml</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ref_xml&#39;</span><span class="p">)</span>
+                <span class="n">qweb_tracker</span> <span class="o">=</span> <span class="n">QwebTracker</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">ref_xml</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+                <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">qweb_tracker</span><span class="o">=</span><span class="n">qweb_tracker</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">qweb_tracker</span><span class="o">.</span><span class="n">execution_context_enabled</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">ExecutionContext</span><span class="p">(</span><span class="n">template</span><span class="o">=</span><span class="n">ref</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="n">render_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">render_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+            <span class="n">template_functions</span><span class="p">[</span><span class="n">def_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">profiled_method_compile</span>
+
+            <span class="k">return</span> <span class="p">(</span><span class="n">template_functions</span><span class="p">,</span> <span class="n">def_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_tracked_compile</span></div>
+
+
+<div class="viewcode-block" id="QwebTracker.wrap_compile_directive">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker.wrap_compile_directive">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">wrap_compile_directive</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">method_compile_directive</span><span class="p">):</span>
+        <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">method_compile_directive</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">_tracked_compile_directive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">directive</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;inner-content&#39;</span><span class="p">,</span> <span class="s1">&#39;tag-open&#39;</span><span class="p">,</span> <span class="s1">&#39;tag-close&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">method_compile_directive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+            <span class="n">enter</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">level</span><span class="si">}</span><span class="s2">self.env.context[&#39;qweb_tracker&#39;].enter_directive(</span><span class="si">{</span><span class="n">directive</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;_qweb_error_path_xml&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+            <span class="n">leave</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">level</span><span class="si">}</span><span class="s2">self.env.context[&#39;qweb_tracker&#39;].leave_directive(</span><span class="si">{</span><span class="n">directive</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;_qweb_error_path_xml&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+            <span class="n">code_directive</span> <span class="o">=</span> <span class="n">method_compile_directive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">enter</span><span class="p">,</span> <span class="o">*</span><span class="n">code_directive</span><span class="p">,</span> <span class="n">leave</span><span class="p">]</span> <span class="k">if</span> <span class="n">code_directive</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="n">_tracked_compile_directive</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">view_id</span><span class="p">,</span> <span class="n">arch</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+        <span class="n">current_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>  <span class="c1"># don&#39;t store current_thread on self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">execution_context_enabled</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;profiler_params&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;execution_context_qweb&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qweb_hooks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;qweb_hooks&#39;</span><span class="p">,</span> <span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_stack</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cr</span> <span class="o">=</span> <span class="n">cr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">view_id</span> <span class="o">=</span> <span class="n">view_id</span>
+        <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">qweb_hooks</span><span class="p">:</span>
+            <span class="n">hook</span><span class="p">(</span><span class="s1">&#39;render&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span><span class="p">,</span> <span class="n">view_id</span><span class="o">=</span><span class="n">view_id</span><span class="p">,</span> <span class="n">arch</span><span class="o">=</span><span class="n">arch</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QwebTracker.enter_directive">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker.enter_directive">[docs]</a>
+    <span class="k">def</span> <span class="nf">enter_directive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">attrib</span><span class="p">,</span> <span class="n">xpath</span><span class="p">):</span>
+        <span class="n">execution_context</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context_enabled</span><span class="p">:</span>
+            <span class="n">directive_info</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="p">(</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">)</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;set&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s1">&#39;t-value&#39;</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-value&#39;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="s1">&#39;t-valuef&#39;</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-valuef&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-valuef&#39;</span><span class="p">])</span>
+
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-set-&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-setf-&#39;</span><span class="p">):</span>
+                        <span class="n">directive_info</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;foreach&#39;</span><span class="p">:</span>
+                <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-as&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-as&#39;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;groups&#39;</span> <span class="ow">and</span> <span class="s1">&#39;groups&#39;</span> <span class="ow">in</span> <span class="n">attrib</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">directive_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;t-groups&#39;</span><span class="p">):</span>
+                <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-groups&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;groups&#39;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;att&#39;</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-att-&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-attf-&#39;</span><span class="p">):</span>
+                        <span class="n">directive_info</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;options&#39;</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-options-&#39;</span><span class="p">):</span>
+                        <span class="n">directive_info</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="n">directive_info</span><span class="p">[</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="n">execution_context</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">ExecutionContext</span><span class="p">(</span><span class="o">**</span><span class="n">directive_info</span><span class="p">,</span> <span class="n">xpath</span><span class="o">=</span><span class="n">xpath</span><span class="p">)</span>
+            <span class="n">execution_context</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">execution_context</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">qweb_hooks</span><span class="p">:</span>
+            <span class="n">hook</span><span class="p">(</span><span class="s1">&#39;enter&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span><span class="p">,</span> <span class="n">view_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">view_id</span><span class="p">,</span> <span class="n">xpath</span><span class="o">=</span><span class="n">xpath</span><span class="p">,</span> <span class="n">directive</span><span class="o">=</span><span class="n">directive</span><span class="p">,</span> <span class="n">attrib</span><span class="o">=</span><span class="n">attrib</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QwebTracker.leave_directive">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebTracker.leave_directive">[docs]</a>
+    <span class="k">def</span> <span class="nf">leave_directive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">attrib</span><span class="p">,</span> <span class="n">xpath</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context_enabled</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">qweb_hooks</span><span class="p">:</span>
+            <span class="n">hook</span><span class="p">(</span><span class="s1">&#39;leave&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span><span class="p">,</span> <span class="n">view_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">view_id</span><span class="p">,</span> <span class="n">xpath</span><span class="o">=</span><span class="n">xpath</span><span class="p">,</span> <span class="n">directive</span><span class="o">=</span><span class="n">directive</span><span class="p">,</span> <span class="n">attrib</span><span class="o">=</span><span class="n">attrib</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QwebCollector">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebCollector">[docs]</a>
+<span class="k">class</span> <span class="nc">QwebCollector</span><span class="p">(</span><span class="n">Collector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Record qweb execution with directive trace.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;qweb&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">events</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span> <span class="nf">hook</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">sql_log_count</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">event</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">sql_log_count</span><span class="p">,</span> <span class="n">real_time</span><span class="p">()))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hook</span> <span class="o">=</span> <span class="n">hook</span>
+
+    <span class="k">def</span> <span class="nf">_get_directive_profiling_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">attrib</span><span class="p">):</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;set&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;t-set&#39;</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t-set=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-set&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="s1">&#39;t-value&#39;</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="n">expr</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; t-value=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-value&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="s1">&#39;t-valuef&#39;</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                    <span class="n">expr</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; t-valuef=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-valuef&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-set-&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-setf-&#39;</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">expr</span><span class="p">:</span>
+                        <span class="n">expr</span> <span class="o">+=</span> <span class="s1">&#39; &#39;</span>
+                    <span class="n">expr</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;foreach&#39;</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t-foreach=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-foreach&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> t-as=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-as&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;options&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;t-options&#39;</span><span class="p">):</span>
+                <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t-options=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-options&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-options-&#39;</span><span class="p">):</span>
+                    <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="s1">&#39;att&#39;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;t-att&#39;</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-att-&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;t-attf-&#39;</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">expr</span><span class="p">:</span>
+                        <span class="n">expr</span> <span class="o">+=</span> <span class="s1">&#39; &#39;</span>
+                    <span class="n">expr</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="s1">&#39;t-&#39;</span> <span class="o">+</span> <span class="n">directive</span><span class="p">)</span> <span class="ow">in</span> <span class="n">attrib</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t-</span><span class="si">{</span><span class="n">directive</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;t-&#39;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">directive</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t-</span><span class="si">{</span><span class="n">directive</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">expr</span>
+
+<div class="viewcode-block" id="QwebCollector.start">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebCollector.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">init_thread</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">init_thread</span><span class="p">,</span> <span class="s1">&#39;qweb_hooks&#39;</span><span class="p">):</span>
+            <span class="n">init_thread</span><span class="o">.</span><span class="n">qweb_hooks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">init_thread</span><span class="o">.</span><span class="n">qweb_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hook</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QwebCollector.stop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebCollector.stop">[docs]</a>
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">init_thread</span><span class="o">.</span><span class="n">qweb_hooks</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hook</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QwebCollector.post_process">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.QwebCollector.post_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">post_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">last_event_query</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">last_event_time</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">archs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">event</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">sql_count</span><span class="p">,</span> <span class="n">time</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;render&#39;</span><span class="p">:</span>
+                <span class="n">archs</span><span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;view_id&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;arch&#39;</span><span class="p">]</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># update the active directive with the elapsed time and queries</span>
+            <span class="k">if</span> <span class="n">stack</span><span class="p">:</span>
+                <span class="n">top</span> <span class="o">=</span> <span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">top</span><span class="p">[</span><span class="s1">&#39;delay&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">time</span> <span class="o">-</span> <span class="n">last_event_time</span>
+                <span class="n">top</span><span class="p">[</span><span class="s1">&#39;query&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">sql_count</span> <span class="o">-</span> <span class="n">last_event_query</span>
+            <span class="n">last_event_time</span> <span class="o">=</span> <span class="n">time</span>
+            <span class="n">last_event_query</span> <span class="o">=</span> <span class="n">sql_count</span>
+
+            <span class="n">directive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_directive_profiling_name</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;directive&#39;</span><span class="p">],</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;attrib&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">directive</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;enter&#39;</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;view_id&#39;</span><span class="p">],</span>
+                        <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;xpath&#39;</span><span class="p">],</span>
+                        <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="n">directive</span><span class="p">,</span>
+                        <span class="s1">&#39;delay&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                        <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="p">}</span>
+                    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">event</span> <span class="o">==</span> <span class="s2">&quot;leave&quot;</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">({</span><span class="s1">&#39;results&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;archs&#39;</span><span class="p">:</span> <span class="n">archs</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">results</span><span class="p">}})</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">post_process</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ExecutionContext">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.ExecutionContext">[docs]</a>
+<span class="k">class</span> <span class="nc">ExecutionContext</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add some context on thread at current call stack level.</span>
+<span class="sd">    This context stored by collector beside stack and is used by Speedscope</span>
+<span class="sd">    to add a level to the stack with this information.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">previous_context</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">current_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">previous_context</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;exec_context&#39;</span><span class="p">,</span> <span class="p">())</span>
+        <span class="n">current_thread</span><span class="o">.</span><span class="n">exec_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">previous_context</span> <span class="o">+</span> <span class="p">((</span><span class="n">stack_size</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">),)</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_args</span><span class="p">):</span>
+        <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">exec_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">previous_context</span></div>
+
+
+
+<div class="viewcode-block" id="Profiler">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Profiler">[docs]</a>
+<span class="k">class</span> <span class="nc">Profiler</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Context manager to use to start the recording of some execution.</span>
+<span class="sd">    Will save sql and async stack trace by default.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">db</span><span class="o">=...</span><span class="p">,</span> <span class="n">profile_session</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">disable_gc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param db: database name to use to save results.</span>
+<span class="sd">            Will try to define database automatically by default.</span>
+<span class="sd">            Use value ``None`` to not save results in a database.</span>
+<span class="sd">        :param collectors: list of string and Collector object Ex: [&#39;sql&#39;, PeriodicCollector(interval=0.2)]. Use `None` for default collectors</span>
+<span class="sd">        :param profile_session: session description to use to reproup multiple profile. use make_session(name) for default format.</span>
+<span class="sd">        :param description: description of the current profiler Suggestion: (route name/test method/loading module, ...)</span>
+<span class="sd">        :param disable_gc: flag to disable gc durring profiling (usefull to avoid gc while profiling, especially during sql execution)</span>
+<span class="sd">        :param params: parameters usable by collectors (like frame interval)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profile_session</span> <span class="o">=</span> <span class="n">profile_session</span> <span class="ow">or</span> <span class="n">make_session</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">description</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_frame</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_thread</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disable_gc</span> <span class="o">=</span> <span class="n">disable_gc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filecache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="n">params</span> <span class="ow">or</span> <span class="p">{}</span>  <span class="c1"># custom parameters usable by collectors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profile_id</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">db</span> <span class="ow">is</span> <span class="o">...</span><span class="p">:</span>
+            <span class="c1"># determine database from current thread</span>
+            <span class="n">db</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s1">&#39;dbname&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">db</span><span class="p">:</span>
+                <span class="c1"># only raise if path is not given and db is not explicitely disabled</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Database name cannot be defined automaticaly. </span><span class="se">\n</span><span class="s1"> Please provide a valid/falsy dbname or path parameter&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">db</span>
+
+        <span class="c1"># collectors</span>
+        <span class="k">if</span> <span class="n">collectors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">collectors</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;sql&#39;</span><span class="p">,</span> <span class="s1">&#39;traces_async&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="n">collectors</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">collector</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="o">.</span><span class="n">make</span><span class="p">(</span><span class="n">collector</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not create collector with name </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">collector</span><span class="p">)</span>
+                    <span class="k">continue</span>
+            <span class="n">collector</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="bp">self</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">collector</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_frame</span> <span class="o">=</span> <span class="n">get_current_frame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_thread</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span> <span class="o">=</span> <span class="n">_get_stack_trace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_frame</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="c1"># when using thread pools (gevent) the thread won&#39;t exist in the current_frames</span>
+            <span class="c1"># this case is managed by http.py but will still fail when adding a profiler</span>
+            <span class="c1"># inside a piece of code that may be called by a longpolling route.</span>
+            <span class="c1"># in this case, avoid crashing the caller and disable all collectors</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Cannot start profiler, thread not found. Is the thread part of a thread pool?&quot;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">message</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_frame</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_code</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">code</span><span class="o">.</span><span class="n">co_filename</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">frame</span><span class="o">.</span><span class="n">f_lineno</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_thread</span><span class="o">.</span><span class="n">profiler_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">disable_gc</span> <span class="ow">and</span> <span class="n">gc</span><span class="o">.</span><span class="n">isenabled</span><span class="p">():</span>
+            <span class="n">gc</span><span class="o">.</span><span class="n">disable</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="p">:</span>
+            <span class="n">collector</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="p">:</span>
+                <span class="n">collector</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_add_file_lines</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">:</span>
+                <span class="c1"># pylint: disable=import-outside-toplevel</span>
+                <span class="kn">from</span> <span class="nn">odoo.sql_db</span> <span class="kn">import</span> <span class="n">db_connect</span>  <span class="c1"># only import from odoo if/when needed.</span>
+                <span class="k">with</span> <span class="n">db_connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">)</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                    <span class="n">values</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+                        <span class="s2">&quot;session&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">profile_session</span><span class="p">,</span>
+                        <span class="s2">&quot;create_date&quot;</span><span class="p">:</span> <span class="n">real_datetime_now</span><span class="p">(),</span>
+                        <span class="s2">&quot;init_stack_trace&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">_format_stack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">)),</span>
+                        <span class="s2">&quot;duration&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span>
+                        <span class="s2">&quot;entry_count&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_count</span><span class="p">(),</span>
+                        <span class="s2">&quot;sql_count&quot;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">)</span> <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span> <span class="k">if</span> <span class="n">collector</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;sql&#39;</span><span class="p">)</span>
+                    <span class="p">}</span>
+                    <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>
+                            <span class="n">values</span><span class="p">[</span><span class="n">collector</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">)</span>
+                    <span class="n">query</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;INSERT INTO </span><span class="si">{}</span><span class="s2">(</span><span class="si">{}</span><span class="s2">) VALUES </span><span class="si">%s</span><span class="s2"> RETURNING id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="s2">&quot;ir_profile&quot;</span><span class="p">),</span>
+                        <span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">,</span> <span class="n">values</span><span class="p">)),</span>
+                    <span class="p">)</span>
+                    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">values</span><span class="p">())])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">profile_id</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;ir_profile </span><span class="si">%s</span><span class="s1"> (</span><span class="si">%s</span><span class="s1">) created&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">profile_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">profile_session</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">disable_gc</span><span class="p">:</span>
+                <span class="n">gc</span><span class="o">.</span><span class="n">enable</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_thread</span><span class="o">.</span><span class="n">profiler_params</span>
+
+    <span class="k">def</span> <span class="nf">_add_file_lines</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">stack</span><span class="p">):</span>
+            <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span> <span class="o">=</span> <span class="n">frame</span>
+            <span class="k">if</span> <span class="n">line</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="c1"># retrieve file lines from the filecache</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">lineno</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">filelines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filecache</span><span class="p">[</span><span class="n">filename</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">tools</span><span class="o">.</span><span class="n">file_open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                        <span class="n">filelines</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">FileNotFoundError</span><span class="p">):</span>  <span class="c1"># mainly for &lt;decorator&gt; &quot;filename&quot;</span>
+                    <span class="n">filelines</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">filecache</span><span class="p">[</span><span class="n">filename</span><span class="p">]</span> <span class="o">=</span> <span class="n">filelines</span>
+            <span class="c1"># fill in the line</span>
+            <span class="k">if</span> <span class="n">filelines</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="n">filelines</span><span class="p">[</span><span class="n">lineno</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">stack</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Profiler.entry_count">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Profiler.entry_count">[docs]</a>
+    <span class="k">def</span> <span class="nf">entry_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the total number of entries collected in this profiler. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">)</span> <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Profiler.format_path">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Profiler.format_path">[docs]</a>
+    <span class="k">def</span> <span class="nf">format_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Utility function to format a path for this profiler.</span>
+<span class="sd">        This is mainly useful to uniquify a path between executions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">time</span><span class="o">=</span><span class="n">real_datetime_now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">-%H%M%S&quot;</span><span class="p">),</span>
+            <span class="nb">len</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">entry_count</span><span class="p">(),</span>
+            <span class="n">desc</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;[^0-9a-zA-Z-]+&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Profiler.json">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Profiler.json">[docs]</a>
+    <span class="k">def</span> <span class="nf">json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Utility function to generate a json version of this profiler.</span>
+<span class="sd">        This is useful to write profiling entries into a file, such as::</span>
+
+<span class="sd">            with Profiler(db=None) as profiler:</span>
+<span class="sd">                do_stuff()</span>
+
+<span class="sd">            filename = p.format_path(&#39;/home/foo/{desc}_{len}.json&#39;)</span>
+<span class="sd">            with open(filename, &#39;w&#39;) as f:</span>
+<span class="sd">                f.write(profiler.json())</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="s2">&quot;session&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">profile_session</span><span class="p">,</span>
+            <span class="s2">&quot;create_date&quot;</span><span class="p">:</span> <span class="n">real_datetime_now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">-%H%M%S&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;init_stack_trace&quot;</span><span class="p">:</span> <span class="n">_format_stack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">),</span>
+            <span class="s2">&quot;duration&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span>
+            <span class="s2">&quot;collectors&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">collector</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">collector</span><span class="o">.</span><span class="n">entries</span> <span class="k">for</span> <span class="n">collector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">collectors</span><span class="p">},</span>
+        <span class="p">},</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Nested">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.profiler.Nested">[docs]</a>
+<span class="k">class</span> <span class="nc">Nested</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Utility to nest another context manager inside a profiler.</span>
+
+<span class="sd">    The profiler should only be called directly in the &quot;with&quot; without nesting it</span>
+<span class="sd">    with ExitStack. If not, the retrieval of the &#39;init_frame&#39; may be incorrect</span>
+<span class="sd">    and lead to an error &quot;Limit frame was not found&quot; when profiling. Since the</span>
+<span class="sd">    stack will ignore all stack frames inside this file, the nested frames will</span>
+<span class="sd">    be ignored, too. This is also why Nested() does not use</span>
+<span class="sd">    contextlib.contextmanager.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler</span><span class="p">,</span> <span class="n">context_manager</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="n">profiler</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_manager</span> <span class="o">=</span> <span class="n">context_manager</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_manager</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_manager</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

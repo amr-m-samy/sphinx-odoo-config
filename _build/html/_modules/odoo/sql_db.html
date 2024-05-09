@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.sql_db &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.sql_db</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.sql_db</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">The PostgreSQL connector is a connectivity layer between the OpenERP code and</span>
+<span class="sd">the database, *not* a database abstraction toolkit. Database abstraction is what</span>
+<span class="sd">the ORM does, in fact.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">uuid</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">inspect</span> <span class="kn">import</span> <span class="n">currentframe</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">psycopg2.extensions</span>
+<span class="kn">import</span> <span class="nn">psycopg2.extras</span>
+<span class="kn">from</span> <span class="nn">psycopg2.extensions</span> <span class="kn">import</span> <span class="n">ISOLATION_LEVEL_REPEATABLE_READ</span>
+<span class="kn">from</span> <span class="nn">psycopg2.pool</span> <span class="kn">import</span> <span class="n">PoolError</span>
+<span class="kn">from</span> <span class="nn">psycopg2.sql</span> <span class="kn">import</span> <span class="n">Composable</span>
+<span class="kn">from</span> <span class="nn">werkzeug</span> <span class="kn">import</span> <span class="n">urls</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="kn">import</span> <span class="n">SQL</span>
+<span class="kn">from</span> <span class="nn">.tools.func</span> <span class="kn">import</span> <span class="n">frame_codeinfo</span><span class="p">,</span> <span class="n">locked</span>
+
+<span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">register_type</span><span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">UNICODE</span><span class="p">)</span>
+
+<div class="viewcode-block" id="undecimalize">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.undecimalize">[docs]</a>
+<span class="k">def</span> <span class="nf">undecimalize</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">register_type</span><span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">new_type</span><span class="p">((</span><span class="mi">700</span><span class="p">,</span> <span class="mi">701</span><span class="p">,</span> <span class="mi">1700</span><span class="p">),</span> <span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="n">undecimalize</span><span class="p">))</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_logger_conn</span> <span class="o">=</span> <span class="n">_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s2">&quot;connection&quot;</span><span class="p">)</span>
+
+<span class="n">real_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="o">.</span><span class="fm">__call__</span>  <span class="c1"># ensure we have a non patched time for query times when using freezegun</span>
+
+<span class="n">re_from</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\bfrom\s+&quot;?([a-zA-Z_0-9]+)\b&#39;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+<span class="n">re_into</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\binto\s+&quot;?([a-zA-Z_0-9]+)\b&#39;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+
+<span class="n">sql_counter</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="n">MAX_IDLE_TIMEOUT</span> <span class="o">=</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">10</span>
+
+
+<div class="viewcode-block" id="Savepoint">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Savepoint">[docs]</a>
+<span class="k">class</span> <span class="nc">Savepoint</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Reifies an active breakpoint, allows :meth:`BaseCursor.savepoint` users</span>
+<span class="sd">    to internally rollback the savepoint (as many times as they want) without</span>
+<span class="sd">    having to implement their own savepointing, or triggering exceptions.</span>
+
+<span class="sd">    Should normally be created using :meth:`BaseCursor.savepoint` rather than</span>
+<span class="sd">    directly.</span>
+
+<span class="sd">    The savepoint will be rolled back on unsuccessful context exits</span>
+<span class="sd">    (exceptions). It will be released (&quot;committed&quot;) on successful context exit.</span>
+<span class="sd">    The savepoint object can be wrapped in ``contextlib.closing`` to</span>
+<span class="sd">    unconditionally roll it back.</span>
+
+<span class="sd">    The savepoint can also safely be explicitly closed during context body. This</span>
+<span class="sd">    will rollback by default.</span>
+
+<span class="sd">    :param BaseCursor cr: the cursor to execute the `SAVEPOINT` queries on</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid1</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span> <span class="o">=</span> <span class="n">cr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;SAVEPOINT </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">rollback</span><span class="o">=</span><span class="n">exc_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Savepoint.close">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Savepoint.close">[docs]</a>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rollback</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_close</span><span class="p">(</span><span class="n">rollback</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Savepoint.rollback">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Savepoint.rollback">[docs]</a>
+    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;ROLLBACK TO SAVEPOINT </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">))</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rollback</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">rollback</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;RELEASE SAVEPOINT </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<span class="k">class</span> <span class="nc">_FlushingSavepoint</span><span class="p">(</span><span class="n">Savepoint</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rollback</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rollback</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">rollback</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">raise</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_close</span><span class="p">(</span><span class="n">rollback</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="BaseCursor">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.BaseCursor">[docs]</a>
+<span class="k">class</span> <span class="nc">BaseCursor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Base class for cursors that manage pre/post commit hooks. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">precommit</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postcommit</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prerollback</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postrollback</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+        <span class="c1"># By default a cursor has no transaction object.  A transaction object</span>
+        <span class="c1"># for managing environments is instantiated by registry.cursor().  It</span>
+        <span class="c1"># is not done here in order to avoid cyclic module dependencies.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="BaseCursor.flush">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.BaseCursor.flush">[docs]</a>
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Flush the current transaction, and run precommit hooks. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">precommit</span><span class="o">.</span><span class="n">run</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BaseCursor.clear">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.BaseCursor.clear">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Clear the current transaction, and clear precommit hooks. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">precommit</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BaseCursor.reset">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.BaseCursor.reset">[docs]</a>
+    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Reset the current transaction (this invalidates more that clear()).</span>
+<span class="sd">            This method should be called only right after commit() or rollback().</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transaction</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BaseCursor.savepoint">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.BaseCursor.savepoint">[docs]</a>
+    <span class="k">def</span> <span class="nf">savepoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Savepoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;context manager entering in a new savepoint</span>
+
+<span class="sd">        With ``flush`` (the default), will automatically run (or clear) the</span>
+<span class="sd">        relevant hooks.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_FlushingSavepoint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Savepoint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Using the cursor as a contextmanager automatically commits and</span>
+<span class="sd">            closes it::</span>
+
+<span class="sd">                with cr:</span>
+<span class="sd">                    cr.execute(...)</span>
+
+<span class="sd">                # cr is committed if no failure occurred</span>
+<span class="sd">                # cr is closed in any case</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">exc_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="Cursor">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor">[docs]</a>
+<span class="k">class</span> <span class="nc">Cursor</span><span class="p">(</span><span class="n">BaseCursor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents an open transaction to the PostgreSQL DB backend,</span>
+<span class="sd">       acting as a lightweight wrapper around psycopg2&#39;s</span>
+<span class="sd">       ``cursor`` objects.</span>
+
+<span class="sd">        ``Cursor`` is the object behind the ``cr`` variable used all</span>
+<span class="sd">        over the OpenERP code.</span>
+
+<span class="sd">        .. rubric:: Transaction Isolation</span>
+
+<span class="sd">        One very important property of database transactions is the</span>
+<span class="sd">        level of isolation between concurrent transactions.</span>
+<span class="sd">        The SQL standard defines four levels of transaction isolation,</span>
+<span class="sd">        ranging from the most strict *Serializable* level, to the least</span>
+<span class="sd">        strict *Read Uncommitted* level. These levels are defined in</span>
+<span class="sd">        terms of the phenomena that must not occur between concurrent</span>
+<span class="sd">        transactions, such as *dirty read*, etc.</span>
+<span class="sd">        In the context of a generic business data management software</span>
+<span class="sd">        such as OpenERP, we need the best guarantees that no data</span>
+<span class="sd">        corruption can ever be cause by simply running multiple</span>
+<span class="sd">        transactions in parallel. Therefore, the preferred level would</span>
+<span class="sd">        be the *serializable* level, which ensures that a set of</span>
+<span class="sd">        transactions is guaranteed to produce the same effect as</span>
+<span class="sd">        running them one at a time in some order.</span>
+
+<span class="sd">        However, most database management systems implement a limited</span>
+<span class="sd">        serializable isolation in the form of</span>
+<span class="sd">        `snapshot isolation &lt;http://en.wikipedia.org/wiki/Snapshot_isolation&gt;`_,</span>
+<span class="sd">        providing most of the same advantages as True Serializability,</span>
+<span class="sd">        with a fraction of the performance cost.</span>
+<span class="sd">        With PostgreSQL up to version 9.0, this snapshot isolation was</span>
+<span class="sd">        the implementation of both the ``REPEATABLE READ`` and</span>
+<span class="sd">        ``SERIALIZABLE`` levels of the SQL standard.</span>
+<span class="sd">        As of PostgreSQL 9.1, the previous snapshot isolation implementation</span>
+<span class="sd">        was kept for ``REPEATABLE READ``, while a new ``SERIALIZABLE``</span>
+<span class="sd">        level was introduced, providing some additional heuristics to</span>
+<span class="sd">        detect a concurrent update by parallel transactions, and forcing</span>
+<span class="sd">        one of them to rollback.</span>
+
+<span class="sd">        OpenERP implements its own level of locking protection</span>
+<span class="sd">        for transactions that are highly likely to provoke concurrent</span>
+<span class="sd">        updates, such as stock reservations or document sequences updates.</span>
+<span class="sd">        Therefore we mostly care about the properties of snapshot isolation,</span>
+<span class="sd">        but we don&#39;t really need additional heuristics to trigger transaction</span>
+<span class="sd">        rollbacks, as we are taking care of triggering instant rollbacks</span>
+<span class="sd">        ourselves when it matters (and we can save the additional performance</span>
+<span class="sd">        hit of these heuristics).</span>
+
+<span class="sd">        As a result of the above, we have selected ``REPEATABLE READ`` as</span>
+<span class="sd">        the default transaction isolation level for OpenERP cursors, as</span>
+<span class="sd">        it will be mapped to the desired ``snapshot isolation`` level for</span>
+<span class="sd">        all supported PostgreSQL version (&gt;10).</span>
+
+<span class="sd">        .. attribute:: cache</span>
+
+<span class="sd">            Cache dictionary with a &quot;request&quot; (-ish) lifecycle, only lives as</span>
+<span class="sd">            long as the cursor itself does and proactively cleared when the</span>
+<span class="sd">            cursor is closed.</span>
+
+<span class="sd">            This cache should *only* be used to store repeatable reads as it</span>
+<span class="sd">            ignores rollbacks and savepoints, it should not be used to store</span>
+<span class="sd">            *any* data which may be modified during the life of the cursor.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">IN_MAX</span> <span class="o">=</span> <span class="mi">1000</span>   <span class="c1"># decent limit on size of IN queries - guideline = Oracle limit</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pool</span><span class="p">,</span> <span class="n">dbname</span><span class="p">,</span> <span class="n">dsn</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_from_log</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_into_log</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># default log level determined at cursor creation, could be</span>
+        <span class="c1"># overridden later for debugging purposes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sql_table_tracking</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># avoid the call of close() (by __del__) if an exception</span>
+        <span class="c1"># is raised by any of the following initializations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__pool</span> <span class="o">=</span> <span class="n">pool</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dbname</span> <span class="o">=</span> <span class="n">dbname</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">borrow</span><span class="p">(</span><span class="n">dsn</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__caller</span> <span class="o">=</span> <span class="n">frame_codeinfo</span><span class="p">(</span><span class="n">currentframe</span><span class="p">(),</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__caller</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">False</span>   <span class="c1"># real initialization value</span>
+        <span class="c1"># See the docstring of this class.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">set_isolation_level</span><span class="p">(</span><span class="n">ISOLATION_LEVEL_REPEATABLE_READ</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">__build_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">d</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">description</span><span class="p">)}</span>
+
+<div class="viewcode-block" id="Cursor.dictfetchone">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.dictfetchone">[docs]</a>
+    <span class="k">def</span> <span class="nf">dictfetchone</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">row</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">__build_dict</span><span class="p">(</span><span class="n">row</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cursor.dictfetchmany">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.dictfetchmany">[docs]</a>
+    <span class="k">def</span> <span class="nf">dictfetchmany</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">__build_dict</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">fetchmany</span><span class="p">(</span><span class="n">size</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="Cursor.dictfetchall">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.dictfetchall">[docs]</a>
+    <span class="k">def</span> <span class="nf">dictfetchall</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">__build_dict</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+            <span class="c1"># Oops. &#39;self&#39; has not been closed explicitly.</span>
+            <span class="c1"># The cursor will be deleted by the garbage collector,</span>
+            <span class="c1"># but the database connection is not put back into the connection</span>
+            <span class="c1"># pool, preventing some operation on the database like dropping it.</span>
+            <span class="c1"># This can also lead to a server overload.</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cursor not closed explicitly</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__caller</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot;Cursor was created at </span><span class="si">%s</span><span class="s2">:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">__caller</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot;Please enable sql debugging to trace the caller.&quot;</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_close</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">encodings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">encoding</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mogrify</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">encoding</span><span class="p">,</span> <span class="s1">&#39;replace&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Cursor.mogrify">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.mogrify">[docs]</a>
+    <span class="k">def</span> <span class="nf">mogrify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">SQL</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="n">params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Unexpected parameters for SQL query object&quot;</span>
+            <span class="n">query</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">params</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">mogrify</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cursor.execute">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.execute">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">global</span> <span class="n">sql_counter</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">SQL</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="n">params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Unexpected parameters for SQL query object&quot;</span>
+            <span class="n">query</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">params</span>
+
+        <span class="k">if</span> <span class="n">params</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)):</span>
+            <span class="c1"># psycopg2&#39;s TypeError is not clear if you mess up the params</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SQL query parameters should be a tuple, list or dict; got </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">params</span><span class="p">,))</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="n">params</span> <span class="ow">or</span> <span class="kc">None</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">log_exceptions</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;bad query: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">ERROR: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">query</span> <span class="ow">or</span> <span class="n">query</span><span class="p">),</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">delay</span> <span class="o">=</span> <span class="n">real_time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+            <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">%.3f</span><span class="s2"> ms] query: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">delay</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">))</span>
+
+        <span class="c1"># simple query count is always computed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">sql_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">current_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;query_count&#39;</span><span class="p">):</span>
+            <span class="n">current_thread</span><span class="o">.</span><span class="n">query_count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">current_thread</span><span class="o">.</span><span class="n">query_time</span> <span class="o">+=</span> <span class="n">delay</span>
+
+        <span class="c1"># optional hooks for performance and tracing analysis</span>
+        <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">current_thread</span><span class="p">,</span> <span class="s1">&#39;query_hooks&#39;</span><span class="p">,</span> <span class="p">()):</span>
+            <span class="n">hook</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">delay</span><span class="p">)</span>
+
+        <span class="c1"># advanced stats</span>
+        <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sql_table_tracking</span><span class="p">:</span>
+            <span class="n">delay</span> <span class="o">*=</span> <span class="mf">1E6</span>
+
+            <span class="n">decoded_query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+            <span class="n">res_into</span> <span class="o">=</span> <span class="n">re_into</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">decoded_query</span><span class="p">)</span>
+            <span class="c1"># prioritize `insert` over `select` so `select` subqueries are not</span>
+            <span class="c1"># considered when inside a `insert`</span>
+            <span class="k">if</span> <span class="n">res_into</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sql_into_log</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">res_into</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sql_into_log</span><span class="p">[</span><span class="n">res_into</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sql_into_log</span><span class="p">[</span><span class="n">res_into</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delay</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">res_from</span> <span class="o">=</span> <span class="n">re_from</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">decoded_query</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">res_from</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sql_from_log</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">res_from</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sql_from_log</span><span class="p">[</span><span class="n">res_from</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sql_from_log</span><span class="p">[</span><span class="n">res_from</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delay</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="Cursor.execute_values">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.execute_values">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">argslist</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">page_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">fetch</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A proxy for psycopg2.extras.execute_values which can log all queries like execute.</span>
+<span class="sd">        But this method cannot set log_exceptions=False like execute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Odoo Cursor only proxies all methods of psycopg2 Cursor. This is a patch for problems caused by passing</span>
+        <span class="c1"># self instead of self._obj to the first parameter of psycopg2.extras.execute_values.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">Composable</span><span class="p">):</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">as_string</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">extras</span><span class="o">.</span><span class="n">execute_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">argslist</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="n">template</span><span class="p">,</span> <span class="n">page_size</span><span class="o">=</span><span class="n">page_size</span><span class="p">,</span> <span class="n">fetch</span><span class="o">=</span><span class="n">fetch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cursor.split_for_in_conditions">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.split_for_in_conditions">[docs]</a>
+    <span class="k">def</span> <span class="nf">split_for_in_conditions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Split a list of identifiers into one or more smaller tuples</span>
+<span class="sd">           safe for IN conditions, after uniquifying them.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">tools</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">split_every</span><span class="p">(</span><span class="n">size</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">IN_MAX</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cursor.print_log">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.print_log">[docs]</a>
+    <span class="k">def</span> <span class="nf">print_log</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">global</span> <span class="n">sql_counter</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+            <span class="n">sqllogs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;from&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_from_log</span><span class="p">,</span> <span class="s1">&#39;into&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_into_log</span><span class="p">}</span>
+            <span class="nb">sum</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">if</span> <span class="n">sqllogs</span><span class="p">[</span><span class="nb">type</span><span class="p">]:</span>
+                <span class="n">sqllogitems</span> <span class="o">=</span> <span class="n">sqllogs</span><span class="p">[</span><span class="nb">type</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;SQL LOG </span><span class="si">%s</span><span class="s2">:&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">sqllogitems</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">k</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">delay</span> <span class="o">=</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">microseconds</span><span class="o">=</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;table: </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delay</span><span class="p">,</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="nb">sum</span> <span class="o">+=</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">sqllogs</span><span class="p">[</span><span class="nb">type</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="nb">sum</span> <span class="o">=</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">microseconds</span><span class="o">=</span><span class="nb">sum</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;SUM </span><span class="si">%s</span><span class="s2">:</span><span class="si">%s</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> [</span><span class="si">%d</span><span class="s2">]&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="nb">sum</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_log_count</span><span class="p">,</span> <span class="n">sql_counter</span><span class="p">)</span>
+            <span class="n">sqllogs</span><span class="p">[</span><span class="nb">type</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="n">process</span><span class="p">(</span><span class="s1">&#39;from&#39;</span><span class="p">)</span>
+        <span class="n">process</span><span class="p">(</span><span class="s1">&#39;into&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">_enable_logging</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Forcefully enables logging for this cursor, restores it afterwards.</span>
+
+<span class="sd">        Updates the logger in-place, so not thread-safe.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="n">_logger</span><span class="o">.</span><span class="n">level</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+
+    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">_enable_table_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sql_table_tracking</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sql_table_tracking</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sql_table_tracking</span> <span class="o">=</span> <span class="n">old</span>
+
+<div class="viewcode-block" id="Cursor.close">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.close">[docs]</a>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_close</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">leak</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache</span>
+
+        <span class="c1"># advanced stats only at logging.DEBUG level</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c1"># This force the cursor to be freed, and thus, available again. It is</span>
+        <span class="c1"># important because otherwise we can overload the server very easily</span>
+        <span class="c1"># because of a cursor shortage (because cursors are not garbage</span>
+        <span class="c1"># collected as fast as they should). The problem is probably due in</span>
+        <span class="c1"># part because browse records keep a reference to the cursor.</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_obj</span>
+
+        <span class="c1"># Clean the underlying connection, and run rollback hooks.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">leak</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">leaked</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">chosen_template</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_template&#39;</span><span class="p">]</span>
+            <span class="n">keep_in_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dbname</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;template0&#39;</span><span class="p">,</span> <span class="s1">&#39;template1&#39;</span><span class="p">,</span> <span class="s1">&#39;postgres&#39;</span><span class="p">,</span> <span class="n">chosen_template</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__pool</span><span class="o">.</span><span class="n">give_back</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="p">,</span> <span class="n">keep_in_pool</span><span class="o">=</span><span class="n">keep_in_pool</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Cursor.commit">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.commit">[docs]</a>
+    <span class="k">def</span> <span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Perform an SQL `COMMIT` &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prerollback</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postrollback</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postcommit</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="Cursor.rollback">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.rollback">[docs]</a>
+    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Perform an SQL `ROLLBACK` &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postcommit</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prerollback</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postrollback</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="ow">and</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;_obj&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">InterfaceError</span><span class="p">(</span><span class="s2">&quot;Cursor already closed&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_obj</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">closed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">closed</span>
+
+<div class="viewcode-block" id="Cursor.now">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Cursor.now">[docs]</a>
+    <span class="k">def</span> <span class="nf">now</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the transaction&#39;s timestamp ``NOW() AT TIME ZONE &#39;UTC&#39;``. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT (now() AT TIME ZONE &#39;UTC&#39;)&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_now</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestCursor">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCursor</span><span class="p">(</span><span class="n">BaseCursor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A pseudo-cursor to be used for tests, on top of a real cursor. It keeps</span>
+<span class="sd">        the transaction open across requests, and simulates committing, rolling</span>
+<span class="sd">        back, and closing:</span>
+
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">        |  test cursor           | queries on actual cursor                          |</span>
+<span class="sd">        +========================+===================================================+</span>
+<span class="sd">        |``cr = TestCursor(...)``| SAVEPOINT test_cursor_N                           |</span>
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">        | ``cr.execute(query)``  | query                                             |</span>
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">        |  ``cr.commit()``       | RELEASE SAVEPOINT test_cursor_N                   |</span>
+<span class="sd">        |                        | SAVEPOINT test_cursor_N (lazy)                    |</span>
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">        |  ``cr.rollback()``     | ROLLBACK TO SAVEPOINT test_cursor_N (if savepoint)|</span>
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">        |  ``cr.close()``        | ROLLBACK TO SAVEPOINT test_cursor_N (if savepoint)|</span>
+<span class="sd">        |                        | RELEASE SAVEPOINT test_cursor_N (if savepoint)    |</span>
+<span class="sd">        +------------------------+---------------------------------------------------+</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_cursors_stack</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cursor</span><span class="p">,</span> <span class="n">lock</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cursor</span> <span class="o">=</span> <span class="n">cursor</span>
+        <span class="c1"># we use a lock to serialize concurrent requests</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">lock</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cursors_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="c1"># in order to simulate commit and rollback, the cursor maintains a</span>
+        <span class="c1"># savepoint at its last commit, the savepoint is created lazily</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cursor</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestCursor.execute">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor.execute">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cursor</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCursor.close">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor.close">[docs]</a>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">rollback</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+            <span class="n">tos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cursors_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">tos</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Found different un-closed cursor when trying to close </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">tos</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestCursor.commit">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor.commit">[docs]</a>
+    <span class="k">def</span> <span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Perform an SQL `COMMIT` &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">rollback</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prerollback</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postrollback</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postcommit</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>         <span class="c1"># TestCursor ignores post-commit hooks</span></div>
+
+
+<div class="viewcode-block" id="TestCursor.rollback">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor.rollback">[docs]</a>
+    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Perform an SQL `ROLLBACK` &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postcommit</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prerollback</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_savepoint</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">postrollback</span><span class="o">.</span><span class="n">run</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cursor</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestCursor.now">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.TestCursor.now">[docs]</a>
+    <span class="k">def</span> <span class="nf">now</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the transaction&#39;s timestamp ``datetime.now()``. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_now</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PsycoConnection">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.PsycoConnection">[docs]</a>
+<span class="k">class</span> <span class="nc">PsycoConnection</span><span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">connection</span><span class="p">):</span>
+<div class="viewcode-block" id="PsycoConnection.lobject">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.PsycoConnection.lobject">[docs]</a>
+    <span class="k">def</span> <span class="nf">lobject</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="p">,</span> <span class="s1">&#39;ConnectionInfo&#39;</span><span class="p">):</span>
+        <span class="nd">@property</span>
+        <span class="k">def</span> <span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">class</span> <span class="nc">PsycoConnectionInfo</span><span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">ConnectionInfo</span><span class="p">):</span>
+                <span class="nd">@property</span>
+                <span class="k">def</span> <span class="nf">password</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                    <span class="k">pass</span>
+            <span class="k">return</span> <span class="n">PsycoConnectionInfo</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ConnectionPool">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.ConnectionPool">[docs]</a>
+<span class="k">class</span> <span class="nc">ConnectionPool</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; The pool of connections to database(s)</span>
+
+<span class="sd">        Keep a set of connections to pg databases open, and reuse them</span>
+<span class="sd">        to open cursors for all transactions.</span>
+
+<span class="sd">        The connections are *not* automatically closed. Only a close_db()</span>
+<span class="sd">        can trigger that.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxconn</span><span class="o">=</span><span class="mi">64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_maxconn</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">maxconn</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">used</span> <span class="o">=</span> <span class="nb">len</span><span class="p">([</span><span class="mi">1</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">[:]</span> <span class="k">if</span> <span class="n">u</span><span class="p">])</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;ConnectionPool(used=</span><span class="si">%d</span><span class="s2">/count=</span><span class="si">%d</span><span class="s2">/max=</span><span class="si">%d</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">used</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_maxconn</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">_logger_conn</span><span class="o">.</span><span class="n">debug</span><span class="p">((</span><span class="s1">&#39;</span><span class="si">%r</span><span class="s1"> &#39;</span> <span class="o">+</span> <span class="n">msg</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ConnectionPool.borrow">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.ConnectionPool.borrow">[docs]</a>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">borrow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">connection_info</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Borrow a PsycoConnection from the pool. If no connection is available, create a new one</span>
+<span class="sd">        as long as there are still slots available. Perform some garbage-collection in the pool:</span>
+<span class="sd">        idle, dead and leaked connections are removed.</span>
+
+<span class="sd">        :param dict connection_info: dict of psql connection keywords</span>
+<span class="sd">        :rtype: PsycoConnection</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># free idle, dead and leaked connections</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="n">used</span><span class="p">,</span> <span class="n">last_used</span><span class="p">)</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">reverse_enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">used</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">cnx</span><span class="o">.</span><span class="n">closed</span> <span class="ow">and</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">last_used</span> <span class="o">&gt;</span> <span class="n">MAX_IDLE_TIMEOUT</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Close connection at index </span><span class="si">%d</span><span class="s1">: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                <span class="n">cnx</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">cnx</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Removing closed connection at index </span><span class="si">%d</span><span class="s1">: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="s1">&#39;leaked&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="nb">delattr</span><span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="s1">&#39;leaked&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%r</span><span class="s1">: Free leaked connection to </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="n">used</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">used</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dsn_equals</span><span class="p">(</span><span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">,</span> <span class="n">connection_info</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">cnx</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">OperationalError</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Cannot reset connection at index </span><span class="si">%d</span><span class="s1">: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                    <span class="c1"># psycopg2 2.4.4 and earlier do not allow closing a closed connection</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">cnx</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+                        <span class="n">cnx</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    <span class="k">continue</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Borrow existing connection to </span><span class="si">%r</span><span class="s1"> at index </span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">cnx</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_maxconn</span><span class="p">:</span>
+            <span class="c1"># try to remove the oldest connection not used</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="n">used</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">used</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">cnx</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+                        <span class="n">cnx</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Removing old connection at index </span><span class="si">%d</span><span class="s1">: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># note: this code is called only if the for loop has completed (no break)</span>
+                <span class="k">raise</span> <span class="n">PoolError</span><span class="p">(</span><span class="s1">&#39;The Connection Pool Is Full&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+                <span class="n">connection_factory</span><span class="o">=</span><span class="n">PsycoConnection</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">connection_info</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Connection to the database failed&#39;</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">result</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Create new connection backend PID </span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">get_backend_pid</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="ConnectionPool.give_back">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.ConnectionPool.give_back">[docs]</a>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">give_back</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">keep_in_pool</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Give back connection to </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">connection</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">cnx</span> <span class="ow">is</span> <span class="n">connection</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">keep_in_pool</span><span class="p">:</span>
+                    <span class="c1"># Release the connection and record the last time used</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Put connection to </span><span class="si">%r</span><span class="s1"> in pool&#39;</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">(</span><span class="s1">&#39;Forgot connection to </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+                    <span class="n">cnx</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PoolError</span><span class="p">(</span><span class="s1">&#39;This connection does not belong to the pool&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConnectionPool.close_all">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.ConnectionPool.close_all">[docs]</a>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">close_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dsn</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">cnx</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">reverse_enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dsn</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dsn_equals</span><span class="p">(</span><span class="n">cnx</span><span class="o">.</span><span class="n">dsn</span><span class="p">,</span> <span class="n">dsn</span><span class="p">):</span>
+                <span class="n">cnx</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="n">last</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">i</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%r</span><span class="s1">: Closed </span><span class="si">%d</span><span class="s1"> connections </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">dsn</span> <span class="ow">and</span> <span class="n">last</span> <span class="ow">and</span> <span class="s1">&#39;to </span><span class="si">%r</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">last</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_dsn_equals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dsn1</span><span class="p">,</span> <span class="n">dsn2</span><span class="p">):</span>
+        <span class="n">alias_keys</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;dbname&#39;</span><span class="p">:</span> <span class="s1">&#39;database&#39;</span><span class="p">}</span>
+        <span class="n">ignore_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;password&#39;</span><span class="p">]</span>
+        <span class="n">dsn1</span><span class="p">,</span> <span class="n">dsn2</span> <span class="o">=</span> <span class="p">({</span>
+            <span class="n">alias_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">parse_dsn</span><span class="p">(</span><span class="n">dsn</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dsn</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">dsn</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ignore_keys</span>
+        <span class="p">}</span> <span class="k">for</span> <span class="n">dsn</span> <span class="ow">in</span> <span class="p">(</span><span class="n">dsn1</span><span class="p">,</span> <span class="n">dsn2</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">dsn1</span> <span class="o">==</span> <span class="n">dsn2</span></div>
+
+
+
+<div class="viewcode-block" id="Connection">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Connection">[docs]</a>
+<span class="k">class</span> <span class="nc">Connection</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A lightweight instance of a connection to postgres</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pool</span><span class="p">,</span> <span class="n">dbname</span><span class="p">,</span> <span class="n">dsn</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__dbname</span> <span class="o">=</span> <span class="n">dbname</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__dsn</span> <span class="o">=</span> <span class="n">dsn</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__pool</span> <span class="o">=</span> <span class="n">pool</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">dsn</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dsn</span><span class="p">)</span>
+        <span class="n">dsn</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;password&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dsn</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dbname</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dbname</span>
+
+<div class="viewcode-block" id="Connection.cursor">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.Connection.cursor">[docs]</a>
+    <span class="k">def</span> <span class="nf">cursor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;create cursor to </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsn</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Cursor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__pool</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dbname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dsn</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+    <span class="n">__nonzero__</span> <span class="o">=</span> <span class="fm">__bool__</span></div>
+
+
+<div class="viewcode-block" id="connection_info_for">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.connection_info_for">[docs]</a>
+<span class="k">def</span> <span class="nf">connection_info_for</span><span class="p">(</span><span class="n">db_or_uri</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; parse the given `db_or_uri` and return a 2-tuple (dbname, connection_params)</span>
+
+<span class="sd">    Connection params are either a dictionary with a single key ``dsn``</span>
+<span class="sd">    containing a connection URI, or a dictionary containing connection</span>
+<span class="sd">    parameter keywords which psycopg2 can build a key/value connection string</span>
+<span class="sd">    (dsn) from</span>
+
+<span class="sd">    :param str db_or_uri: database name or postgres dsn</span>
+<span class="sd">    :rtype: (str, dict)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s1">&#39;ODOO_PGAPPNAME&#39;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+        <span class="c1"># Using manual string interpolation for security reason and trimming at default NAMEDATALEN=63</span>
+        <span class="n">app_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;ODOO_PGAPPNAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{pid}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()))[</span><span class="mi">0</span><span class="p">:</span><span class="mi">63</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">app_name</span> <span class="o">=</span> <span class="s2">&quot;odoo-</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">db_or_uri</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39;postgresql://&#39;</span><span class="p">,</span> <span class="s1">&#39;postgres://&#39;</span><span class="p">)):</span>
+        <span class="c1"># extract db from uri</span>
+        <span class="n">us</span> <span class="o">=</span> <span class="n">urls</span><span class="o">.</span><span class="n">url_parse</span><span class="p">(</span><span class="n">db_or_uri</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">us</span><span class="o">.</span><span class="n">path</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">db_name</span> <span class="o">=</span> <span class="n">us</span><span class="o">.</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="k">elif</span> <span class="n">us</span><span class="o">.</span><span class="n">username</span><span class="p">:</span>
+            <span class="n">db_name</span> <span class="o">=</span> <span class="n">us</span><span class="o">.</span><span class="n">username</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">db_name</span> <span class="o">=</span> <span class="n">us</span><span class="o">.</span><span class="n">hostname</span>
+        <span class="k">return</span> <span class="n">db_name</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;dsn&#39;</span><span class="p">:</span> <span class="n">db_or_uri</span><span class="p">,</span> <span class="s1">&#39;application_name&#39;</span><span class="p">:</span> <span class="n">app_name</span><span class="p">}</span>
+
+    <span class="n">connection_info</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;database&#39;</span><span class="p">:</span> <span class="n">db_or_uri</span><span class="p">,</span> <span class="s1">&#39;application_name&#39;</span><span class="p">:</span> <span class="n">app_name</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;host&#39;</span><span class="p">,</span> <span class="s1">&#39;port&#39;</span><span class="p">,</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;password&#39;</span><span class="p">,</span> <span class="s1">&#39;sslmode&#39;</span><span class="p">):</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_&#39;</span> <span class="o">+</span> <span class="n">p</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">cfg</span><span class="p">:</span>
+            <span class="n">connection_info</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">=</span> <span class="n">cfg</span>
+
+    <span class="k">return</span> <span class="n">db_or_uri</span><span class="p">,</span> <span class="n">connection_info</span></div>
+
+
+<span class="n">_Pool</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="db_connect">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.db_connect">[docs]</a>
+<span class="k">def</span> <span class="nf">db_connect</span><span class="p">(</span><span class="n">to</span><span class="p">,</span> <span class="n">allow_uri</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">_Pool</span>
+    <span class="k">if</span> <span class="n">_Pool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_Pool</span> <span class="o">=</span> <span class="n">ConnectionPool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">evented</span> <span class="ow">and</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_maxconn_gevent&#39;</span><span class="p">]</span>
+            <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_maxconn&#39;</span><span class="p">]</span>
+        <span class="p">))</span>
+
+    <span class="n">db</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">connection_info_for</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_uri</span> <span class="ow">and</span> <span class="n">db</span> <span class="o">!=</span> <span class="n">to</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;URI connections not allowed&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Connection</span><span class="p">(</span><span class="n">_Pool</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="close_db">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.close_db">[docs]</a>
+<span class="k">def</span> <span class="nf">close_db</span><span class="p">(</span><span class="n">db_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; You might want to call odoo.modules.registry.Registry.delete(db_name) along this function.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_Pool</span>
+    <span class="k">if</span> <span class="n">_Pool</span><span class="p">:</span>
+        <span class="n">_Pool</span><span class="o">.</span><span class="n">close_all</span><span class="p">(</span><span class="n">connection_info_for</span><span class="p">(</span><span class="n">db_name</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="close_all">
+<a class="viewcode-back" href="../../odoo.html#odoo.sql_db.close_all">[docs]</a>
+<span class="k">def</span> <span class="nf">close_all</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">_Pool</span>
+    <span class="k">if</span> <span class="n">_Pool</span><span class="p">:</span>
+        <span class="n">_Pool</span><span class="o">.</span><span class="n">close_all</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.test_testing_utilities.tests.test_form_impl &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.addons.test_testing_utilities.tests.test_form_impl</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.test_testing_utilities.tests.test_form_impl</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Test for the pseudo-form implementation (odoo.tests.common.Form), which should</span>
+<span class="sd">basically be a server-side implementation of form views (though probably not</span>
+<span class="sd">complete) intended for properly validating business &quot;view&quot; flows (onchanges,</span>
+<span class="sd">readonly, required, ...) and make it easier to generate sensible &amp; coherent</span>
+<span class="sd">business objects.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">Form</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">Command</span>
+
+
+<div class="viewcode-block" id="TestBasic">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic">[docs]</a>
+<span class="k">class</span> <span class="nc">TestBasic</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestBasic.test_defaults">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_defaults">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks that we can load a default form view and perform trivial</span>
+<span class="sd">        default_get &amp; onchanges &amp; computations</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.a&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;check that our record is not in db (yet)&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="mi">21</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f4</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">f1</span> <span class="o">=</span> <span class="s1">&#39;4&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="mi">21</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f4</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">8</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f4</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1"># f.record cannot be accessed yet</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f1</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f4</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;4&#39;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestBasic.test_required">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_required">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.a&#39;</span><span class="p">])</span>
+        <span class="c1"># f1 no default &amp; no value =&gt; should fail</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaisesRegex</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="s1">&#39;f1 is a required field&#39;</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="c1"># set f1 and unset f2 =&gt; should work</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f1</span> <span class="o">=</span> <span class="s1">&#39;1&#39;</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f1</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">f4</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestBasic.test_required_bool">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_required_bool">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_required_bool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.req_bool&#39;</span><span class="p">])</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f_bool</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f_bool</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">f2</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.req_bool&#39;</span><span class="p">])</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">f2</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r2</span><span class="o">.</span><span class="n">f_bool</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestBasic.test_readonly">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_readonly">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_readonly</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks that fields with readonly modifiers (marked as readonly or</span>
+<span class="sd">        computed w/o set) raise an error when set.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.readonly&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f1</span> <span class="o">=</span> <span class="s1">&#39;5&#39;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">42</span></div>
+
+
+<div class="viewcode-block" id="TestBasic.test_readonly_save">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_readonly_save">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_readonly_save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Should not save readonly fields unless they&#39;re force_save</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.a&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.non_normalized_attrs&#39;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">f1</span> <span class="o">=</span> <span class="s1">&#39;1&#39;</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">987</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f5</span><span class="p">,</span> <span class="mi">987</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f6</span><span class="p">,</span> <span class="mi">987</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f5</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f6</span><span class="p">,</span> <span class="mi">987</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestBasic.test_attrs">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestBasic.test_attrs">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_attrs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Checks that attrs/modifiers with non-normalized domains work</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.a&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.non_normalized_attrs&#39;</span><span class="p">)</span>
+
+        <span class="c1"># not readonly yet, should work</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="c1"># make f2 readonly</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f1</span> <span class="o">=</span> <span class="s1">&#39;63&#39;</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f3</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">6</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestM2O">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2O">[docs]</a>
+<span class="k">class</span> <span class="nc">TestM2O</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestM2O.test_default_and_onchange">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2O.test_default_and_onchange">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_default_and_onchange</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Checks defaults &amp; onchanges impacting m2o fields</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">})</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">})</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.d&#39;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span>
+            <span class="s2">&quot;The default value gets overridden by the onchange&quot;</span>
+        <span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="s2">&quot;B&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;The new m2o value should match the second field by name&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestM2O.test_set">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2O.test_set">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks that we get/set recordsets for m2o &amp; that set correctly</span>
+<span class="sd">        triggers onchange</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">})</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.c&#39;</span><span class="p">])</span>
+
+        <span class="c1"># check that basic manipulations work</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="n">r1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;A&#39;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="n">r2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">)</span>
+
+        <span class="c1"># can&#39;t set an int to an m2o field</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="n">r1</span><span class="o">.</span><span class="n">id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">)</span>
+
+        <span class="c1"># can&#39;t set a record of the wrong model</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.readonly&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="n">temp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">)</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestM2M">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M">[docs]</a>
+<span class="k">class</span> <span class="nc">TestM2M</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestM2M.test_add">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_add">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_add</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item2&quot;</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r1</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r2</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span>
+            <span class="n">r1</span> <span class="o">|</span> <span class="n">r2</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_remove_by_index">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_remove_by_index">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_remove_by_index</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item2&quot;</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r1</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r2</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span>
+            <span class="n">r2</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_remove_by_id">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_remove_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_remove_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item2&quot;</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r1</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r2</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">r1</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span>
+            <span class="n">r2</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_set">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_set">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item2&quot;</span><span class="p">})</span>
+        <span class="n">r3</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Item3&quot;</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">r1</span> <span class="o">+</span> <span class="n">r2</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span> <span class="n">r1</span> <span class="o">+</span> <span class="n">r2</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span> <span class="o">=</span> <span class="n">r3</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span> <span class="n">r3</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_on_m2m_change">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_on_m2m_change">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_on_m2m_change</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}))</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}))</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_m2m_changed">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_m2m_changed">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2m_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">})</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">})</span>
+
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">})</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">})</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="s1">&#39;m2o_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="n">r1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">r2</span><span class="o">.</span><span class="n">id</span><span class="p">])]})</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;d&#39;</span><span class="p">})</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.f&#39;</span><span class="p">])</span>
+        <span class="c1"># check default_get</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="p">[:],</span> <span class="n">a</span> <span class="o">|</span> <span class="n">b</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">m2o</span> <span class="o">=</span> <span class="n">c</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="p">[:],</span> <span class="n">a</span> <span class="o">|</span> <span class="n">b</span> <span class="o">|</span> <span class="n">c</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">m2o</span> <span class="o">=</span> <span class="n">d</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="p">[:],</span> <span class="n">a</span> <span class="o">|</span> <span class="n">b</span> <span class="o">|</span> <span class="n">c</span> <span class="o">|</span> <span class="n">d</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_m2m_readonly">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_m2m_readonly">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2m_readonly</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub3&#39;</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">})</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">})</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.g&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;m2m&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">ids</span><span class="p">)]</span>
+        <span class="p">})</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestM2M.test_attr">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestM2M.test_attr">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_attr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.e&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.attrs_using_m2m&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;ok&#39;</span><span class="p">}))</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">),</span>
+            <span class="p">[</span><span class="s1">&#39;ok&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span>
+        <span class="p">)</span></div>
+</div>
+
+
+<span class="n">get</span> <span class="o">=</span> <span class="n">itemgetter</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="s1">&#39;v&#39;</span><span class="p">)</span>
+<div class="viewcode-block" id="TestO2M">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M">[docs]</a>
+<span class="k">class</span> <span class="nc">TestO2M</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestO2M.test_basic_alterations">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_basic_alterations">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_basic_alterations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that the o2m proxy allows adding, removing and editing o2m</span>
+<span class="sd">        records</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">get</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">],</span>
+            <span class="p">[(</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">sub</span><span class="p">:</span>
+                <span class="n">sub</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="k">as</span> <span class="n">sub</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">get</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">],</span>
+            <span class="p">[(</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;5&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">,</span> \
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">as</span> <span class="n">sub</span><span class="p">,</span>\
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+                <span class="n">sub</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;whop whop&quot;</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_editable_list">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_editable_list">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_editable_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests the o2m proxy when the list view is editable rather than</span>
+<span class="sd">        delegating to a separate form view</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent_ed&#39;</span><span class="p">)</span>
+        <span class="n">custom_tree</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;test_testing_utilities.editable_external&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//field[@name=&quot;subs&quot;]/tree//field&#39;</span><span class="p">)],</span>
+            <span class="p">[</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">custom_tree</span><span class="p">[</span><span class="s1">&#39;arch&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//field&#39;</span><span class="p">)],</span>
+            <span class="s1">&#39;check that the tree view is the one referenced by tree_view_ref&#39;</span>
+        <span class="p">)</span>
+        <span class="n">subs_field</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">][</span><span class="s1">&#39;subs&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIs</span><span class="p">(</span><span class="n">subs_field</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">][</span><span class="s1">&#39;tree&#39;</span><span class="p">],</span> <span class="n">f</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//field[@name=&quot;subs&quot;]/tree&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;check that the edition view is the tree view&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">subs_field</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">][</span><span class="s1">&#39;tree&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;.//field&#39;</span><span class="p">)],</span>
+            <span class="p">[</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">custom_tree</span><span class="p">[</span><span class="s1">&#39;arch&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//field&#39;</span><span class="p">)],</span>
+        <span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">7</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">get</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">],</span>
+            <span class="p">[(</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;3&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;7&#39;</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">)]</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_inline">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_inline">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_inline</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests the o2m proxy when the list and form views are provided</span>
+<span class="sd">        inline rather than fetched separately</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent_inline&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">42</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">get</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">],</span>
+            <span class="p">[(</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="mi">42</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span>
+            <span class="s2">&quot;should not have set v (and thus not name)&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_parent_context">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_parent_context">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_parent_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the o2m form with a context on the field that uses &#39;parent&#39;. &quot;&quot;&quot;</span>
+        <span class="n">view</span> <span class="o">=</span> <span class="s1">&#39;test_testing_utilities.o2m_parent_context&#39;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">42</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_default">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_default">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that default_get can return defaults for the o2m</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.default&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">get</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">],</span>
+            <span class="p">[(</span><span class="s2">&quot;5&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)]</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_inner_default">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_inner_default">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_inner_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that creating an o2m record will get defaults for it</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.default&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;should have onchanged value to v&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_default_discarded">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_default_discarded">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_default_discarded</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests what happens when the default value is discarded. &quot;&quot;&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.default&#39;</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_value</span><span class="o">=</span><span class="mi">42</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_onchange_parent">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_onchange_parent">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_onchange_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that changing o2m content triggers onchange in the parent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;value should have its default&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;v should be equal to value&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;should be sum of value &amp; children v&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_onchange_inner">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_onchange_inner">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_onchange_inner</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that editing a field of an o2m record triggers onchange</span>
+<span class="sd">        in the o2m record and its parent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">])</span>
+
+        <span class="c1"># only apply the onchange on edition end (?)</span>
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">sub</span><span class="p">:</span>
+            <span class="n">sub</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">6</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_parent_content">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_parent_content">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_parent_content</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that when editing a field of an o2m the data sent contains</span>
+<span class="sd">        the parent data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">])</span>
+
+        <span class="c1"># only apply the onchange on edition end (?)</span>
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">sub</span><span class="p">:</span>
+            <span class="n">sub</span><span class="o">.</span><span class="n">has_parent</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">has_parent</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_readonly_o2m">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_readonly_o2m">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_readonly_o2m</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that o2m fields flagged as readonly (readonly=&quot;1&quot; in the</span>
+<span class="sd">        view) can&#39;t be written to</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;subs&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({})]</span>
+        <span class="p">})</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_parent_readonly&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_readonly_subfield">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_readonly_subfield">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_readonly_subfield</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Tests that readonly is applied to the field of the o2m = not sent</span>
+<span class="sd">        as part of the create / write values</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;o2m_readonly_subfield_parent&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">new_line</span><span class="p">:</span>
+                <span class="n">new_line</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">new_line</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">f</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;ok&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_dyn_onchange">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_dyn_onchange">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_dyn_onchange</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.onchange_parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.m2o_onchange_view&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">new_line</span><span class="p">:</span>
+            <span class="n">new_line</span><span class="o">.</span><span class="n">dummy</span> <span class="o">=</span> <span class="mi">42</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">new_line</span><span class="o">.</span><span class="n">flag</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">as</span> <span class="n">new_line</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">new_line</span><span class="o">.</span><span class="n">flag</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_remove">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_remove</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">commands</span><span class="p">():</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="s1">&#39;line_ids&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_commands</span><span class="p">()]</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.onchange_count&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">2</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">4</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="n">previous</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">line_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">previous</span><span class="p">),</span> <span class="mi">4</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">2</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">commands</span><span class="p">(),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;Should contain 2 creations and 4 deletions&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">commands</span><span class="p">(),</span> <span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">commands</span><span class="p">(),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;should contain 1 creation and 2 deletions&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_self_recursive">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_self_recursive">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_self_recursive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.recursive&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_recursive_relation_view&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_readonly">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_readonly">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_readonly</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_modifier&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">form</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">form</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">5</span>
+                <span class="c1"># this makes &#39;value&#39; readonly</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="mi">42</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+                    <span class="n">line</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">7</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_readonly_parent">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_readonly_parent">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_readonly_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_modifier_parent&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">form</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">form</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="c1"># this makes &#39;value&#39; readonly on lines</span>
+            <span class="n">form</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">42</span>
+            <span class="k">with</span> <span class="n">form</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">):</span>
+                    <span class="n">line</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">7</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_external_readonly_parent">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_external_readonly_parent">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_external_readonly_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.ref&#39;</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_modifier_ref&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">form</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">form</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="mi">2</span>
+                <span class="c1"># readonly from context</span>
+                <span class="c1"># with self.assertRaises(AssertionError): # this part must raise but the context attributes on x2m field is not used. To fix.</span>
+                <span class="c1">#     line.c = 3</span>
+                <span class="c1"># will hide &#39;subs&#39; field</span>
+                <span class="n">form</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">666</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaisesRegex</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">):</span>
+                    <span class="n">line</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="mi">4</span>
+                <span class="c1"># this makes &#39;has_parent&#39; readonly on lines</span>
+                <span class="n">form</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">42</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="mi">5</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaisesRegex</span><span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">):</span>
+                    <span class="n">line</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="mi">6</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_widget">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_widget">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_widget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">create</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">create</span><span class="p">({</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span> <span class="n">create</span><span class="p">({</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}),</span> <span class="n">create</span><span class="p">({</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.parent&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;test_testing_utilities.o2m_widget_m2m&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">subs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">subs</span><span class="p">,</span>
+            <span class="n">a</span> <span class="o">|</span> <span class="n">b</span> <span class="o">|</span> <span class="n">c</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestO2M.test_o2m_onchange_change_saved">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestO2M.test_o2m_onchange_change_saved">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_o2m_onchange_change_saved</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; If an onchange updates o2m values (in existing sub-records of an</span>
+<span class="sd">        existing record), those updated values should be saved, both if the</span>
+<span class="sd">        sub-records were touched by the user and not (check that one maybe)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># create record: line created before v is updated should reflect it,</span>
+        <span class="c1"># line created after should not</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;o2m_changes_children&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="o">...</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">record</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;line_ids.vv&#39;</span><span class="p">),</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;onchange should have updated the existing lines&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;onchange should not impact new line&quot;</span><span class="p">)</span>
+
+        <span class="c1"># update record: onchange then touch the lines</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="mi">6</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">with</span> <span class="n">f</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">as</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">line</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;line_ids.vv&#39;</span><span class="p">),</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;line_ids.v&#39;</span><span class="p">),</span> <span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span> <span class="s2">&quot;onchange should have updated vs&quot;</span><span class="p">)</span>
+
+        <span class="c1"># update record: onchange then don&#39;t even touch the lines</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="mi">7</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;line_ids.vv&#39;</span><span class="p">),</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;line_ids.v&#39;</span><span class="p">),</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestNestedO2M">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestNestedO2M">[docs]</a>
+<span class="k">class</span> <span class="nc">TestNestedO2M</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestNestedO2M.test_id_cannot_be_assigned">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestNestedO2M.test_id_cannot_be_assigned">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_id_cannot_be_assigned</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># MO with:</span>
+        <span class="c1"># produces product0</span>
+        <span class="c1"># produces 1 (product_qty)</span>
+        <span class="c1"># flexible BOM produces 1</span>
+        <span class="c1"># bom consumes 4x product 1</span>
+        <span class="c1"># bom consumes 1x product 2</span>
+        <span class="n">product0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">product1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">product2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="c1"># create pseudo-MO in post-asigned state</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.root&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product0</span><span class="p">,</span>
+            <span class="s1">&#39;product_qty&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+            <span class="c1"># qty_producing=0 (onchange)</span>
+            <span class="c1"># qty_produced=0 (computed)</span>
+            <span class="s1">&#39;move_raw_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product2</span><span class="p">,</span>
+                    <span class="c1"># quantity_done=0 (computed)</span>
+                    <span class="s1">&#39;move_line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                        <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product2</span><span class="p">,</span>
+                        <span class="s1">&#39;product_uom_qty&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+                        <span class="s1">&#39;qty_done&#39;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="c1"># -&gt; 1.0</span>
+                    <span class="p">})]</span> <span class="c1"># -&gt; new line with qty=0, qty_done=2</span>
+                <span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product1</span><span class="p">,</span>
+                    <span class="s1">&#39;unit_factor&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                    <span class="s1">&#39;move_line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                        <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product1</span><span class="p">,</span>
+                        <span class="s1">&#39;product_uom_qty&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>
+                        <span class="s1">&#39;qty_done&#39;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="c1"># -&gt; 4.0</span>
+                    <span class="p">})]</span> <span class="c1"># -&gt; new line with qty=0, qty_done=8</span>
+                <span class="p">})</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;move_finished_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product0</span><span class="p">})]</span>
+            <span class="c1"># -&gt; new line with qty=0, qty_done=3</span>
+        <span class="p">})</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">qty_producing</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="s1">&#39;move_raw_ids&#39;</span><span class="p">)</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestNestedO2M.test_empty_update">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestNestedO2M.test_empty_update">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_empty_update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># MO with:</span>
+        <span class="c1"># produces product0</span>
+        <span class="c1"># produces 1 (product_qty)</span>
+        <span class="c1"># flexible BOM produces 1</span>
+        <span class="c1"># bom consumes 4x product 1</span>
+        <span class="c1"># bom consumes 1x product 2</span>
+        <span class="n">product0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">product1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">product2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">product4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.product&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="c1"># create pseudo-MO in post-asigned state</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ttu.root&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product0</span><span class="p">,</span>
+            <span class="s1">&#39;product_qty&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+            <span class="c1"># qty_producing=0 (onchange)</span>
+            <span class="c1"># qty_produced=0 (computed)</span>
+            <span class="s1">&#39;move_raw_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product2</span><span class="p">,</span>
+                    <span class="c1"># quantity_done=0 (computed)</span>
+                    <span class="s1">&#39;move_line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                        <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product2</span><span class="p">,</span>
+                        <span class="s1">&#39;product_uom_qty&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+                        <span class="s1">&#39;qty_done&#39;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="c1"># -&gt; 1.0</span>
+                    <span class="p">})]</span> <span class="c1"># -&gt; new line with qty=0, qty_done=2</span>
+                <span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product1</span><span class="p">,</span>
+                    <span class="s1">&#39;unit_factor&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                    <span class="s1">&#39;move_line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                        <span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product1</span><span class="p">,</span>
+                        <span class="s1">&#39;product_uom_qty&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>
+                        <span class="s1">&#39;qty_done&#39;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="c1"># -&gt; 4.0</span>
+                    <span class="p">})]</span> <span class="c1"># -&gt; new line with qty=0, qty_done=8</span>
+                <span class="p">})</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;move_finished_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;product_id&#39;</span><span class="p">:</span> <span class="n">product0</span><span class="p">})]</span>
+            <span class="c1"># -&gt; new line with qty=0, qty_done=3</span>
+        <span class="p">})</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">qty_producing</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">form</span><span class="o">.</span><span class="n">move_raw_ids</span><span class="o">.</span><span class="n">new</span><span class="p">()</span> <span class="k">as</span> <span class="n">move</span><span class="p">:</span>
+            <span class="n">move</span><span class="o">.</span><span class="n">product_id</span> <span class="o">=</span> <span class="n">product4</span>
+            <span class="n">move</span><span class="o">.</span><span class="n">quantity_done</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="c1"># Check that this new product is not updated by qty_producing</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">qty_producing</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestNestedO2M.test_remove">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestNestedO2M.test_remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_remove</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; onchanges can remove o2m records which haven&#39;t been loaded yet due</span>
+<span class="sd">        to lazy loading of o2ms. The removal information should still be</span>
+<span class="sd">        retained, otherwise due to the stateful update system we end up</span>
+<span class="sd">        retaining records we don&#39;t even know exist.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># create structure with sub-sub-children</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;o2m_changes_parent&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;line 1&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                    <span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;vv&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">})],</span>
+                <span class="p">})</span>
+            <span class="p">]</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;B&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">vv</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestEdition">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestEdition">[docs]</a>
+<span class="k">class</span> <span class="nc">TestEdition</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; These use the context manager form as we don&#39;t need the record</span>
+<span class="sd">    post-save (we already have it) and it&#39;s easier to see what bits act on</span>
+<span class="sd">    the form (inside `with`) versus outside. That let me catch a few</span>
+<span class="sd">    mistakes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TestEdition.test_trivial">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestEdition.test_trivial">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_trivial</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.a&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;f1&#39;</span><span class="p">:</span> <span class="s1">&#39;5&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f1</span><span class="p">,</span> <span class="s1">&#39;5&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f4</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f4</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f3</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEdition.test_m2o">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestEdition.test_m2o">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2o</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.m2o&#39;</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">})</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">})</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">})</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.d&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;f&#39;</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;f2&#39;</span><span class="p">:</span> <span class="s2">&quot;OK&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="c1"># no default/onchange should have run so loading an incoherent</span>
+            <span class="c1"># record should still be incoherent</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="s1">&#39;OK&#39;</span><span class="p">)</span>
+
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="s2">&quot;b&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="s2">&quot;Whoops&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">Sub</span><span class="p">)</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">f2</span> <span class="o">=</span> <span class="s2">&quot;a&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f2</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEdition.test_m2m_empty">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestEdition.test_m2m_empty">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2m_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">})</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.f&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;m2m&#39;</span><span class="p">:</span> <span class="p">[]</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2o</span> <span class="o">=</span> <span class="n">sub</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">m2o</span><span class="p">,</span> <span class="n">sub</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span> <span class="n">sub</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEdition.test_m2m_nonempty">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_testing_utilities.tests.html#odoo.addons.test_testing_utilities.tests.test_form_impl.TestEdition.test_m2m_nonempty">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2m_nonempty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.sub2&#39;</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">})</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">})</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">Sub</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">})</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_testing_utilities.f&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;m2m&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">((</span><span class="n">a</span> <span class="o">|</span> <span class="n">b</span> <span class="o">|</span> <span class="n">c</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)]</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="p">[:],</span> <span class="p">(</span><span class="n">a</span> <span class="o">|</span> <span class="n">b</span> <span class="o">|</span> <span class="n">c</span><span class="p">))</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">m2m</span><span class="p">[:],</span> <span class="p">(</span><span class="n">b</span> <span class="o">|</span> <span class="n">c</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">m2m</span><span class="p">,</span> <span class="p">(</span><span class="n">b</span> <span class="o">|</span> <span class="n">c</span><span class="p">))</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

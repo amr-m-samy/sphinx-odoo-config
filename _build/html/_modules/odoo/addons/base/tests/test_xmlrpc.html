@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_xmlrpc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_xmlrpc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_xmlrpc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">xmlrpc.client</span> <span class="kn">import</span> <span class="n">Binary</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessDenied</span><span class="p">,</span> <span class="n">AccessError</span>
+<span class="kn">from</span> <span class="nn">odoo.http</span> <span class="kn">import</span> <span class="n">_request_stack</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.tools</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">common</span>
+<span class="kn">from</span> <span class="nn">odoo.service</span> <span class="kn">import</span> <span class="n">common</span> <span class="k">as</span> <span class="n">auth</span><span class="p">,</span> <span class="n">model</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">DotDict</span>
+
+
+<div class="viewcode-block" id="TestXMLRPC">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC">[docs]</a>
+<span class="nd">@common</span><span class="o">.</span><span class="n">tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestXMLRPC</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">HttpCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestXMLRPC.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TestXMLRPC</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.xmlrpc">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.xmlrpc">[docs]</a>
+    <span class="k">def</span> <span class="nf">xmlrpc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span><span class="o">.</span><span class="n">execute_kw</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_01_xmlrpc_login">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_01_xmlrpc_login">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_01_xmlrpc_login</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Try to login on the common service. &quot;&quot;&quot;</span>
+        <span class="n">db_name</span> <span class="o">=</span> <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">()</span>
+        <span class="n">uid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_common</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">uid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_ir_model_search">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_ir_model_search">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_ir_model_search</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Try a search on the object service. &quot;&quot;&quot;</span>
+        <span class="n">o</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span>
+        <span class="n">db_name</span> <span class="o">=</span> <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">()</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="n">o</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="s1">&#39;ir.model&#39;</span><span class="p">,</span> <span class="s1">&#39;search&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsInstance</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="n">o</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="s1">&#39;ir.model&#39;</span><span class="p">,</span> <span class="s1">&#39;search&#39;</span><span class="p">,</span> <span class="p">[],</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsInstance</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_read_group">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_read_group">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_read_group</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;read_group&#39;</span><span class="p">,</span> <span class="p">[],</span> <span class="p">[</span><span class="s1">&#39;is_company&#39;</span><span class="p">,</span> <span class="s1">&#39;color&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;parent_id&#39;</span><span class="p">]</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_name_search">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_name_search">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_name_search</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;name_search&#39;</span><span class="p">,</span> <span class="s2">&quot;admin&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_html_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_html_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_html_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="s1">&#39;&lt;p&gt;bork bork bork &lt;span style=&quot;font-weight: bork&quot;&gt;bork&lt;/span&gt;&lt;br&gt;&lt;/p&gt;&#39;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;bob&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;bob&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;signature&#39;</span><span class="p">:</span> <span class="n">sig</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">signature</span><span class="p">),</span> <span class="n">sig</span><span class="p">)</span>
+        <span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc</span><span class="p">(</span><span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;signature&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;signature&#39;</span><span class="p">],</span> <span class="n">sig</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_frozendict_marshalling">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_frozendict_marshalling">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_frozendict_marshalling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that the marshalling of a frozendict object works properly over XMLRPC &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">tz</span> <span class="o">=</span> <span class="s2">&quot;Europe/Brussels&quot;</span>
+        <span class="n">ctx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;lang&#39;</span><span class="p">],</span> <span class="s1">&#39;en_US&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;tz&#39;</span><span class="p">],</span> <span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_defaultdict_marshalling">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_defaultdict_marshalling">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_defaultdict_marshalling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Test that the marshalling of a collections.defaultdict object</span>
+<span class="sd">        works properly over XMLRPC</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">],</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span>
+                   <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc</span><span class="p">(</span><span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">),</span> <span class="p">{})</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_remove_control_characters">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_remove_control_characters">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_remove_control_characters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;bob with a control character: </span><span class="se">\x03</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;bob&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;bob with a control character: </span><span class="se">\x03</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="p">[</span><span class="n">record_data</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc</span><span class="p">(</span><span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record_data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;bob with a control character: &#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_jsonrpc_read_group">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_jsonrpc_read_group">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_jsonrpc_read_group</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_json_call</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;read_group&#39;</span><span class="p">,</span> <span class="p">[],</span> <span class="p">[</span><span class="s1">&#39;is_company&#39;</span><span class="p">,</span> <span class="s1">&#39;color&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;parent_id&#39;</span><span class="p">]</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestXMLRPC.test_jsonrpc_name_search">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_jsonrpc_name_search">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_jsonrpc_name_search</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># well that&#39;s some sexy sexy call right there</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_json_call</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;name_search&#39;</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_json_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">opener</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;http://</span><span class="si">%s</span><span class="s2">:</span><span class="si">%s</span><span class="s2">/jsonrpc&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">HOST</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;http_port&#39;</span><span class="p">]),</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+            <span class="s1">&#39;jsonrpc&#39;</span><span class="p">:</span> <span class="s1">&#39;2.0&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;call&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;service&#39;</span><span class="p">:</span> <span class="s1">&#39;object&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;execute&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;args&#39;</span><span class="p">:</span> <span class="n">args</span>
+            <span class="p">}</span>
+        <span class="p">})</span>
+
+<div class="viewcode-block" id="TestXMLRPC.test_xmlrpc_attachment_raw">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestXMLRPC.test_xmlrpc_attachment_raw">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_xmlrpc_attachment_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;n&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\x01\x09</span><span class="s1">&#39;</span><span class="p">})</span><span class="o">.</span><span class="n">ids</span>
+        <span class="p">[</span><span class="n">att</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xmlrpc_object</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">admin_uid</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;ir.attachment&#39;</span><span class="p">,</span> <span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">att</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">],</span> <span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;on read, binary data should be decoded as a string and stripped from control character&quot;</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1"># really just for the test cursor</span>
+<div class="viewcode-block" id="TestAPIKeys">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys">[docs]</a>
+<span class="nd">@common</span><span class="o">.</span><span class="n">tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestAPIKeys</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">HttpCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestAPIKeys.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;Bylan&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;byl&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;ananananan&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tz&#39;</span><span class="p">:</span> <span class="s1">&#39;Australia/Eucla&#39;</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="c1"># needs a fake request in order to call methods protected with check_identity</span>
+        <span class="n">fake_req</span> <span class="o">=</span> <span class="n">DotDict</span><span class="p">({</span>
+            <span class="c1"># various things go and access request items</span>
+            <span class="s1">&#39;httprequest&#39;</span><span class="p">:</span> <span class="n">DotDict</span><span class="p">({</span>
+                <span class="s1">&#39;environ&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;REMOTE_ADDR&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">},</span>
+                <span class="s1">&#39;cookies&#39;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="p">}),</span>
+            <span class="c1"># bypass check_identity flow</span>
+            <span class="s1">&#39;session&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;identity-check-last&#39;</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()},</span>
+            <span class="s1">&#39;geoip&#39;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="p">})</span>
+        <span class="n">_request_stack</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">fake_req</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="n">_request_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.test_trivial">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.test_trivial">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_trivial</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">uid</span> <span class="o">=</span> <span class="n">auth</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;authenticate&#39;</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="s1">&#39;byl&#39;</span><span class="p">,</span> <span class="s1">&#39;ananananan&#39;</span><span class="p">,</span> <span class="p">{}])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">uid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">ctx</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;execute_kw&#39;</span><span class="p">,</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="s1">&#39;ananananan&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;tz&#39;</span><span class="p">],</span> <span class="s1">&#39;Australia/Eucla&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.test_wrongpw">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.test_wrongpw">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_wrongpw</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># User.authenticate raises but RPC.authenticate returns False</span>
+        <span class="n">uid</span> <span class="o">=</span> <span class="n">auth</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;authenticate&#39;</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="s1">&#39;byl&#39;</span><span class="p">,</span> <span class="s1">&#39;aws&#39;</span><span class="p">,</span> <span class="p">{}])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">uid</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessDenied</span><span class="p">):</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;execute_kw&#39;</span><span class="p">,</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;aws&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.test_key">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.test_key">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span>
+        <span class="p">})</span><span class="o">.</span><span class="n">make_key</span><span class="p">()</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="s1">&#39;context&#39;</span><span class="p">][</span><span class="s1">&#39;default_key&#39;</span><span class="p">]</span>
+
+        <span class="n">uid</span> <span class="o">=</span> <span class="n">auth</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;authenticate&#39;</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="s1">&#39;byl&#39;</span><span class="p">,</span> <span class="s1">&#39;ananananan&#39;</span><span class="p">,</span> <span class="p">{}])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">uid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">uid</span> <span class="o">=</span> <span class="n">auth</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;authenticate&#39;</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="s1">&#39;byl&#39;</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="p">{}])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">uid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">ctx</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;execute_kw&#39;</span><span class="p">,</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span>
+            <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;tz&#39;</span><span class="p">],</span> <span class="s1">&#39;Australia/Eucla&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.test_delete">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.test_delete">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="p">)</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">,})</span><span class="o">.</span><span class="n">make_key</span><span class="p">()</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">,})</span><span class="o">.</span><span class="n">make_key</span><span class="p">()</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">,})</span><span class="o">.</span><span class="n">make_key</span><span class="p">()</span>
+        <span class="n">k0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">k2</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+
+        <span class="c1"># user can remove their own keys</span>
+        <span class="n">k0</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">k0</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="c1"># admin can remove user keys</span>
+        <span class="n">k1</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">remove</span>    <span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">k1</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="c1"># other user can&#39;t remove user keys</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">k2</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">u</span><span class="p">)</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestAPIKeys.test_disabled">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_xmlrpc.TestAPIKeys.test_disabled">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="p">)</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">,})</span><span class="o">.</span><span class="n">make_key</span><span class="p">()[</span><span class="s1">&#39;context&#39;</span><span class="p">][</span><span class="s1">&#39;default_key&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessDenied</span><span class="p">):</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;execute_kw&#39;</span><span class="p">,</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;ananananan&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessDenied</span><span class="p">):</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s1">&#39;execute_kw&#39;</span><span class="p">,</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span>
+                <span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;context_get&#39;</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">])</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

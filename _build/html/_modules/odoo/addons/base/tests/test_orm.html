@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_orm &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_orm</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_orm</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span><span class="p">,</span> <span class="n">MissingError</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCase</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">Command</span>
+
+
+<div class="viewcode-block" id="TestORM">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM">[docs]</a>
+<span class="k">class</span> <span class="nc">TestORM</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; test special behaviors of ORM CRUD functions &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestORM.test_access_deleted_records">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_access_deleted_records">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_access_deleted_records</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Verify that accessing deleted records works as expected &quot;&quot;&quot;</span>
+        <span class="n">c1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;W&#39;</span><span class="p">})</span>
+        <span class="n">c2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Y&#39;</span><span class="p">})</span>
+        <span class="n">c1</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># read() is expected to skip deleted records because our API is not</span>
+        <span class="c1"># transactional for a sequence of search()-&gt;read() performed from the</span>
+        <span class="c1"># client-side... a concurrent deletion could therefore cause spurious</span>
+        <span class="c1"># exceptions even when simply opening a list view!</span>
+        <span class="c1"># /!\ Using unprileged user to detect former side effects of ir.rules!</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;test2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)])],</span>
+        <span class="p">})</span>
+        <span class="n">cs</span> <span class="o">=</span> <span class="p">(</span><span class="n">c1</span> <span class="o">+</span> <span class="n">c2</span><span class="p">)</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">c2</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Y&#39;</span><span class="p">}],</span> <span class="n">cs</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">]),</span> <span class="s2">&quot;read() should skip deleted records&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([],</span> <span class="n">cs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">]),</span> <span class="s2">&quot;read() should skip deleted records&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Deleting an already deleted record should be simply ignored</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">c1</span><span class="o">.</span><span class="n">unlink</span><span class="p">(),</span> <span class="s2">&quot;Re-deleting should be a no-op&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_access_partial_deletion">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_access_partial_deletion">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_access_partial_deletion</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check accessing a record from a recordset where another record has been deleted. &quot;&quot;&quot;</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.country&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">Model</span><span class="p">)</span><span class="o">.</span><span class="n">display_name</span><span class="o">.</span><span class="n">automatic</span><span class="p">,</span> <span class="s2">&quot;test assumption not satisfied&quot;</span><span class="p">)</span>
+
+        <span class="c1"># access regular field when another record from the same prefetch set has been deleted</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">([</span><span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;ZV&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;ZX&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Baz&#39;</span><span class="p">,</span> <span class="s1">&#39;ZY&#39;</span><span class="p">])])</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># access computed field when another record from the same prefetch set has been deleted</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">([</span><span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;ZV&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;ZX&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Baz&#39;</span><span class="p">,</span> <span class="s1">&#39;ZY&#39;</span><span class="p">])])</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">display_name</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_access_filtered_records">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_access_filtered_records">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.addons.base.models.ir_rule&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_access_filtered_records</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Verify that accessing filtered records works as expected for non-admin user &quot;&quot;&quot;</span>
+        <span class="n">p1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;W&#39;</span><span class="p">})</span>
+        <span class="n">p2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Y&#39;</span><span class="p">})</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;test2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)])],</span>
+        <span class="p">})</span>
+
+        <span class="n">partner_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span><span class="s1">&#39;=&#39;</span><span class="p">,</span><span class="s1">&#39;res.partner&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.rule&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Y is invisible&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;domain_force&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="n">p1</span><span class="o">.</span><span class="n">id</span><span class="p">)],</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># search as unprivileged user</span>
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">p1</span><span class="p">,</span> <span class="n">partners</span><span class="p">,</span> <span class="s2">&quot;W should not be visible...&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">p2</span><span class="p">,</span> <span class="n">partners</span><span class="p">,</span> <span class="s2">&quot;... but Y should be visible&quot;</span><span class="p">)</span>
+
+        <span class="c1"># read as unprivileged user</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">p1</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="c1"># write as unprivileged user</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">p1</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="c1"># unlink as unprivileged user</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">p1</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># Prepare mixed case </span>
+        <span class="n">p2</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="c1"># read mixed records: some deleted and some filtered</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span><span class="p">)</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="c1"># delete mixed records: some deleted and some filtered</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span><span class="p">)</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_read">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_read">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">})</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsInstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_search_read">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_search_read">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_search_read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+
+        <span class="c1"># simple search_read</span>
+        <span class="n">partner</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">})</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># search_read correct order</span>
+        <span class="n">partner</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;MyPartner2&#39;</span><span class="p">})</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;like&#39;</span><span class="p">,</span> <span class="s1">&#39;MyPartner&#39;</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;MyPartner2&#39;</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;like&#39;</span><span class="p">,</span> <span class="s1">&#39;MyPartner&#39;</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;name desc&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;MyPartner2&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="s1">&#39;MyPartner1&#39;</span><span class="p">)</span>
+
+        <span class="c1"># search_read that finds nothing</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;Does not exists&#39;</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># search_read with an empty array of fields</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">field</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;display_name&#39;</span><span class="p">,</span> <span class="s1">&#39;email&#39;</span><span class="p">])</span>
+
+        <span class="c1"># search_read without fields</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="kc">False</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">found</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">field</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;display_name&#39;</span><span class="p">,</span> <span class="s1">&#39;email&#39;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_exists">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_exists">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+
+        <span class="c1"># check that records obtained from search exist</span>
+        <span class="n">recs</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">recs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">recs</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="n">recs</span><span class="p">)</span>
+
+        <span class="c1"># check that new records exist by convention</span>
+        <span class="n">recs</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">new</span><span class="p">({})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">recs</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="c1"># check that there is no record with id 0</span>
+        <span class="n">recs</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">browse</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">recs</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_groupby_date">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_groupby_date">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_groupby_date</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">partners_data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">A</span><span class="o">=</span><span class="s1">&#39;2012-11-19&#39;</span><span class="p">,</span>
+            <span class="n">B</span><span class="o">=</span><span class="s1">&#39;2012-12-17&#39;</span><span class="p">,</span>
+            <span class="n">C</span><span class="o">=</span><span class="s1">&#39;2012-12-31&#39;</span><span class="p">,</span>
+            <span class="n">D</span><span class="o">=</span><span class="s1">&#39;2013-01-07&#39;</span><span class="p">,</span>
+            <span class="n">E</span><span class="o">=</span><span class="s1">&#39;2013-01-14&#39;</span><span class="p">,</span>
+            <span class="n">F</span><span class="o">=</span><span class="s1">&#39;2013-01-28&#39;</span><span class="p">,</span>
+            <span class="n">G</span><span class="o">=</span><span class="s1">&#39;2013-02-11&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">partner_ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">partner_ids_by_day</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">partner_ids_by_month</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">partner_ids_by_year</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">partners_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">date</span><span class="o">=</span><span class="n">date</span><span class="p">))</span>
+            <span class="n">partner_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="n">partner_ids_by_day</span><span class="p">[</span><span class="n">date</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="n">partner_ids_by_month</span><span class="p">[</span><span class="n">date</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="n">partner_ids_by_year</span><span class="p">[</span><span class="n">date</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">read_group</span><span class="p">(</span><span class="n">interval</span><span class="p">):</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">)]</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">grp</span> <span class="ow">in</span> <span class="n">partners</span><span class="o">.</span><span class="n">read_group</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;date:&#39;</span> <span class="o">+</span> <span class="n">interval</span><span class="p">]):</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;date:&#39;</span> <span class="o">+</span> <span class="n">interval</span><span class="p">]]</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;__domain&#39;</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">read_group</span><span class="p">(</span><span class="s1">&#39;day&#39;</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids_by_day</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">read_group</span><span class="p">(</span><span class="s1">&#39;month&#39;</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids_by_month</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">read_group</span><span class="p">(</span><span class="s1">&#39;year&#39;</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids_by_year</span><span class="p">))</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">read_group</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">],</span>
+                                  <span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">,</span> <span class="s1">&#39;date:day&#39;</span><span class="p">],</span> <span class="n">lazy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">))</span>
+
+        <span class="c1"># combine groupby and orderby</span>
+        <span class="n">months</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;February 2013&#39;</span><span class="p">,</span> <span class="s1">&#39;January 2013&#39;</span><span class="p">,</span> <span class="s1">&#39;December 2012&#39;</span><span class="p">,</span> <span class="s1">&#39;November 2012&#39;</span><span class="p">]</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">read_group</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">],</span>
+                                  <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">],</span> <span class="n">orderby</span><span class="o">=</span><span class="s1">&#39;date:month DESC&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">res</span><span class="p">],</span> <span class="n">months</span><span class="p">)</span>
+
+        <span class="c1"># order by date should reorder by date:month</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">read_group</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">],</span>
+                                  <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">],</span> <span class="n">orderby</span><span class="o">=</span><span class="s1">&#39;date DESC&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">res</span><span class="p">],</span> <span class="n">months</span><span class="p">)</span>
+
+        <span class="c1"># order by date should reorder by date:day</span>
+        <span class="n">days</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;11 Feb 2013&#39;</span><span class="p">,</span> <span class="s1">&#39;28 Jan 2013&#39;</span><span class="p">,</span> <span class="s1">&#39;14 Jan 2013&#39;</span><span class="p">,</span> <span class="s1">&#39;07 Jan 2013&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;31 Dec 2012&#39;</span><span class="p">,</span> <span class="s1">&#39;17 Dec 2012&#39;</span><span class="p">,</span> <span class="s1">&#39;19 Nov 2012&#39;</span><span class="p">]</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">partners</span><span class="o">.</span><span class="n">read_group</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">)],</span> <span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">],</span>
+                                  <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;date:month&#39;</span><span class="p">,</span> <span class="s1">&#39;date:day&#39;</span><span class="p">],</span>
+                                  <span class="n">orderby</span><span class="o">=</span><span class="s1">&#39;date DESC&#39;</span><span class="p">,</span> <span class="n">lazy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;date:day&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">res</span><span class="p">],</span> <span class="n">days</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_write_duplicate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_write_duplicate">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_write_duplicate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">p1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;W&#39;</span><span class="p">})</span>
+        <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p1</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_m2m_store_trigger">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_m2m_store_trigger">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_m2m_store_trigger</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">group_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span>
+
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;test_m2m_store_trigger&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([])],</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">share</span><span class="p">)</span>
+
+        <span class="n">group_user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;users&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">share</span><span class="p">)</span>
+
+        <span class="n">group_user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;users&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">share</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_unlink_with_property">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_unlink_with_property">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_unlink_with_property</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Verify that unlink removes the related ir.property as unprivileged user &quot;&quot;&quot;</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Justine Bridou&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;saucisson&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_partner_manager&#39;</span><span class="p">)])],</span>
+        <span class="p">})</span>
+        <span class="n">p1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Zorro&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">_set_multi</span><span class="p">(</span><span class="s2">&quot;ref&quot;</span><span class="p">,</span> <span class="s2">&quot;res.partner&quot;</span><span class="p">,</span> <span class="p">{</span><span class="n">p1</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="s2">&quot;Nain poilu&quot;</span><span class="p">})</span>
+        <span class="n">p1_prop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s2">&quot;ref&quot;</span><span class="p">,</span> <span class="s2">&quot;res.partner&quot;</span><span class="p">,</span> <span class="n">res_id</span><span class="o">=</span><span class="n">p1</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">p1_prop</span><span class="p">,</span> <span class="s2">&quot;Nain poilu&quot;</span><span class="p">,</span> <span class="s1">&#39;p1_prop should have been created&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Unlink with unprivileged user</span>
+        <span class="n">p1</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># ir.property is deleted</span>
+        <span class="n">p1_prop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s2">&quot;ref&quot;</span><span class="p">,</span> <span class="s2">&quot;res.partner&quot;</span><span class="p">,</span> <span class="n">res_id</span><span class="o">=</span><span class="n">p1</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">p1_prop</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;p1_prop should have been deleted&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestORM.test_create_multi">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestORM.test_create_multi">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create for multiple records &quot;&quot;&quot;</span>
+        <span class="c1"># assumption: &#39;res.bank&#39; does not override &#39;create&#39;</span>
+        <span class="n">vals_list</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">}</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;Baz&#39;</span><span class="p">)]</span>
+        <span class="n">vals_list</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;email&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;foo@example.com&#39;</span>
+        <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">:</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.bank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">email</span><span class="p">,</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.bank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.bank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">vals_list</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">record</span><span class="p">,</span> <span class="n">vals</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">email</span><span class="p">,</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+
+        <span class="c1"># create countries and states</span>
+        <span class="n">vals_list</span> <span class="o">=</span> <span class="p">[{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;state_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;North Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;NF&#39;</span><span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;South Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;SF&#39;</span><span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;West Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;WF&#39;</span><span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;East Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;EF&#39;</span><span class="p">}),</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;ZV&#39;</span><span class="p">,</span>
+        <span class="p">},</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Bar&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;state_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;North Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;NB&#39;</span><span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;South Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;SB&#39;</span><span class="p">}),</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;ZX&#39;</span><span class="p">,</span>
+        <span class="p">}]</span>
+        <span class="n">foo</span><span class="p">,</span> <span class="n">bar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.country&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">foo</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCountEqual</span><span class="p">(</span><span class="n">foo</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;state_ids.code&#39;</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;NF&#39;</span><span class="p">,</span> <span class="s1">&#39;SF&#39;</span><span class="p">,</span> <span class="s1">&#39;WF&#39;</span><span class="p">,</span> <span class="s1">&#39;EF&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">bar</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCountEqual</span><span class="p">(</span><span class="n">bar</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;state_ids.code&#39;</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;NB&#39;</span><span class="p">,</span> <span class="s1">&#39;SB&#39;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestInherits">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits">[docs]</a>
+<span class="k">class</span> <span class="nc">TestInherits</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; test the behavior of the orm for models that use _inherits;</span>
+<span class="sd">        specifically: res.users, that inherits from res.partner</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestInherits.test_default">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_default">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; `default_get` cannot return a dictionary or a new id &quot;&quot;&quot;</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">default_get</span><span class="p">([</span><span class="s1">&#39;partner_id&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="s1">&#39;partner_id&#39;</span> <span class="ow">in</span> <span class="n">defaults</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIsInstance</span><span class="p">(</span><span class="n">defaults</span><span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">],</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_create">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; creating a user should automatically create a new partner &quot;&quot;&quot;</span>
+        <span class="n">partners_before</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="n">user_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">partner_id</span><span class="p">,</span> <span class="n">partners_before</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_create_with_ancestor">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_create_with_ancestor">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_with_ancestor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; creating a user with a specific &#39;partner_id&#39; should not create a new partner &quot;&quot;&quot;</span>
+        <span class="n">partner_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">})</span>
+        <span class="n">partners_before</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="n">user_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner_foo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="n">partners_after</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">partners_before</span><span class="p">,</span> <span class="n">partners_after</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">partner_id</span><span class="p">,</span> <span class="n">partner_foo</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_read">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_read">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; inherited fields should be read without any indirection &quot;&quot;&quot;</span>
+        <span class="n">user_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="n">user_values</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="n">partner_values</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">partner_values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_copy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_copy">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; copying a user should automatically copy its partner, too &quot;&quot;&quot;</span>
+        <span class="n">user_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;employee&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">foo_before</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">del</span> <span class="n">foo_before</span><span class="p">[</span><span class="s1">&#39;create_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_before</span><span class="p">[</span><span class="s1">&#39;write_date&#39;</span><span class="p">]</span>
+        <span class="n">user_bar</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;bar&#39;</span><span class="p">})</span>
+        <span class="n">foo_after</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">del</span> <span class="n">foo_after</span><span class="p">[</span><span class="s1">&#39;create_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_after</span><span class="p">[</span><span class="s1">&#39;write_date&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">foo_before</span><span class="p">,</span> <span class="n">foo_after</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Foo (copy)&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">login</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">employee</span><span class="p">,</span> <span class="n">user_bar</span><span class="o">.</span><span class="n">employee</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_bar</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_bar</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_copy_with_ancestor">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_copy_with_ancestor">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_copy_with_ancestor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; copying a user with &#39;parent_id&#39; in defaults should not duplicate the partner &quot;&quot;&quot;</span>
+        <span class="n">user_foo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;signature&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">})</span>
+        <span class="n">partner_bar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Bar&#39;</span><span class="p">})</span>
+
+        <span class="n">foo_before</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">del</span> <span class="n">foo_before</span><span class="p">[</span><span class="s1">&#39;create_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_before</span><span class="p">[</span><span class="s1">&#39;write_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_before</span><span class="p">[</span><span class="s1">&#39;login_date&#39;</span><span class="p">]</span>
+        <span class="n">partners_before</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="n">user_bar</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner_bar</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;bar&#39;</span><span class="p">})</span>
+        <span class="n">foo_after</span><span class="p">,</span> <span class="o">=</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">del</span> <span class="n">foo_after</span><span class="p">[</span><span class="s1">&#39;create_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_after</span><span class="p">[</span><span class="s1">&#39;write_date&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">foo_after</span><span class="p">[</span><span class="s1">&#39;login_date&#39;</span><span class="p">]</span>
+        <span class="n">partners_after</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">foo_before</span><span class="p">,</span> <span class="n">foo_after</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">partners_before</span><span class="p">,</span> <span class="n">partners_after</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">user_foo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_bar</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">partner_bar</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">login</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="s2">&quot;login is given from copy parameters&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">password</span><span class="p">,</span> <span class="s2">&quot;password should not be copied from original record&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">,</span> <span class="s2">&quot;name is given from specific partner&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user_bar</span><span class="o">.</span><span class="n">signature</span><span class="p">,</span> <span class="n">user_foo</span><span class="o">.</span><span class="n">signature</span><span class="p">,</span> <span class="s2">&quot;signature should be copied&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestInherits.test_write_date">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_orm.TestInherits.test_write_date">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_write_date</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; modifying inherited fields must update write_date &quot;&quot;&quot;</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span>
+        <span class="n">write_date_before</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">write_date</span>
+
+        <span class="c1"># write base64 image</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;image_1920&#39;</span><span class="p">:</span> <span class="s1">&#39;R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==&#39;</span><span class="p">})</span>
+        <span class="n">write_date_after</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">write_date</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">write_date_before</span><span class="p">,</span> <span class="n">write_date_after</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

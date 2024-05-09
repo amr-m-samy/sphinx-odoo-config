@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tests.form &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tests.form</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tests.form</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">The module :mod:`odoo.tests.form` provides an implementation of a client form</span>
+<span class="sd">view for server-side unit tests.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">date</span>
+<span class="kn">from</span> <span class="nn">dateutil.relativedelta</span> <span class="kn">import</span> <span class="n">relativedelta</span>
+
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.models</span> <span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span> <span class="nn">odoo.fields</span> <span class="kn">import</span> <span class="n">Command</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.safe_eval</span> <span class="kn">import</span> <span class="n">safe_eval</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">MODIFIER_ALIASES</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;1&#39;</span><span class="p">:</span> <span class="s1">&#39;True&#39;</span><span class="p">,</span> <span class="s1">&#39;0&#39;</span><span class="p">:</span> <span class="s1">&#39;False&#39;</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="Form">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.Form">[docs]</a>
+<span class="k">class</span> <span class="nc">Form</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Server-side form view implementation (partial)</span>
+
+<span class="sd">    Implements much of the &quot;form view&quot; manipulation flow, such that server-side</span>
+<span class="sd">    tests can more properly reflect the behaviour which would be observed when</span>
+<span class="sd">    manipulating the interface:</span>
+
+<span class="sd">    * call the relevant onchanges on &quot;creation&quot;;</span>
+<span class="sd">    * call the relevant onchanges on setting fields;</span>
+<span class="sd">    * properly handle defaults &amp; onchanges around x2many fields.</span>
+
+<span class="sd">    Saving the form returns the current record (which means the created record</span>
+<span class="sd">    if in creation mode). It can also be accessed as ``form.record``, but only</span>
+<span class="sd">    when the form has no pending changes.</span>
+
+<span class="sd">    Regular fields can just be assigned directly to the form. In the case</span>
+<span class="sd">    of :class:`~odoo.fields.Many2one` fields, one can assign a recordset::</span>
+
+<span class="sd">        # empty recordset =&gt; creation mode</span>
+<span class="sd">        f = Form(self.env[&#39;sale.order&#39;])</span>
+<span class="sd">        f.partner_id = a_partner</span>
+<span class="sd">        so = f.save()</span>
+
+<span class="sd">    One can also use the form as a context manager to create or edit a record.</span>
+<span class="sd">    The changes are automatically saved at the end of the scope::</span>
+
+<span class="sd">        with Form(self.env[&#39;sale.order&#39;]) as f1:</span>
+<span class="sd">            f1.partner_id = a_partner</span>
+<span class="sd">            # f1 is saved here</span>
+
+<span class="sd">        # retrieve the created record</span>
+<span class="sd">        so = f1.record</span>
+
+<span class="sd">        # call Form on record =&gt; edition mode</span>
+<span class="sd">        with Form(so) as f2:</span>
+<span class="sd">            f2.payment_term_id = env.ref(&#39;account.account_payment_term_15days&#39;)</span>
+<span class="sd">            # f2 is saved here</span>
+
+<span class="sd">    For :class:`~odoo.fields.Many2many` fields, the field itself is a</span>
+<span class="sd">    :class:`~odoo.tests.common.M2MProxy` and can be altered by adding or</span>
+<span class="sd">    removing records::</span>
+
+<span class="sd">        with Form(user) as u:</span>
+<span class="sd">            u.groups_id.add(env.ref(&#39;account.group_account_manager&#39;))</span>
+<span class="sd">            u.groups_id.remove(id=env.ref(&#39;base.group_portal&#39;).id)</span>
+
+<span class="sd">    Finally :class:`~odoo.fields.One2many` are reified as :class:`~O2MProxy`.</span>
+
+<span class="sd">    Because the :class:`~odoo.fields.One2many` only exists through its parent,</span>
+<span class="sd">    it is manipulated more directly by creating &quot;sub-forms&quot; with</span>
+<span class="sd">    the :meth:`~O2MProxy.new` and :meth:`~O2MProxy.edit` methods. These would</span>
+<span class="sd">    normally be used as context managers since they get saved in the parent</span>
+<span class="sd">    record::</span>
+
+<span class="sd">        with Form(so) as f3:</span>
+<span class="sd">            f.partner_id = a_partner</span>
+<span class="sd">            # add support</span>
+<span class="sd">            with f3.order_line.new() as line:</span>
+<span class="sd">                line.product_id = env.ref(&#39;product.product_product_2&#39;)</span>
+<span class="sd">            # add a computer</span>
+<span class="sd">            with f3.order_line.new() as line:</span>
+<span class="sd">                line.product_id = env.ref(&#39;product.product_product_3&#39;)</span>
+<span class="sd">            # we actually want 5 computers</span>
+<span class="sd">            with f3.order_line.edit(1) as line:</span>
+<span class="sd">                line.product_uom_qty = 5</span>
+<span class="sd">            # remove support</span>
+<span class="sd">            f3.order_line.remove(index=0)</span>
+<span class="sd">            # SO is saved here</span>
+
+<span class="sd">    :param record: empty or singleton recordset. An empty recordset will put</span>
+<span class="sd">                   the view in &quot;creation&quot; mode from default values, while a</span>
+<span class="sd">                   singleton will put it in &quot;edit&quot; mode and only load the</span>
+<span class="sd">                   view&#39;s data.</span>
+<span class="sd">    :type record: odoo.models.Model</span>
+<span class="sd">    :param view: the id, xmlid or actual view object to use for onchanges and</span>
+<span class="sd">                 view constraints. If none is provided, simply loads the</span>
+<span class="sd">                 default view for the model.</span>
+<span class="sd">    :type view: int | str | odoo.model.Model</span>
+
+<span class="sd">    .. versionadded:: 12.0</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+
+        <span class="c1"># use object.__setattr__ to bypass Form&#39;s override of __setattr__</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_record&#39;</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_env&#39;</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+
+        <span class="c1"># determine view and process it</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="n">view</span><span class="o">.</span><span class="n">_name</span> <span class="o">==</span> <span class="s1">&#39;ir.ui.view&#39;</span><span class="p">,</span> <span class="s2">&quot;the view parameter must be a view id, xid or record, got </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">view</span>
+            <span class="n">view_id</span> <span class="o">=</span> <span class="n">view</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">view_id</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">view</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">view_id</span> <span class="o">=</span> <span class="n">view</span> <span class="ow">or</span> <span class="kc">False</span>
+
+        <span class="n">views</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">get_views</span><span class="p">([(</span><span class="n">view_id</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">)])</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_models_info&#39;</span><span class="p">,</span> <span class="n">views</span><span class="p">[</span><span class="s1">&#39;models&#39;</span><span class="p">])</span>
+        <span class="c1"># self._models_info = {model_name: {field_name: field_info}}</span>
+        <span class="n">tree</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">views</span><span class="p">[</span><span class="s1">&#39;views&#39;</span><span class="p">][</span><span class="s1">&#39;form&#39;</span><span class="p">][</span><span class="s1">&#39;arch&#39;</span><span class="p">])</span>
+        <span class="n">view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_view</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_view&#39;</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
+        <span class="c1"># self._view = {</span>
+        <span class="c1">#     &#39;tree&#39;: view_arch_etree,</span>
+        <span class="c1">#     &#39;fields&#39;: {field_name: field_info},</span>
+        <span class="c1">#     &#39;fields_spec&#39;: web_read_fields_spec,</span>
+        <span class="c1">#     &#39;modifiers&#39;: {field_name: {modifier: expression}},</span>
+        <span class="c1">#     &#39;contexts&#39;: {field_name: field_context_str},</span>
+        <span class="c1">#     &#39;onchange&#39;: onchange_spec,</span>
+        <span class="c1"># }</span>
+
+        <span class="c1"># determine record values</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_values&#39;</span><span class="p">,</span> <span class="n">UpdateDict</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">record</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_record</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_defaults</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_process_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tree</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Post-processes to augment the view_get with:</span>
+<span class="sd">        * an id field (may not be present if not in the view but needed)</span>
+<span class="sd">        * pre-processed modifiers</span>
+<span class="sd">        * pre-processed onchanges list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;id&#39;</span><span class="p">}}</span>
+        <span class="n">fields_spec</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">modifiers</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;required&#39;</span><span class="p">:</span> <span class="s1">&#39;False&#39;</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">:</span> <span class="s1">&#39;True&#39;</span><span class="p">}}</span>
+        <span class="n">contexts</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># retrieve &lt;field&gt; nodes at the current level</span>
+        <span class="n">flevel</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;count(ancestor::field)&#39;</span><span class="p">)</span>
+        <span class="n">daterange_field_names</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;.//field[count(ancestor::field) = </span><span class="si">{</span><span class="n">flevel</span><span class="si">}</span><span class="s1">]&#39;</span><span class="p">):</span>
+            <span class="n">field_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+
+            <span class="c1"># add field_info into fields</span>
+            <span class="n">field_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+            <span class="n">fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_info</span>
+            <span class="n">fields_spec</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_spec</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="c1"># determine modifiers</span>
+            <span class="n">field_modifiers</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;required&#39;</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">,</span> <span class="s1">&#39;column_invisible&#39;</span><span class="p">):</span>
+                <span class="c1"># use python field attribute as default value</span>
+                <span class="n">default</span> <span class="o">=</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;required&#39;</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">field_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+                <span class="n">expr</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">default</span><span class="p">)</span>
+                <span class="n">field_modifiers</span><span class="p">[</span><span class="n">attr</span><span class="p">]</span> <span class="o">=</span> <span class="n">MODIFIER_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span>
+
+            <span class="c1"># Combine the field modifiers with its ancestor modifiers with an</span>
+            <span class="c1"># OR: A field is invisible if its own invisible modifier is True OR</span>
+            <span class="c1"># if one of its ancestor invisible modifier is True</span>
+            <span class="k">for</span> <span class="n">ancestor</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;ancestor::*[@invisible][count(ancestor::field) = </span><span class="si">{</span><span class="n">flevel</span><span class="si">}</span><span class="s1">]&#39;</span><span class="p">):</span>
+                <span class="n">modifier</span> <span class="o">=</span> <span class="s1">&#39;invisible&#39;</span>
+                <span class="n">expr</span> <span class="o">=</span> <span class="n">ancestor</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">modifier</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">expr</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span> <span class="ow">or</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+                    <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;True&#39;</span>
+                <span class="k">if</span> <span class="n">expr</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span>
+                    <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span>
+                <span class="k">elif</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span>
+                    <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">expr</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;(</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s1">) or (</span><span class="si">{</span><span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span><span class="si">}</span><span class="s1">)&#39;</span>
+
+            <span class="c1"># merge field_modifiers into modifiers[field_name]</span>
+            <span class="k">if</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="n">modifiers</span><span class="p">:</span>
+                <span class="c1"># The field is several times in the view, combine the modifier</span>
+                <span class="c1"># expression with an AND: a field is X if all occurences of the</span>
+                <span class="c1"># field in the view are X.</span>
+                <span class="k">for</span> <span class="n">modifier</span><span class="p">,</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">modifiers</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">expr</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span> <span class="ow">or</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span>
+                        <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;False&#39;</span>
+                    <span class="k">if</span> <span class="n">expr</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+                        <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span>
+                    <span class="k">elif</span> <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+                        <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">expr</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;(</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s1">) and (</span><span class="si">{</span><span class="n">field_modifiers</span><span class="p">[</span><span class="n">modifier</span><span class="p">]</span><span class="si">}</span><span class="s1">)&#39;</span>
+
+            <span class="n">modifiers</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_modifiers</span>
+
+            <span class="c1"># determine context</span>
+            <span class="n">ctx</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;context&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ctx</span><span class="p">:</span>
+                <span class="n">contexts</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">ctx</span>
+                <span class="n">field_spec</span><span class="p">[</span><span class="s1">&#39;context&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_static_context</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+
+            <span class="c1"># FIXME: better widgets support</span>
+            <span class="c1"># NOTE: selection breaks because of m2o widget=selection</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;widget&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;many2many&#39;</span><span class="p">]:</span>
+                <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;widget&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;widget&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;daterange&#39;</span><span class="p">:</span>
+                <span class="n">options</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&#39;</span><span class="p">))</span>
+                <span class="n">related_field</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;start_date_field&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;end_date_field&#39;</span><span class="p">)</span>
+                <span class="n">daterange_field_names</span><span class="p">[</span><span class="n">related_field</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_name</span>
+
+            <span class="c1"># determine subview to use for edition</span>
+            <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">level</span><span class="p">:</span>
+                    <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;invisible&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_modifiers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;invisible&#39;</span><span class="p">)</span>
+                    <span class="n">edition_view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_one2many_edition_view</span><span class="p">(</span><span class="n">field_info</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+                    <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edition_view</span>
+                    <span class="n">field_spec</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edition_view</span><span class="p">[</span><span class="s1">&#39;fields_spec&#39;</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># this trick enables the following invariant: every one2many</span>
+                    <span class="c1"># field has some &#39;edition_view&#39; in its info dict</span>
+                    <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;many2many&#39;</span>
+
+        <span class="k">for</span> <span class="n">related_field</span><span class="p">,</span> <span class="n">start_field</span> <span class="ow">in</span> <span class="n">daterange_field_names</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">modifiers</span><span class="p">[</span><span class="n">related_field</span><span class="p">][</span><span class="s1">&#39;invisible&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">modifiers</span><span class="p">[</span><span class="n">start_field</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;invisible&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;tree&#39;</span><span class="p">:</span> <span class="n">tree</span><span class="p">,</span>
+            <span class="s1">&#39;fields&#39;</span><span class="p">:</span> <span class="n">fields</span><span class="p">,</span>
+            <span class="s1">&#39;fields_spec&#39;</span><span class="p">:</span> <span class="n">fields_spec</span><span class="p">,</span>
+            <span class="s1">&#39;modifiers&#39;</span><span class="p">:</span> <span class="n">modifiers</span><span class="p">,</span>
+            <span class="s1">&#39;contexts&#39;</span><span class="p">:</span> <span class="n">contexts</span><span class="p">,</span>
+            <span class="s1">&#39;onchange&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">_onchange_spec</span><span class="p">({</span><span class="s1">&#39;arch&#39;</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">tree</span><span class="p">)}),</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_get_one2many_edition_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_info</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a suitable view for editing records into a one2many field. &quot;&quot;&quot;</span>
+        <span class="n">submodel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]]</span>
+
+        <span class="c1"># by simplicity, ensure we always have tree and form views</span>
+        <span class="n">views</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">view</span><span class="o">.</span><span class="n">tag</span><span class="p">:</span> <span class="n">view</span> <span class="k">for</span> <span class="n">view</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;./*[descendant::field]&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">view_type</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">view_type</span> <span class="ow">in</span> <span class="n">views</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;invisible&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+                <span class="c1"># add an empty view</span>
+                <span class="n">views</span><span class="p">[</span><span class="n">view_type</span><span class="p">]</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="n">view_type</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">refs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_view_refs</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+            <span class="n">subviews</span> <span class="o">=</span> <span class="n">submodel</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">refs</span><span class="p">)</span><span class="o">.</span><span class="n">get_views</span><span class="p">([(</span><span class="kc">None</span><span class="p">,</span> <span class="n">view_type</span><span class="p">)])</span>
+            <span class="n">subnode</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">subviews</span><span class="p">[</span><span class="s1">&#39;views&#39;</span><span class="p">][</span><span class="n">view_type</span><span class="p">][</span><span class="s1">&#39;arch&#39;</span><span class="p">])</span>
+            <span class="n">views</span><span class="p">[</span><span class="n">view_type</span><span class="p">]</span> <span class="o">=</span> <span class="n">subnode</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subnode</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">fields</span> <span class="ow">in</span> <span class="n">subviews</span><span class="p">[</span><span class="s1">&#39;models&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_models_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+
+        <span class="c1"># pick the first editable subview</span>
+        <span class="n">view_type</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+            <span class="n">vtype</span> <span class="k">for</span> <span class="n">vtype</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;mode&#39;</span><span class="p">,</span> <span class="s1">&#39;tree&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">vtype</span> <span class="o">!=</span> <span class="s1">&#39;form&#39;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">view_type</span> <span class="o">==</span> <span class="s1">&#39;tree&#39;</span> <span class="ow">and</span> <span class="n">views</span><span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;editable&#39;</span><span class="p">)):</span>
+            <span class="n">view_type</span> <span class="o">=</span> <span class="s1">&#39;form&#39;</span>
+
+        <span class="c1"># don&#39;t recursively process o2ms in o2ms</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_view</span><span class="p">(</span><span class="n">views</span><span class="p">[</span><span class="n">view_type</span><span class="p">],</span> <span class="n">submodel</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_init_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Initialize the form for an existing record. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s2">&quot;editing unstored records is not supported&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="p">[</span><span class="n">record_values</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">web_read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields_spec&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>  <span class="c1"># discard cache and pending recomputations</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="n">convert_read_to_form</span><span class="p">(</span><span class="n">record_values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_init_from_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Initialize the form for a new record. &quot;&quot;&quot;</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span>
+        <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># call onchange with no field; this retrieves default values, applies</span>
+        <span class="c1"># onchanges and return the result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">()</span>
+        <span class="c1"># mark all fields as modified</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the current value of the given field. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the current value of the given field. &quot;&quot;&quot;</span>
+        <span class="n">field_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">field_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">!r}</span><span class="s2"> was not found in the view&quot;</span>
+
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]]</span>
+            <span class="k">return</span> <span class="n">Model</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">O2MProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">M2MProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Set the given field to the given value, and proceed with the expected onchanges. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Set the given field to the given value, and proceed with the expected onchanges. &quot;&quot;&quot;</span>
+        <span class="n">field_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">field_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">!r}</span><span class="s2"> was not found in the view&quot;</span>
+        <span class="k">assert</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;one2many&#39;</span><span class="p">,</span> <span class="s2">&quot;Can&#39;t set an one2many field directly, use its proxy instead&quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;can&#39;t write on readonly field </span><span class="si">{</span><span class="n">field_name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;can&#39;t write on invisible field </span><span class="si">{</span><span class="n">field_name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+
+        <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">M2MProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">)</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">_name</span> <span class="o">==</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_modifier</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">modifier</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">view</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span>
+
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">view</span><span class="p">[</span><span class="s1">&#39;modifiers&#39;</span><span class="p">][</span><span class="n">field_name</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">modifier</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">expr</span>
+        <span class="k">if</span> <span class="n">expr</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;True&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">expr</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span>
+
+        <span class="k">if</span> <span class="n">vals</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span>
+
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_eval_context</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">safe_eval</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_get_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the context of a given field. &quot;&quot;&quot;</span>
+        <span class="n">context_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;contexts&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">context_str</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_eval_context</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">context_str</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_eval_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the context dict to eval something. &quot;&quot;&quot;</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;active_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;active_ids&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+            <span class="s1">&#39;active_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="s1">&#39;current_date&#39;</span><span class="p">:</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">),</span>
+            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_all_values</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="o">**</span><span class="n">context</span><span class="p">,</span>
+            <span class="s1">&#39;context&#39;</span><span class="p">:</span> <span class="n">context</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">values</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_get_all_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the values of all fields. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_values</span><span class="p">(</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; This makes the Form usable as a context manager. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">exc_type</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+<div class="viewcode-block" id="Form.save">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.Form.save">[docs]</a>
+    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Save the form (if necessary) and return the current record:</span>
+
+<span class="sd">        * does not save ``readonly`` fields;</span>
+<span class="sd">        * does not save unmodified fields (during edition) — any assignment</span>
+<span class="sd">          or onchange return marks the field as modified, even if set to its</span>
+<span class="sd">          current value.</span>
+
+<span class="sd">        When nothing must be saved, it simply returns the current record.</span>
+
+<span class="sd">        :raises AssertionError: if the form has any unfilled required field</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_save_values</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span> <span class="ow">or</span> <span class="n">values</span><span class="p">:</span>
+            <span class="c1"># save and reload</span>
+            <span class="p">[</span><span class="n">record_values</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">web_save</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields_spec&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>  <span class="c1"># discard cache and pending recomputations</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">:</span>
+                <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">record_values</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">])</span>
+                <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_record&#39;</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+
+            <span class="n">values</span> <span class="o">=</span> <span class="n">convert_read_to_form</span><span class="p">(</span><span class="n">record_values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">record</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the record being edited by the form. This attribute is</span>
+<span class="sd">        readonly and can only be accessed when the form has no pending changes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">_changed</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span>
+
+    <span class="k">def</span> <span class="nf">_get_save_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Validate and return field values modified since load/save. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_values</span><span class="p">(</span><span class="s1">&#39;save&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">modifiers_values</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_link</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Validate &amp; extract values, recursively in order to handle o2ms properly.</span>
+
+<span class="sd">        :param mode: can be ``&quot;save&quot;`` (validate and return non-readonly modified fields),</span>
+<span class="sd">            ``&quot;onchange&quot;`` (return modified fields) or ``&quot;all&quot;`` (return all field values)</span>
+<span class="sd">        :param UpdateDict values: values of the record to extract</span>
+<span class="sd">        :param view: view info</span>
+<span class="sd">        :param dict modifiers_values: defaults to ``values``, but o2ms need some additional massaging</span>
+<span class="sd">        :param parent_link: optional field representing &quot;parent&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;save&#39;</span><span class="p">,</span> <span class="s1">&#39;onchange&#39;</span><span class="p">,</span> <span class="s1">&#39;all&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span>
+        <span class="k">if</span> <span class="n">view</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">UpdateDict</span><span class="p">)</span>
+
+        <span class="n">modifiers_values</span> <span class="o">=</span> <span class="n">modifiers_values</span> <span class="ow">or</span> <span class="n">values</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">field_info</span> <span class="ow">in</span> <span class="n">view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">field_name</span> <span class="o">==</span> <span class="s1">&#39;id&#39;</span> <span class="ow">or</span> <span class="n">field_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+
+            <span class="c1"># note: maybe `invisible` should not skip `required` if model attribute</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;save&#39;</span>
+                <span class="ow">and</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">False</span>
+                <span class="ow">and</span> <span class="n">field_name</span> <span class="o">!=</span> <span class="n">parent_link</span>
+                <span class="ow">and</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;boolean&#39;</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="n">modifiers_values</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;column_invisible&#39;</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="n">modifiers_values</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;required&#39;</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="n">modifiers_values</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2"> is a required field (</span><span class="si">{</span><span class="n">view</span><span class="p">[</span><span class="s1">&#39;modifiers&#39;</span><span class="p">][</span><span class="n">field_name</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+            <span class="c1"># skip unmodified fields unless all_fields</span>
+            <span class="k">if</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;save&#39;</span><span class="p">,</span> <span class="s1">&#39;onchange&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">field_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">_changed</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;save&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="n">modifiers_values</span><span class="p">):</span>
+                <span class="n">field_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+                    <span class="n">node</span>
+                    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">view</span><span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="s1">&#39;field&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">field_name</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">field_node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;force_save&#39;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
+                    <span class="c1"># in the context of an eval, format it as a list of ids</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">subview</span> <span class="o">=</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">]</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">to_commands</span><span class="p">(</span><span class="k">lambda</span> <span class="n">vals</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_values</span><span class="p">(</span>
+                        <span class="n">mode</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">subview</span><span class="p">,</span>
+                        <span class="n">modifiers_values</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">vals</span><span class="p">,</span> <span class="s1">&#39;parent&#39;</span><span class="p">:</span> <span class="n">Dotter</span><span class="p">(</span><span class="n">values</span><span class="p">)},</span>
+                        <span class="c1"># related o2m don&#39;t have a relation_field</span>
+                        <span class="n">parent_link</span><span class="o">=</span><span class="n">field_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;relation_field&#39;</span><span class="p">),</span>
+                    <span class="p">))</span>
+
+            <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
+                    <span class="c1"># in the context of an eval, format it as a list of ids</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">to_commands</span><span class="p">()</span>
+
+            <span class="n">result</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">field_name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+
+        <span class="c1"># marks onchange source as changed</span>
+        <span class="k">if</span> <span class="n">field_name</span><span class="p">:</span>
+            <span class="n">field_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">field_names</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># skip calling onchange() if there&#39;s no on_change on the field</span>
+        <span class="k">if</span> <span class="n">field_name</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;onchange&#39;</span><span class="p">][</span><span class="n">field_name</span><span class="p">]:</span>
+            <span class="k">return</span>
+
+        <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_record</span>
+
+        <span class="c1"># if the onchange is triggered by a field, add the context of that field</span>
+        <span class="k">if</span> <span class="n">field_name</span><span class="p">:</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_context</span><span class="p">(</span><span class="n">field_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">context</span><span class="p">:</span>
+                <span class="n">record</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">context</span><span class="p">)</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_onchange_values</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">field_names</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields_spec&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>  <span class="c1"># discard cache and pending recomputations</span>
+
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;warning&#39;</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;onchange&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%(title)s</span><span class="s2"> </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;warning&#39;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">field_name</span><span class="p">:</span>
+            <span class="c1"># fill in whatever fields are still missing with falsy values</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">field_name</span><span class="p">:</span> <span class="n">_cleanup_from_default</span><span class="p">(</span><span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="kc">False</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">field_info</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">field_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span>
+            <span class="p">})</span>
+
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_onchange</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_get_onchange_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return modified field values for onchange. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_values</span><span class="p">(</span><span class="s1">&#39;onchange&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_apply_onchange</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_onchange_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">],</span> <span class="n">values</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_apply_onchange_</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">onchange_values</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">UpdateDict</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fname</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">onchange_values</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">field_info</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;one2many&#39;</span><span class="p">,</span> <span class="s1">&#39;many2many&#39;</span><span class="p">):</span>
+                <span class="n">subfields</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+                    <span class="n">subfields</span> <span class="o">=</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">][</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span>
+                <span class="n">field_value</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">Command</span><span class="o">.</span><span class="n">CREATE</span><span class="p">:</span>
+                        <span class="n">vals</span> <span class="o">=</span> <span class="n">UpdateDict</span><span class="p">(</span><span class="n">convert_read_to_form</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">subfields</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="n">subfields</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_onchange_</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">subfields</span><span class="p">,</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                        <span class="n">field_value</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">Command</span><span class="o">.</span><span class="n">UPDATE</span><span class="p">:</span>
+                        <span class="n">vals</span> <span class="o">=</span> <span class="n">field_value</span><span class="o">.</span><span class="n">get_vals</span><span class="p">(</span><span class="n">cmd</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_onchange_</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">subfields</span><span class="p">,</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="k">elif</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">DELETE</span><span class="p">,</span> <span class="n">Command</span><span class="o">.</span><span class="n">UNLINK</span><span class="p">):</span>
+                        <span class="n">field_value</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">cmd</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">elif</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">Command</span><span class="o">.</span><span class="n">LINK</span><span class="p">:</span>
+                        <span class="n">field_value</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cmd</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">convert_read_to_form</span><span class="p">(</span><span class="n">cmd</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">subfields</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Unexpected onchange() result&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="n">values</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="O2MForm">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MForm">[docs]</a>
+<span class="k">class</span> <span class="nc">O2MForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+    <span class="c1"># noinspection PyMissingConstructor</span>
+    <span class="c1"># pylint: disable=super-init-not-called</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">proxy</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">proxy</span><span class="o">.</span><span class="n">_model</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_proxy&#39;</span><span class="p">,</span> <span class="n">proxy</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_index&#39;</span><span class="p">,</span> <span class="n">index</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_record&#39;</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_env&#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_models_info&#39;</span><span class="p">,</span> <span class="n">proxy</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_models_info</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_view&#39;</span><span class="p">,</span> <span class="n">proxy</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">])</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_values&#39;</span><span class="p">,</span> <span class="n">UpdateDict</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_defaults</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="n">proxy</span><span class="o">.</span><span class="n">_records</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">):</span>
+                <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_record&#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]))</span>
+
+    <span class="k">def</span> <span class="nf">_get_modifier</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">modifier</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">modifier</span> <span class="o">!=</span> <span class="s1">&#39;required&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span><span class="o">.</span><span class="n">_field</span><span class="p">,</span> <span class="n">modifier</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="n">modifier</span><span class="p">,</span> <span class="n">view</span><span class="o">=</span><span class="n">view</span><span class="p">,</span> <span class="n">vals</span><span class="o">=</span><span class="n">vals</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_eval_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_eval_context</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">eval_context</span><span class="p">[</span><span class="s1">&#39;parent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Dotter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">eval_context</span>
+
+    <span class="k">def</span> <span class="nf">_get_onchange_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_onchange_values</span><span class="p">()</span>
+        <span class="c1"># computed o2m may not have a relation_field(?)</span>
+        <span class="n">field_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span><span class="o">.</span><span class="n">_field_info</span>
+        <span class="k">if</span> <span class="s1">&#39;relation_field&#39;</span> <span class="ow">in</span> <span class="n">field_info</span><span class="p">:</span>  <span class="c1"># note: should be fine because not recursive</span>
+            <span class="n">parent_form</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span><span class="o">.</span><span class="n">_form</span>
+            <span class="n">parent_values</span> <span class="o">=</span> <span class="n">parent_form</span><span class="o">.</span><span class="n">_get_onchange_values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">parent_form</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+                <span class="n">parent_values</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent_form</span><span class="o">.</span><span class="n">_record</span><span class="o">.</span><span class="n">id</span>
+            <span class="n">values</span><span class="p">[</span><span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;relation_field&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">parent_values</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+<div class="viewcode-block" id="O2MForm.save">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MForm.save">[docs]</a>
+    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">proxy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proxy</span>
+        <span class="n">field_value</span> <span class="o">=</span> <span class="n">proxy</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">proxy</span><span class="o">.</span><span class="n">_field</span><span class="p">]</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_save_values</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">field_value</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">id_</span> <span class="o">=</span> <span class="n">field_value</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="p">]</span>
+            <span class="n">field_value</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+
+        <span class="n">proxy</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="n">proxy</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_save_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Validate and return field values modified since load/save. &quot;&quot;&quot;</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">UpdateDict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;required&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;column_invisible&#39;</span><span class="p">)</span>
+                <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">assert</span> <span class="n">values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">!r}</span><span class="s2"> is a required field&quot;</span>
+
+        <span class="k">return</span> <span class="n">values</span></div>
+
+
+
+<div class="viewcode-block" id="UpdateDict">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.UpdateDict">[docs]</a>
+<span class="k">class</span> <span class="nc">UpdateDict</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_changed</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">UpdateDict</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_changed</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">!r}{</span><span class="s1">&#39;*&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">_changed</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">val</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">{{</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">items</span><span class="p">)</span><span class="si">}</span><span class="se">}}</span><span class="s2">&quot;</span>
+
+<div class="viewcode-block" id="UpdateDict.changed_items">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.UpdateDict.changed_items">[docs]</a>
+    <span class="k">def</span> <span class="nf">changed_items</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_changed</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="UpdateDict.update">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.UpdateDict.update">[docs]</a>
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">UpdateDict</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_changed</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="UpdateDict.clear">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.UpdateDict.clear">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="X2MValue">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue">[docs]</a>
+<span class="k">class</span> <span class="nc">X2MValue</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; The value of a one2many field, with the API of a sequence of record ids. &quot;&quot;&quot;</span>
+    <span class="n">_virtual_seq</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable_of_vals</span><span class="o">=</span><span class="p">()):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="p">{</span><span class="n">vals</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]:</span> <span class="n">UpdateDict</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">iterable_of_vals</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">id_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)[</span><span class="n">index</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="c1"># this enables to compare self with a list</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">==</span> <span class="n">other</span>
+
+<div class="viewcode-block" id="X2MValue.get_vals">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.get_vals">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_vals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">id_</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.add">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">id_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">id_</span><span class="p">]</span> <span class="o">=</span> <span class="n">UpdateDict</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.remove">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.clear">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.clear">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.create">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.create">[docs]</a>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="n">id_</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;virtual_</span><span class="si">{</span><span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_virtual_seq</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">create_vals</span> <span class="o">=</span> <span class="n">UpdateDict</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="n">create_vals</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">id_</span><span class="p">]</span> <span class="o">=</span> <span class="n">create_vals</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.update">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.update">[docs]</a>
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_</span><span class="p">,</span> <span class="n">changes</span><span class="p">,</span> <span class="n">changed</span><span class="o">=</span><span class="p">()):</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">id_</span><span class="p">]</span>
+        <span class="n">vals</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">changes</span><span class="p">)</span>
+        <span class="n">vals</span><span class="o">.</span><span class="n">_changed</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">changed</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="X2MValue.to_list_of_vals">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MValue.to_list_of_vals">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_list_of_vals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">values</span><span class="p">())</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="O2MValue">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MValue">[docs]</a>
+<span class="k">class</span> <span class="nc">O2MValue</span><span class="p">(</span><span class="n">X2MValue</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable_of_vals</span><span class="o">=</span><span class="p">()):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">iterable_of_vals</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_given</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)</span>
+
+<div class="viewcode-block" id="O2MValue.to_commands">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MValue.to_commands">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_commands</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">convert_values</span><span class="o">=</span><span class="k">lambda</span> <span class="n">vals</span><span class="p">:</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="n">given</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_given</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">id_</span><span class="p">,</span> <span class="n">vals</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">id_</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;virtual_&#39;</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">Command</span><span class="o">.</span><span class="n">CREATE</span><span class="p">,</span> <span class="n">id_</span><span class="p">,</span> <span class="n">convert_values</span><span class="p">(</span><span class="n">vals</span><span class="p">)))</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">id_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">given</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">id_</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">vals</span><span class="o">.</span><span class="n">_changed</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="n">convert_values</span><span class="p">(</span><span class="n">vals</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_given</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">id_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">id_</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="M2MValue">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MValue">[docs]</a>
+<span class="k">class</span> <span class="nc">M2MValue</span><span class="p">(</span><span class="n">X2MValue</span><span class="p">):</span>
+<div class="viewcode-block" id="M2MValue.to_commands">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MValue.to_commands">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_commands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ids</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">id_</span><span class="p">,</span> <span class="n">vals</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">id_</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;virtual_&#39;</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">Command</span><span class="o">.</span><span class="n">CREATE</span><span class="p">,</span> <span class="n">id_</span><span class="p">,</span> <span class="p">{</span>
+                    <span class="n">key</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">to_commands</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">X2MValue</span><span class="p">)</span> <span class="k">else</span> <span class="n">val</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">vals</span><span class="o">.</span><span class="n">changed_items</span><span class="p">()</span>
+                <span class="p">}))</span>
+                <span class="k">continue</span>
+            <span class="n">ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">vals</span><span class="o">.</span><span class="n">_changed</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="p">{</span>
+                    <span class="n">key</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">to_commands</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">X2MValue</span><span class="p">)</span> <span class="k">else</span> <span class="n">val</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">vals</span><span class="o">.</span><span class="n">changed_items</span><span class="p">()</span>
+                <span class="p">}))</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="X2MProxy">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.X2MProxy">[docs]</a>
+<span class="k">class</span> <span class="nc">X2MProxy</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A proxy represents the value of an x2many field, but not directly.</span>
+<span class="sd">    Instead, it provides an API to add, remove or edit records in the value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_form</span> <span class="o">=</span> <span class="kc">None</span>        <span class="c1"># Form containing the corresponding x2many field</span>
+    <span class="n">_field</span> <span class="o">=</span> <span class="kc">None</span>       <span class="c1"># name of the x2many field</span>
+    <span class="n">_field_info</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># field info</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">field_name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form</span> <span class="o">=</span> <span class="n">form</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field</span> <span class="o">=</span> <span class="n">field_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_view</span><span class="p">[</span><span class="s1">&#39;fields&#39;</span><span class="p">][</span><span class="n">field_name</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_assert_editable</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">,</span> <span class="s1">&#39;readonly&#39;</span><span class="p">),</span> <span class="sa">f</span><span class="s1">&#39;field </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="si">!r}</span><span class="s1"> is not editable&#39;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_get_modifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">,</span> <span class="s1">&#39;invisible&#39;</span><span class="p">),</span> <span class="sa">f</span><span class="s1">&#39;field </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="si">!r}</span><span class="s1"> is not visible&#39;</span></div>
+
+
+
+<div class="viewcode-block" id="O2MProxy">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MProxy">[docs]</a>
+<span class="k">class</span> <span class="nc">O2MProxy</span><span class="p">(</span><span class="n">X2MProxy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Proxy object for editing the value of a one2many field. &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_model</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]]</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_get_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">context</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">context</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_records</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">to_list_of_vals</span><span class="p">()</span>
+
+<div class="viewcode-block" id="O2MProxy.new">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MProxy.new">[docs]</a>
+    <span class="k">def</span> <span class="nf">new</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns a :class:`Form` for a new</span>
+<span class="sd">        :class:`~odoo.fields.One2many` record, properly initialised.</span>
+
+<span class="sd">        The form is created from the list view if editable, or the field&#39;s</span>
+<span class="sd">        form view otherwise.</span>
+
+<span class="sd">        :raises AssertionError: if the field is not editable</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">O2MForm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="O2MProxy.edit">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MProxy.edit">[docs]</a>
+    <span class="k">def</span> <span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns a :class:`Form` to edit the pre-existing</span>
+<span class="sd">        :class:`~odoo.fields.One2many` record.</span>
+
+<span class="sd">        The form is created from the list view if editable, or the field&#39;s</span>
+<span class="sd">        form view otherwise.</span>
+
+<span class="sd">        :raises AssertionError: if the field is not editable</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">O2MForm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="O2MProxy.remove">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.O2MProxy.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Removes the record at ``index`` from the parent form.</span>
+
+<span class="sd">        :raises AssertionError: if the field is not editable</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="M2MProxy">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MProxy">[docs]</a>
+<span class="k">class</span> <span class="nc">M2MProxy</span><span class="p">(</span><span class="n">X2MProxy</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Proxy object for editing the value of a many2many field.</span>
+
+<span class="sd">    Behaves as a :class:`~collection.Sequence` of recordsets, can be</span>
+<span class="sd">    indexed or sliced to get actual underlying recordsets.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="n">comodel_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="n">comodel_name</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">comodel_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_env</span><span class="p">[</span><span class="n">comodel_name</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="n">comodel_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">_name</span> <span class="o">==</span> <span class="n">comodel_name</span>
+        <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span>
+
+<div class="viewcode-block" id="M2MProxy.add">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MProxy.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Adds ``record`` to the field, the record must already exist.</span>
+
+<span class="sd">        The addition will only be finalized when the parent record is saved.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form</span>
+        <span class="n">comodel_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">_name</span> <span class="o">==</span> <span class="n">comodel_name</span><span class="p">,</span> \
+            <span class="sa">f</span><span class="s2">&quot;trying to assign a </span><span class="si">{</span><span class="n">record</span><span class="o">.</span><span class="n">_name</span><span class="si">!r}</span><span class="s2"> object to a </span><span class="si">{</span><span class="n">comodel_name</span><span class="si">!r}</span><span class="s2"> field&quot;</span>
+
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+            <span class="n">parent</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+
+
+    <span class="c1"># pylint: disable=redefined-builtin</span>
+<div class="viewcode-block" id="M2MProxy.remove">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MProxy.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Removes a record at a certain index or with a provided id from</span>
+<span class="sd">        the field.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="nb">id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">&quot;can remove by either id or index&quot;</span>
+        <span class="k">if</span> <span class="nb">id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="M2MProxy.set">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MProxy.set">[docs]</a>
+    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">records</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Set the field value to be ``records``. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="n">comodel_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_info</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">records</span><span class="o">.</span><span class="n">_name</span> <span class="o">==</span> <span class="n">comodel_name</span><span class="p">,</span> \
+            <span class="sa">f</span><span class="s2">&quot;trying to assign a </span><span class="si">{</span><span class="n">records</span><span class="o">.</span><span class="n">_name</span><span class="si">!r}</span><span class="s2"> object to a </span><span class="si">{</span><span class="n">comodel_name</span><span class="si">!r}</span><span class="s2"> field&quot;</span>
+
+        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">records</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">ids</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">id_</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">id_</span><span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="M2MProxy.clear">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.M2MProxy.clear">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Removes all existing records in the m2m</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assert_editable</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_value</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form</span><span class="o">.</span><span class="n">_perform_onchange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="convert_read_to_form">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.convert_read_to_form">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_read_to_form</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">fields</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">fname</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">field_info</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;id&#39;</span><span class="p">}</span> <span class="k">if</span> <span class="n">fname</span> <span class="o">==</span> <span class="s1">&#39;id&#39;</span> <span class="k">else</span> <span class="n">fields</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;edition_view&#39;</span> <span class="ow">in</span> <span class="n">field_info</span><span class="p">:</span>
+                <span class="n">subfields</span> <span class="o">=</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;edition_view&#39;</span><span class="p">][</span><span class="s1">&#39;fields&#39;</span><span class="p">]</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">O2MValue</span><span class="p">(</span><span class="n">convert_read_to_form</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">subfields</span><span class="p">)</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="p">()))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">O2MValue</span><span class="p">({</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">id_</span><span class="p">}</span> <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="p">()))</span>
+        <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">M2MValue</span><span class="p">({</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">id_</span><span class="p">}</span> <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="p">()))</span>
+        <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;datetime&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">field_info</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;date&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">date</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_cleanup_from_default</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">O2MValue</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">M2MValue</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">type_</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="s1">&#39;float&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">if</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;not implemented yet&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">cmd</span> <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">value</span> <span class="k">if</span> <span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">Command</span><span class="o">.</span><span class="n">SET</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;datetime&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;date&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">date</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="get_static_context">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.get_static_context">[docs]</a>
+<span class="k">def</span> <span class="nf">get_static_context</span><span class="p">(</span><span class="n">context_str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Parse the given context string, and return the literal part of it. &quot;&quot;&quot;</span>
+    <span class="n">context_ast</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">context_str</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">body</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Dict</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key_ast</span><span class="p">,</span> <span class="n">val_ast</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">context_ast</span><span class="o">.</span><span class="n">keys</span><span class="p">,</span> <span class="n">context_ast</span><span class="o">.</span><span class="n">values</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">key_ast</span><span class="p">)</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">val_ast</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="Dotter">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.form.Dotter">[docs]</a>
+<span class="k">class</span> <span class="nc">Dotter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Simple wrapper for a dict where keys are accessed as readonly attributes. &quot;&quot;&quot;</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;__values&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__values</span> <span class="o">=</span> <span class="n">values</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__values</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">Dotter</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">val</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

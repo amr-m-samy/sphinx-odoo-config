@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_ir_actions &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_ir_actions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_ir_actions</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">IntegrityError</span><span class="p">,</span> <span class="n">ProgrammingError</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span><span class="p">,</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">AccessError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">common</span><span class="p">,</span> <span class="n">tagged</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCaseWithUserDemo</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">Command</span>
+
+
+<div class="viewcode-block" id="TestServerActionsBase">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActionsBase">[docs]</a>
+<span class="k">class</span> <span class="nc">TestServerActionsBase</span><span class="p">(</span><span class="n">TransactionCaseWithUserDemo</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestServerActionsBase.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActionsBase.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TestServerActionsBase</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+
+        <span class="c1"># Data on which we will run the server action</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_country</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.country&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestingCountry&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;TY&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;address_format&#39;</span><span class="p">:</span> <span class="s1">&#39;SuperFormat&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name_position&#39;</span><span class="p">:</span> <span class="s1">&#39;before&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="s1">&#39;OrigCity&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;test.partner@test.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestingPartner&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;active_model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;active_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Model data</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span>
+        <span class="n">Fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comment_html</span> <span class="o">=</span> <span class="s1">&#39;&lt;p&gt;MyComment&lt;/p&gt;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_name_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_city_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;city&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_country_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;country_id&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_parent_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;parent_id&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_children_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;child_ids&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_category_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.country&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_country_name_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.country&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_country_code_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.country&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_country_name_position_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.country&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;name_position&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_category_model</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner.category&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_category_name_field</span> <span class="o">=</span> <span class="n">Fields</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner.category&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">)])</span>
+
+        <span class="c1"># create server action to</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestAction&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;model_name&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;record.write({&quot;comment&quot;: &quot;</span><span class="si">%s</span><span class="s1">&quot;})&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">comment_html</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">server_action_model</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;ir.actions.server&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_server_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestDummyServerAction&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">server_action_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">_logger.log(10, &quot;This is a %s debug %s&quot;, &quot;test&quot;, &quot;log&quot;)</span>
+<span class="sd">_logger.info(&quot;This is a %s info %s&quot;, &quot;test&quot;, &quot;log&quot;)</span>
+<span class="sd">_logger.warning(&quot;This is a %s warning %s&quot;, &quot;test&quot;, &quot;log&quot;)</span>
+<span class="sd">_logger.error(&quot;This is a %s error %s&quot;, &quot;test&quot;, &quot;log&quot;)</span>
+<span class="sd">try:</span>
+<span class="sd">    0/0</span>
+<span class="sd">except:</span>
+<span class="sd">    _logger.exception(&quot;This is a %s exception %s&quot;, &quot;test&quot;, &quot;log&quot;)</span>
+<span class="sd">&quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestServerActions">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions">[docs]</a>
+<span class="k">class</span> <span class="nc">TestServerActions</span><span class="p">(</span><span class="n">TestServerActionsBase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestServerActions.test_00_server_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_00_server_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_00_server_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertLogs</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_actions.server_action_safe_eval&#39;</span><span class="p">,</span>
+                             <span class="n">level</span><span class="o">=</span><span class="s1">&#39;DEBUG&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">log_catcher</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_server_action</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log_catcher</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="p">[</span>
+                <span class="s1">&#39;DEBUG:odoo.addons.base.models.ir_actions.server_action_safe_eval:This is a test debug log&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;INFO:odoo.addons.base.models.ir_actions.server_action_safe_eval:This is a test info log&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;WARNING:odoo.addons.base.models.ir_actions.server_action_safe_eval:This is a test warning log&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;ERROR:odoo.addons.base.models.ir_actions.server_action_safe_eval:This is a test error log&#39;</span><span class="p">,</span>
+<span class="sd">&quot;&quot;&quot;ERROR:odoo.addons.base.models.ir_actions.server_action_safe_eval:This is a test exception log</span>
+<span class="sd">Traceback (most recent call last):</span>
+<span class="sd">  File &quot;ir.actions.server(%d,)&quot;, line 6, in &lt;module&gt;</span>
+<span class="sd">ZeroDivisionError: division by zero&quot;&quot;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_server_action</span><span class="o">.</span><span class="n">id</span>
+            <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_00_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_00_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_00_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">comment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">comment_html</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: invalid condition check&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;comment&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+
+        <span class="c1"># Do: create contextual action</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">create_action</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">binding_model_id</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Do: remove contextual action</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">unlink_action</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">binding_model_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_10_code">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_10_code">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_10_code</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;partner_name = record.name + &#39;_code&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>
+                     <span class="s2">&quot;record.env[&#39;res.partner&#39;].create({&#39;name&#39;: partner_name})&quot;</span><span class="p">),</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: code server action correctly finished should return False&#39;</span><span class="p">)</span>
+
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestingPartner_code&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partners</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: 1 new partner should have been created&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_20_crud_create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_20_crud_create">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_20_crud_create</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Do: create a new record in another model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_create&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;crud_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;link_field_id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;TestingPartner2&#39;</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: create record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new partner created</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestingPartner2&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partner</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_20_crud_create_link_many2one">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_20_crud_create_link_many2one">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_20_crud_create_link_many2one</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="c1"># Do: create a new record in the same model and link it with a many2one</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_create&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;crud_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;link_field_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_parent_field</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s2">&quot;TestNew&quot;</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: create record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new partner created</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partner</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new partner linked</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">parent_id</span><span class="p">,</span> <span class="n">partner</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_20_crud_create_link_one2many">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_20_crud_create_link_one2many">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_20_crud_create_link_one2many</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="c1"># Do: create a new record in the same model and link it with a one2many</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_create&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;crud_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;link_field_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_children_field</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: create record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new partner created</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partner</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new partner linked</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">partner</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">child_ids</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_20_crud_create_link_many2many">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_20_crud_create_link_many2many">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_20_crud_create_link_many2many</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Do: create a new record in another model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_create&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;crud_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_category_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;link_field_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_category_field</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;TestingPartner&#39;</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: create record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: new category created</span>
+        <span class="n">category</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestingPartner&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">category</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">category</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_30_crud_write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_30_crud_write">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_30_crud_write</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Do: update partner name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: create record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;TestNew&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partner</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">partner</span><span class="o">.</span><span class="n">city</span><span class="p">,</span> <span class="s1">&#39;OrigCity&#39;</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: TODO&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_35_crud_write_selection">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_35_crud_write_selection">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_35_crud_write_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Don&#39;t want to use res.partner because no &#39;normal selection field&#39; exists there</span>
+        <span class="c1"># we&#39;ll use a speficic action for this test instead of the one from the test setup</span>
+        <span class="c1"># Do: update country name_position field</span>
+        <span class="n">selection_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_name_position_field</span><span class="o">.</span><span class="n">selection_ids</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;after&#39;</span><span class="p">)</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestAction&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;model_name&#39;</span><span class="p">:</span> <span class="s1">&#39;res.country&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;name_position&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;selection_value&#39;</span><span class="p">:</span> <span class="n">selection_value</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">action</span><span class="o">.</span><span class="n">_set_selection_value</span><span class="p">()</span>  <span class="c1"># manual onchange</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">selection_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;active_model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.country&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;active_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: country updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">name_position</span><span class="p">,</span> <span class="s1">&#39;after&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_36_crud_write_m2m_ops">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_36_crud_write_m2m_ops">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_36_crud_write_m2m_ops</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that m2m operations work as expected &quot;&quot;&quot;</span>
+        <span class="n">categ_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestCateg1&#39;</span><span class="p">})</span>
+        <span class="n">categ_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestCateg2&#39;</span><span class="p">})</span>
+        <span class="c1"># set partner category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;category_id&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_m2m_operation&#39;</span><span class="p">:</span> <span class="s1">&#39;set&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;resource_ref&#39;</span><span class="p">:</span> <span class="n">categ_1</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">categ_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: tag should have been set&#39;</span><span class="p">)</span>
+
+        <span class="c1"># add partner category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;category_id&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_m2m_operation&#39;</span><span class="p">:</span> <span class="s1">&#39;add&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;resource_ref&#39;</span><span class="p">:</span> <span class="n">categ_2</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">categ_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: new tag should have been added&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">categ_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: old tag should still be there&#39;</span><span class="p">)</span>
+
+        <span class="c1"># remove partner category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;category_id&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_m2m_operation&#39;</span><span class="p">:</span> <span class="s1">&#39;remove&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;resource_ref&#39;</span><span class="p">:</span> <span class="n">categ_1</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">categ_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: tag should have been removed&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">categ_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: tag should still be there&#39;</span><span class="p">)</span>
+
+        <span class="c1"># clear partner category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;category_id&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_m2m_operation&#39;</span><span class="p">:</span> <span class="s1">&#39;clear&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">category_id</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: tags should have been cleared&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_37_field_path_traversal">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_37_field_path_traversal">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_37_field_path_traversal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the update_path field traversal - allowing records to be updated along relational links &quot;&quot;&quot;</span>
+        <span class="c1"># update the country&#39;s name via the partner</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;country_id.name&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;TestUpdatedCountry&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;TestUpdatedCountry&#39;</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: country name should have been updated through relation&#39;</span><span class="p">)</span>
+
+        <span class="c1"># input an invalid path</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ValidationError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;country_id.name.foo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;DoesNotMatter&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">([</span><span class="s1">&#39;update_path&#39;</span><span class="p">,</span> <span class="s1">&#39;update_field_id&#39;</span><span class="p">])</span>
+
+        <span class="c1"># update a readonly field</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;country_id.id&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">([</span><span class="s1">&#39;update_path&#39;</span><span class="p">,</span> <span class="s1">&#39;update_field_id&#39;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_39_boolean_update">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_39_boolean_update">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_39_boolean_update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that boolean fields can be updated &quot;&quot;&quot;</span>
+        <span class="c1"># update the country&#39;s name via the partner</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;active&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_boolean_value&#39;</span><span class="p">:</span> <span class="s1">&#39;false&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: partner should have been deactivated&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;active&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_boolean_value&#39;</span><span class="p">:</span> <span class="s1">&#39;true&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">run_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">run_res</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: update record action correctly finished should return False&#39;</span><span class="p">)</span>
+        <span class="c1"># Test: partner updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="s1">&#39;ir_actions_server: partner should have been reactivated&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_40_multi">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_40_multi">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_model&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.models&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_40_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Data: 2 server actions that will be nested</span>
+        <span class="n">action1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Subaction1&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;action = {&quot;type&quot;: &quot;ir.actions.act_window&quot;}&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">action2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Subaction2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;crud_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_create&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;RaoulettePoiluchette&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">action3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Subaction2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;object_write&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;update_path&#39;</span><span class="p">:</span> <span class="s1">&#39;city&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;RaoulettePoiluchette&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">action4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Subaction3&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_partner_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;action = {&quot;type&quot;: &quot;ir.actions.act_url&quot;}&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;multi&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="n">action1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">action2</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">action3</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">action4</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+        <span class="p">})</span>
+
+        <span class="c1"># Do: run the action</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        <span class="c1"># Test: new partner created</span>
+        <span class="c1"># currently res_partner overrides default[&#39;name&#39;] whatever its value</span>
+        <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;RaoulettePoiluchette&#39;</span><span class="p">)])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">partner</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># Test: action returned</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">),</span> <span class="s1">&#39;ir.actions.act_url&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Test loops</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ValidationError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">id</span><span class="p">])]</span>
+            <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_50_groups">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_50_groups">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_50_groups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; check the action is returned only for groups dedicated to user &quot;&quot;&quot;</span>
+        <span class="n">Actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.actions&#39;</span><span class="p">]</span>
+
+        <span class="n">group0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;country group&#39;</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;active_model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.country&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;active_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Do: update model and group</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;binding_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">)],</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;record.write({&quot;vat_label&quot;: &quot;VatFromTest&quot;})&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># Test: action is not returned</span>
+        <span class="n">bindings</span> <span class="o">=</span> <span class="n">Actions</span><span class="o">.</span><span class="n">get_bindings</span><span class="p">(</span><span class="s1">&#39;res.country&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">bindings</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">vat_label</span><span class="p">)</span>
+
+        <span class="c1"># add group to the user, and test again</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">)]})</span>
+
+        <span class="n">bindings</span> <span class="o">=</span> <span class="n">Actions</span><span class="o">.</span><span class="n">get_bindings</span><span class="p">(</span><span class="s1">&#39;res.country&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertItemsEqual</span><span class="p">(</span><span class="n">bindings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;action&#39;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">,</span> <span class="s1">&#39;binding_view_types&#39;</span><span class="p">]))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_country</span><span class="o">.</span><span class="n">vat_label</span><span class="p">,</span> <span class="s1">&#39;VatFromTest&#39;</span><span class="p">,</span> <span class="s1">&#39;vat label should be changed to VatFromTest&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_60_sort">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_60_sort">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_60_sort</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; check the actions sorted by sequence &quot;&quot;&quot;</span>
+        <span class="n">Actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.actions&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Do: update model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;binding_model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_country_model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;TestAction2&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>
+
+        <span class="c1"># Test: action returned by sequence</span>
+        <span class="n">bindings</span> <span class="o">=</span> <span class="n">Actions</span><span class="o">.</span><span class="n">get_bindings</span><span class="p">(</span><span class="s1">&#39;res.country&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([</span><span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]],</span> <span class="p">[</span><span class="s1">&#39;TestAction2&#39;</span><span class="p">,</span> <span class="s1">&#39;TestAction&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">([</span><span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sequence&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_70_copy_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_70_copy_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_70_copy_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># first check that the base case (reset state) works normally</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.todo&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;action_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;done&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;done&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;open&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;by default state should be reset by copy&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># then check that on server action we&#39;ve changed that</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;copying a server action should not reset the state&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_80_permission">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_80_permission">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_80_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;record.write({&#39;date&#39;: datetime.date.today()})&quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">user_demo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span>
+        <span class="n">self_demo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user_demo</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="c1"># can write on contact partner</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="s2">&quot;contact&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user_demo</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">check_access_rule</span><span class="p">(</span><span class="s2">&quot;write&quot;</span><span class="p">)</span>
+
+        <span class="n">self_demo</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">date</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestServerActions.test_90_webhook">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestServerActions.test_90_webhook">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_90_webhook</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;webhook&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;webhook_field_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">res_partner_name_field</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">res_partner_city_field</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">res_partner_country_field</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="p">],</span>
+            <span class="s1">&#39;webhook_url&#39;</span><span class="p">:</span> <span class="s1">&#39;http://example.com/webhook&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="c1"># write a mock for the requests.post method that checks the data</span>
+        <span class="c1"># and returns a 200 response</span>
+        <span class="n">num_requests</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">def</span> <span class="nf">_patched_post</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">nonlocal</span> <span class="n">num_requests</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Response</span><span class="p">()</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">=</span> <span class="mi">200</span> <span class="k">if</span> <span class="n">num_requests</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">400</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;http://example.com/webhook&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">],</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span>
+                <span class="s1">&#39;_action&#39;</span><span class="p">:</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">(#</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="s1">&#39;_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+                <span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">city</span><span class="p">,</span>
+                <span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_partner</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="p">}))</span>
+            <span class="n">num_requests</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="n">response</span>
+
+        <span class="k">with</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="n">requests</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="p">,</span> <span class="n">_patched_post</span><span class="p">),</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_actions&#39;</span><span class="p">):</span>
+            <span class="c1"># first run: 200</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="c1"># second run: 400, should *not* raise but</span>
+            <span class="c1"># should warn in logs (hence mute_logger)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">num_requests</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestCommonCustomFields">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCommonCustomFields">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCommonCustomFields</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">TransactionCase</span><span class="p">):</span>
+    <span class="n">MODEL</span> <span class="o">=</span> <span class="s1">&#39;res.partner&#39;</span>
+    <span class="n">COMODEL</span> <span class="o">=</span> <span class="s1">&#39;res.users&#39;</span>
+
+<div class="viewcode-block" id="TestCommonCustomFields.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCommonCustomFields.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># check that the registry is properly reset</span>
+        <span class="n">fnames</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span>
+
+        <span class="nd">@self</span><span class="o">.</span><span class="n">addCleanup</span>
+        <span class="k">def</span> <span class="nf">check_registry</span><span class="p">():</span>
+            <span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span> <span class="o">==</span> <span class="n">fnames</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">reset_changes</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_all_caches</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestCommonCustomFields.create_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCommonCustomFields.create_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">field_type</span><span class="o">=</span><span class="s1">&#39;char&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create a custom field and return it &quot;&quot;&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">)])</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="n">field_type</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">field</span></div>
+
+
+<div class="viewcode-block" id="TestCommonCustomFields.create_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCommonCustomFields.create_view">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create a view with the given field name &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;yet another view&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">,</span>
+            <span class="s1">&#39;arch&#39;</span><span class="p">:</span> <span class="s1">&#39;&lt;tree string=&quot;X&quot;&gt;&lt;field name=&quot;</span><span class="si">%s</span><span class="s1">&quot;/&gt;&lt;/tree&gt;&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">,</span>
+        <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestCustomFields">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCustomFields</span><span class="p">(</span><span class="n">TestCommonCustomFields</span><span class="p">):</span>
+<div class="viewcode-block" id="TestCustomFields.test_create_custom">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_create_custom">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_custom</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; custom field names must be start with &#39;x_&#39; &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">IntegrityError</span><span class="p">),</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;xyz&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_rename_custom">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_rename_custom">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rename_custom</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; custom field names must be start with &#39;x_&#39; &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_xyz&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">IntegrityError</span><span class="p">),</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;xyz&#39;</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_create_valid">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_create_valid">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; field names must be valid pg identifiers &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ValidationError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo bar&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_rename_valid">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_rename_valid">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rename_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; field names must be valid pg identifiers &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ValidationError</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;x_foo bar&#39;</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_create_unique">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_create_unique">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_unique</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; one cannot create two fields with the same name on a given model &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">IntegrityError</span><span class="p">),</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_rename_unique">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_rename_unique">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rename_unique</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; one cannot create two fields with the same name on a given model &quot;&quot;&quot;</span>
+        <span class="n">field1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="n">field2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_bar&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">IntegrityError</span><span class="p">),</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">):</span>
+            <span class="n">field2</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">field1</span><span class="o">.</span><span class="n">name</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_remove_without_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_remove_without_view">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_remove_without_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; try removing a custom field that does not occur in views &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_rename_without_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_rename_without_view">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rename_without_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; try renaming a custom field that does not occur in views &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;x_bar&#39;</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_remove_with_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_remove_with_view">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_ui_view&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_remove_with_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; try removing a custom field that occurs in a view &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_view</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+
+        <span class="c1"># try to delete the field, this should fail but not modify the registry</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_rename_with_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_rename_with_view">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_ui_view&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_rename_with_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; try renaming a custom field that occurs in a view &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_view</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+
+        <span class="c1"># try to delete the field, this should fail but not modify the registry</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;x_bar&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_unlink_base">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_unlink_base">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_unlink_base</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; one cannot delete a non-custom field expect for uninstallation &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">,</span> <span class="s1">&#39;ref&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaisesRegex</span><span class="p">(</span><span class="n">UserError</span><span class="p">,</span> <span class="s1">&#39;This column contains module data&#39;</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># but it works in the context of uninstalling a module</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">_force_unlink</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_unlink_with_inverse">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_unlink_with_inverse">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_unlink_with_inverse</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create a custom o2m and then delete its m2o inverse &quot;&quot;&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">)</span>
+        <span class="n">comodel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">)</span>
+
+        <span class="n">m2o_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">comodel</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_my_m2o&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;my_m2o&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;many2one&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;relation&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">o2m_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_my_o2m&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;my_o2m&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;one2many&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;relation&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">,</span>
+            <span class="s1">&#39;relation_field&#39;</span><span class="p">:</span> <span class="n">m2o_field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># normal mode: you cannot break dependencies</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">m2o_field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># uninstall mode: unlink dependant fields</span>
+        <span class="n">m2o_field</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">_force_unlink</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">o2m_field</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_unlink_with_dependant">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_unlink_with_dependant">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_unlink_with_dependant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create a computed field, then delete its dependency &quot;&quot;&quot;</span>
+        <span class="c1"># Also applies to compute fields</span>
+        <span class="n">comodel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">)])</span>
+
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_my_char&#39;</span><span class="p">)</span>
+
+        <span class="n">dependant</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">comodel</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_boy&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_boy&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;char&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;related&#39;</span><span class="p">:</span> <span class="s1">&#39;partner_id.x_my_char&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># normal mode: you cannot break dependencies</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># uninstall mode: unlink dependant fields</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">_force_unlink</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">dependant</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_unlink_inherited_custom">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_unlink_inherited_custom">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_unlink_inherited_custom</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Creating a field on a model automatically creates an inherited field</span>
+<span class="sd">            in the comodel, and the latter can only be removed by deleting the</span>
+<span class="sd">            &quot;parent&quot; field.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;manual&#39;</span><span class="p">)</span>
+
+        <span class="n">inherited_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">,</span> <span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">inherited_field</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">inherited_field</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">)</span>
+
+        <span class="c1"># one cannot delete the inherited field itself</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">inherited_field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="c1"># but the inherited field is deleted when its parent field is</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">inherited_field</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search_count</span><span class="p">([</span>
+            <span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;x_foo&#39;</span><span class="p">),</span>
+        <span class="p">]))</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_create_binary">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_create_binary">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_create_binary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; binary custom fields should be created as attachment=True to avoid</span>
+<span class="sd">        bloating the DB when creating e.g. image fields via studio</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_image&#39;</span><span class="p">,</span> <span class="n">field_type</span><span class="o">=</span><span class="s1">&#39;binary&#39;</span><span class="p">)</span>
+        <span class="n">custom_binary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;x_image&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">custom_binary</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_related_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_related_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_related_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create a custom related field, and check filled values &quot;&quot;&quot;</span>
+        <span class="c1">#</span>
+        <span class="c1"># Add a custom field equivalent to the following definition:</span>
+        <span class="c1">#</span>
+        <span class="c1"># class Partner(models.Model)</span>
+        <span class="c1">#     _inherit = &#39;res.partner&#39;</span>
+        <span class="c1">#     x_oh_boy = fields.Char(related=&quot;country_id.code&quot;, store=True)</span>
+        <span class="c1">#</span>
+
+        <span class="c1"># pick N=100 records in comodel</span>
+        <span class="n">countries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.country&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">countries</span><span class="p">),</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Not enough records in comodel &#39;res.country&#39;&quot;</span><span class="p">)</span>
+
+        <span class="c1"># create records in model, with N distinct values for the related field</span>
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">country</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="n">country</span><span class="o">.</span><span class="n">id</span><span class="p">}</span> <span class="k">for</span> <span class="n">country</span> <span class="ow">in</span> <span class="n">countries</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="c1"># create a non-computed field, and assert how many queries it takes</span>
+        <span class="n">model_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_id</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">)</span>
+        <span class="n">query_count</span> <span class="o">=</span> <span class="mi">48</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">query_count</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_box&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_box&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;char&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;store&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="p">})</span>
+
+        <span class="c1"># same with a related field, it only takes 8 extra queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">query_count</span> <span class="o">+</span> <span class="mi">8</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_boy&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;x_oh_boy&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;char&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;related&#39;</span><span class="p">:</span> <span class="s1">&#39;country_id.code&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;store&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="p">})</span>
+
+        <span class="c1"># check the computed values</span>
+        <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">partners</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">partner</span><span class="o">.</span><span class="n">x_oh_boy</span><span class="p">,</span> <span class="n">partner</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">code</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_relation_of_a_custom_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_relation_of_a_custom_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_relation_of_a_custom_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; change the relation model of a custom field &quot;&quot;&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">)])</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_foo&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s1">&#39;x_foo&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;many2many&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;relation&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMODEL</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># change the relation</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ValidationError</span><span class="p">):</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">relation</span> <span class="o">=</span> <span class="s1">&#39;foo&#39;</span></div>
+
+
+<div class="viewcode-block" id="TestCustomFields.test_selection">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFields.test_selection">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; custom selection field &quot;&quot;&quot;</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">]</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODEL</span><span class="p">)])</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;x_sel&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s2">&quot;Custom Selection&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;selection&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;selection_ids&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}),</span>
+                <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Bar&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+            <span class="p">],</span>
+        <span class="p">})</span>
+
+        <span class="n">x_sel</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;x_sel&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">selection</span><span class="p">,</span> <span class="p">[(</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;Foo&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">)])</span>
+
+        <span class="c1"># add selection value &#39;baz&#39;</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">selection_ids</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;field_id&#39;</span><span class="p">:</span> <span class="n">field</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;baz&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Baz&#39;</span><span class="p">,</span> <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">x_sel</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;x_sel&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">selection</span><span class="p">,</span> <span class="p">[(</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;Foo&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;baz&#39;</span><span class="p">,</span> <span class="s1">&#39;Baz&#39;</span><span class="p">)])</span>
+
+        <span class="c1"># assign values to records</span>
+        <span class="n">rec1</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Rec1&#39;</span><span class="p">,</span> <span class="s1">&#39;x_sel&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="n">rec2</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Rec2&#39;</span><span class="p">,</span> <span class="s1">&#39;x_sel&#39;</span><span class="p">:</span> <span class="s1">&#39;bar&#39;</span><span class="p">})</span>
+        <span class="n">rec3</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Rec3&#39;</span><span class="p">,</span> <span class="s1">&#39;x_sel&#39;</span><span class="p">:</span> <span class="s1">&#39;baz&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec3</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;baz&#39;</span><span class="p">)</span>
+
+        <span class="c1"># remove selection value &#39;foo&#39;</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">selection_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="n">x_sel</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;x_sel&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">selection</span><span class="p">,</span> <span class="p">[(</span><span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;baz&#39;</span><span class="p">,</span> <span class="s1">&#39;Baz&#39;</span><span class="p">)])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec3</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;baz&#39;</span><span class="p">)</span>
+
+        <span class="c1"># update selection value &#39;bar&#39;</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">selection_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;quux&#39;</span>
+        <span class="n">x_sel</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;x_sel&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">x_sel</span><span class="o">.</span><span class="n">selection</span><span class="p">,</span> <span class="p">[(</span><span class="s1">&#39;quux&#39;</span><span class="p">,</span> <span class="s1">&#39;Bar&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;baz&#39;</span><span class="p">,</span> <span class="s1">&#39;Baz&#39;</span><span class="p">)])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;quux&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec3</span><span class="o">.</span><span class="n">x_sel</span><span class="p">,</span> <span class="s1">&#39;baz&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestCustomFieldsPostInstall">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFieldsPostInstall">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestCustomFieldsPostInstall</span><span class="p">(</span><span class="n">TestCommonCustomFields</span><span class="p">):</span>
+<div class="viewcode-block" id="TestCustomFieldsPostInstall.test_add_field_valid">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_actions.TestCustomFieldsPostInstall.test_add_field_valid">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_add_field_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; custom field names must start with &#39;x_&#39;, even when bypassing the constraints</span>
+
+<span class="sd">        If a user bypasses all constraints to add a custom field not starting by `x_`,</span>
+<span class="sd">        it must not be loaded in the registry.</span>
+
+<span class="sd">        This is to forbid users to override class attributes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_foo&#39;</span><span class="p">)</span>
+        <span class="c1"># Drop the SQL constraint, to bypass it,</span>
+        <span class="c1"># as a user could do through a SQL shell or a `cr.execute` in a server action</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;ALTER TABLE ir_model_fields DROP CONSTRAINT ir_model_fields_name_manual_field&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE ir_model_fields SET name = &#39;foo&#39; WHERE id = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">id</span><span class="p">])</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertLogs</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_model&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">log_catcher</span><span class="p">:</span>
+            <span class="c1"># Trick to reload the registry. The above rename done through SQL didn&#39;t reload the registry. This will.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s1">&#39;The field `</span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">` is not defined in the `</span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">model</span><span class="si">}</span><span class="s1">` Python class&#39;</span><span class="p">,</span> <span class="n">log_catcher</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

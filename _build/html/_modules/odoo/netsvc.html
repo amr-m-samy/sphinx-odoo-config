@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.netsvc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.netsvc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.netsvc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">logging.handlers</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">import</span> <span class="nn">pprint</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">werkzeug.serving</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">release</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">sql_db</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">tools</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="log">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.log">[docs]</a>
+<span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">prefix</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">indent</span><span class="o">=</span><span class="s1">&#39;&#39;</span>
+    <span class="n">indent_after</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">pprint</span><span class="o">.</span><span class="n">pformat</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="n">depth</span><span class="p">))</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">indent</span><span class="o">+</span><span class="n">line</span><span class="p">)</span>
+        <span class="n">indent</span><span class="o">=</span><span class="n">indent_after</span></div>
+
+
+
+<div class="viewcode-block" id="WatchedFileHandler">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.WatchedFileHandler">[docs]</a>
+<span class="k">class</span> <span class="nc">WatchedFileHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">WatchedFileHandler</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errors</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># py38</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="c1"># Unfix bpo-26789, in case the fix is present</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_builtin_open</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_open</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">baseFilename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PostgreSQLHandler">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.PostgreSQLHandler">[docs]</a>
+<span class="k">class</span> <span class="nc">PostgreSQLHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; PostgreSQL Logging Handler will store logs in the database, by default</span>
+<span class="sd">    the current database, can be set using --log-db=DBNAME</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="PostgreSQLHandler.emit">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.PostgreSQLHandler.emit">[docs]</a>
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="n">ct</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span>
+        <span class="n">ct_db</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="s1">&#39;dbname&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">dbname</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="k">else</span> <span class="n">ct_db</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dbname</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">),</span> <span class="n">tools</span><span class="o">.</span><span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">),</span> <span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">dbname</span><span class="p">,</span> <span class="n">allow_uri</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="c1"># preclude risks of deadlocks</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SET LOCAL statement_timeout = 1000&quot;</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span> <span class="o">%</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span>
+            <span class="n">traceback</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="s1">&#39;exc_text&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">traceback</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span>
+            <span class="c1"># we do not use record.levelname because it may have been changed by ColoredFormatter.</span>
+            <span class="n">levelname</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelName</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">)</span>
+
+            <span class="n">val</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;server&#39;</span><span class="p">,</span> <span class="n">ct_db</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">levelname</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">pathname</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">funcName</span><span class="p">)</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                INSERT INTO ir_logging(create_date, type, dbname, name, level, message, path, line, func)</span>
+<span class="s2">                VALUES (NOW() at time zone &#39;UTC&#39;, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">)</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span></div>
+</div>
+
+
+<span class="n">BLACK</span><span class="p">,</span> <span class="n">RED</span><span class="p">,</span> <span class="n">GREEN</span><span class="p">,</span> <span class="n">YELLOW</span><span class="p">,</span> <span class="n">BLUE</span><span class="p">,</span> <span class="n">MAGENTA</span><span class="p">,</span> <span class="n">CYAN</span><span class="p">,</span> <span class="n">WHITE</span><span class="p">,</span> <span class="n">_NOTHING</span><span class="p">,</span> <span class="n">DEFAULT</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<span class="c1">#The background is set with 40 plus the number of the color, and the foreground with 30</span>
+<span class="c1">#These are the sequences needed to get colored output</span>
+<span class="n">RESET_SEQ</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\033</span><span class="s2">[0m&quot;</span>
+<span class="n">COLOR_SEQ</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\033</span><span class="s2">[1;</span><span class="si">%d</span><span class="s2">m&quot;</span>
+<span class="n">BOLD_SEQ</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\033</span><span class="s2">[1m&quot;</span>
+<span class="n">COLOR_PATTERN</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s%s%%</span><span class="s2">s</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">COLOR_SEQ</span><span class="p">,</span> <span class="n">COLOR_SEQ</span><span class="p">,</span> <span class="n">RESET_SEQ</span><span class="p">)</span>
+<span class="n">LEVEL_COLOR_MAPPING</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span> <span class="p">(</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">DEFAULT</span><span class="p">),</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">:</span> <span class="p">(</span><span class="n">GREEN</span><span class="p">,</span> <span class="n">DEFAULT</span><span class="p">),</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">:</span> <span class="p">(</span><span class="n">YELLOW</span><span class="p">,</span> <span class="n">DEFAULT</span><span class="p">),</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">:</span> <span class="p">(</span><span class="n">RED</span><span class="p">,</span> <span class="n">DEFAULT</span><span class="p">),</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">CRITICAL</span><span class="p">:</span> <span class="p">(</span><span class="n">WHITE</span><span class="p">,</span> <span class="n">RED</span><span class="p">),</span>
+<span class="p">}</span>
+
+<div class="viewcode-block" id="PerfFilter">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.PerfFilter">[docs]</a>
+<span class="k">class</span> <span class="nc">PerfFilter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Filter</span><span class="p">):</span>
+<div class="viewcode-block" id="PerfFilter.format_perf">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.PerfFilter.format_perf">[docs]</a>
+    <span class="k">def</span> <span class="nf">format_perf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_count</span><span class="p">,</span> <span class="n">query_time</span><span class="p">,</span> <span class="n">remaining_time</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">query_count</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%.3f</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">query_time</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%.3f</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">remaining_time</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PerfFilter.filter">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.PerfFilter.filter">[docs]</a>
+    <span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s2">&quot;query_count&quot;</span><span class="p">):</span>
+            <span class="n">query_count</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">query_count</span>
+            <span class="n">query_time</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">query_time</span>
+            <span class="n">perf_t0</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">perf_t0</span>
+            <span class="n">remaining_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">perf_t0</span> <span class="o">-</span> <span class="n">query_time</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">perf_info</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">format_perf</span><span class="p">(</span><span class="n">query_count</span><span class="p">,</span> <span class="n">query_time</span><span class="p">,</span> <span class="n">remaining_time</span><span class="p">)</span>
+            <span class="nb">delattr</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s2">&quot;query_count&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">perf_info</span> <span class="o">=</span> <span class="s2">&quot;- - -&quot;</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+</div>
+
+
+<div class="viewcode-block" id="ColoredPerfFilter">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.ColoredPerfFilter">[docs]</a>
+<span class="k">class</span> <span class="nc">ColoredPerfFilter</span><span class="p">(</span><span class="n">PerfFilter</span><span class="p">):</span>
+<div class="viewcode-block" id="ColoredPerfFilter.format_perf">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.ColoredPerfFilter.format_perf">[docs]</a>
+    <span class="k">def</span> <span class="nf">format_perf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_count</span><span class="p">,</span> <span class="n">query_time</span><span class="p">,</span> <span class="n">remaining_time</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">colorize_time</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="nb">format</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">time</span> <span class="o">&gt;</span> <span class="n">high</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">COLOR_PATTERN</span> <span class="o">%</span> <span class="p">(</span><span class="mi">30</span> <span class="o">+</span> <span class="n">RED</span><span class="p">,</span> <span class="mi">40</span> <span class="o">+</span> <span class="n">DEFAULT</span><span class="p">,</span> <span class="nb">format</span> <span class="o">%</span> <span class="n">time</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">time</span> <span class="o">&gt;</span> <span class="n">low</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">COLOR_PATTERN</span> <span class="o">%</span> <span class="p">(</span><span class="mi">30</span> <span class="o">+</span> <span class="n">YELLOW</span><span class="p">,</span> <span class="mi">40</span> <span class="o">+</span> <span class="n">DEFAULT</span><span class="p">,</span> <span class="nb">format</span> <span class="o">%</span> <span class="n">time</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">format</span> <span class="o">%</span> <span class="n">time</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">colorize_time</span><span class="p">(</span><span class="n">query_count</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">1000</span><span class="p">),</span>
+            <span class="n">colorize_time</span><span class="p">(</span><span class="n">query_time</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%.3f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+            <span class="n">colorize_time</span><span class="p">(</span><span class="n">remaining_time</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%.3f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+            <span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="DBFormatter">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.DBFormatter">[docs]</a>
+<span class="k">class</span> <span class="nc">DBFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">):</span>
+<div class="viewcode-block" id="DBFormatter.format">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.DBFormatter.format">[docs]</a>
+    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">dbname</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s1">&#39;dbname&#39;</span><span class="p">,</span> <span class="s1">&#39;?&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="ColoredFormatter">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.ColoredFormatter">[docs]</a>
+<span class="k">class</span> <span class="nc">ColoredFormatter</span><span class="p">(</span><span class="n">DBFormatter</span><span class="p">):</span>
+<div class="viewcode-block" id="ColoredFormatter.format">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.ColoredFormatter.format">[docs]</a>
+    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="n">fg_color</span><span class="p">,</span> <span class="n">bg_color</span> <span class="o">=</span> <span class="n">LEVEL_COLOR_MAPPING</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">,</span> <span class="p">(</span><span class="n">GREEN</span><span class="p">,</span> <span class="n">DEFAULT</span><span class="p">))</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">levelname</span> <span class="o">=</span> <span class="n">COLOR_PATTERN</span> <span class="o">%</span> <span class="p">(</span><span class="mi">30</span> <span class="o">+</span> <span class="n">fg_color</span><span class="p">,</span> <span class="mi">40</span> <span class="o">+</span> <span class="n">bg_color</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">DBFormatter</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span></div>
+</div>
+
+
+<span class="n">_logger_init</span> <span class="o">=</span> <span class="kc">False</span>
+<div class="viewcode-block" id="init_logger">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.init_logger">[docs]</a>
+<span class="k">def</span> <span class="nf">init_logger</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">_logger_init</span>
+    <span class="k">if</span> <span class="n">_logger_init</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">_logger_init</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">old_factory</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogRecordFactory</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">record_factory</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="n">old_factory</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">perf_info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">record</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">setLogRecordFactory</span><span class="p">(</span><span class="n">record_factory</span><span class="p">)</span>
+
+    <span class="c1"># enable deprecation warnings (disabled by default)</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">9</span><span class="p">):</span>
+        <span class="c1"># recordsets are both sequence and set so trigger warning despite no issue</span>
+        <span class="c1"># Only applies to 3.9 as it was fixed in 3.10 see https://bugs.python.org/issue42470</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;^Sampling from a set&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s1">&#39;odoo&#39;</span><span class="p">)</span>
+    <span class="c1"># https://github.com/urllib3/urllib3/issues/2680</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;^</span><span class="se">\&#39;</span><span class="s1">urllib3.contrib.pyopenssl</span><span class="se">\&#39;</span><span class="s1"> module is deprecated.+&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+    <span class="c1"># ofxparse use an html parser to parse ofx xml files and triggers a warning since bs4 4.11.0</span>
+    <span class="c1"># https://github.com/jseutter/ofxparse/issues/170</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">bs4</span> <span class="kn">import</span> <span class="n">XMLParsedAsHTMLWarning</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">XMLParsedAsHTMLWarning</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="c1"># ignore a bunch of warnings we can&#39;t really fix ourselves</span>
+    <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="s1">&#39;babel.util&#39;</span><span class="p">,</span> <span class="c1"># deprecated parser module, no release yet</span>
+        <span class="s1">&#39;zeep.loader&#39;</span><span class="p">,</span><span class="c1"># zeep using defusedxml.lxml</span>
+        <span class="s1">&#39;reportlab.lib.rl_safe_eval&#39;</span><span class="p">,</span><span class="c1"># reportlab importing ABC from collections</span>
+        <span class="s1">&#39;ofxparse&#39;</span><span class="p">,</span><span class="c1"># ofxparse importing ABC from collections</span>
+        <span class="s1">&#39;astroid&#39;</span><span class="p">,</span>  <span class="c1"># deprecated imp module (fixed in 2.5.1)</span>
+        <span class="s1">&#39;requests_toolbelt&#39;</span><span class="p">,</span> <span class="c1"># importing ABC from collections (fixed in 0.9)</span>
+    <span class="p">]:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="n">module</span><span class="p">)</span>
+
+    <span class="c1"># rsjmin triggers this with Python 3.10+ (that warning comes from the C code and has no `module`)</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;^PyUnicode_FromUnicode\(NULL, size\) is deprecated&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+    <span class="c1"># the SVG guesser thing always compares str and bytes, ignore it</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">BytesWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s1">&#39;odoo.tools.image&#39;</span><span class="p">)</span>
+    <span class="c1"># reportlab does a bunch of bytes/str mixing in a hashmap</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">BytesWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s1">&#39;reportlab.platypus.paraparser&#39;</span><span class="p">)</span>
+
+    <span class="c1"># need to be adapted later but too muchwork for this pr.</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;^datetime.datetime.utcnow\(\) is deprecated and scheduled for removal in a future version.*&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+
+    <span class="kn">from</span> <span class="nn">.tools.translate</span> <span class="kn">import</span> <span class="n">resetlocale</span>
+    <span class="n">resetlocale</span><span class="p">()</span>
+
+    <span class="c1"># create a format for log messages and dates</span>
+    <span class="nb">format</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> </span><span class="si">%(pid)s</span><span class="s1"> </span><span class="si">%(levelname)s</span><span class="s1"> </span><span class="si">%(dbname)s</span><span class="s1"> </span><span class="si">%(name)s</span><span class="s1">: </span><span class="si">%(message)s</span><span class="s1"> </span><span class="si">%(perf_info)s</span><span class="s1">&#39;</span>
+    <span class="c1"># Normal Handler on stderr</span>
+    <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;syslog&#39;</span><span class="p">]:</span>
+        <span class="c1"># SysLog Handler</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span><span class="p">:</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">NTEventLogHandler</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="o">.</span><span class="n">description</span><span class="p">,</span> <span class="n">release</span><span class="o">.</span><span class="n">version</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;Darwin&#39;</span><span class="p">:</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">SysLogHandler</span><span class="p">(</span><span class="s1">&#39;/var/run/log&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">SysLogHandler</span><span class="p">(</span><span class="s1">&#39;/dev/log&#39;</span><span class="p">)</span>
+        <span class="nb">format</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="o">.</span><span class="n">description</span><span class="p">,</span> <span class="n">release</span><span class="o">.</span><span class="n">version</span><span class="p">)</span> \
+                <span class="o">+</span> <span class="s1">&#39;:</span><span class="si">%(dbname)s</span><span class="s1">:</span><span class="si">%(levelname)s</span><span class="s1">:</span><span class="si">%(name)s</span><span class="s1">:</span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+
+    <span class="k">elif</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;logfile&#39;</span><span class="p">]:</span>
+        <span class="c1"># LogFile Handler</span>
+        <span class="n">logf</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;logfile&#39;</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># We check we have the right location for the log files</span>
+            <span class="n">dirname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">logf</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dirname</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+                <span class="n">handler</span> <span class="o">=</span> <span class="n">WatchedFileHandler</span><span class="p">(</span><span class="n">logf</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">logf</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;ERROR: couldn&#39;t create the logfile directory. Logging to the standard output.</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check that handler.stream has a fileno() method: when running OpenERP</span>
+    <span class="c1"># behind Apache with mod_wsgi, handler.stream will have type mod_wsgi.Log,</span>
+    <span class="c1"># which has no fileno() method. (mod_wsgi.Log is what is being bound to</span>
+    <span class="c1"># sys.stderr when the logging.StreamHandler is being constructed above.)</span>
+    <span class="k">def</span> <span class="nf">is_a_tty</span><span class="p">(</span><span class="n">stream</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="s1">&#39;fileno&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">isatty</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">is_a_tty</span><span class="p">(</span><span class="n">handler</span><span class="o">.</span><span class="n">stream</span><span class="p">)</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ODOO_PY_COLORS&quot;</span><span class="p">)):</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">ColoredFormatter</span><span class="p">(</span><span class="nb">format</span><span class="p">)</span>
+        <span class="n">perf_filter</span> <span class="o">=</span> <span class="n">ColoredPerfFilter</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">DBFormatter</span><span class="p">(</span><span class="nb">format</span><span class="p">)</span>
+        <span class="n">perf_filter</span> <span class="o">=</span> <span class="n">PerfFilter</span><span class="p">()</span>
+        <span class="n">werkzeug</span><span class="o">.</span><span class="n">serving</span><span class="o">.</span><span class="n">_log_add_style</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;werkzeug&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">addFilter</span><span class="p">(</span><span class="n">perf_filter</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db&#39;</span><span class="p">]:</span>
+        <span class="n">db_levels</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;debug&#39;</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
+            <span class="s1">&#39;info&#39;</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+            <span class="s1">&#39;warning&#39;</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span>
+            <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">,</span>
+            <span class="s1">&#39;critical&#39;</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">CRITICAL</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">postgresqlHandler</span> <span class="o">=</span> <span class="n">PostgreSQLHandler</span><span class="p">()</span>
+        <span class="n">postgresqlHandler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">db_levels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db_level&#39;</span><span class="p">],</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_db_level&#39;</span><span class="p">])))</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">postgresqlHandler</span><span class="p">)</span>
+
+    <span class="c1"># Configure loggers levels</span>
+    <span class="n">pseudo_config</span> <span class="o">=</span> <span class="n">PSEUDOCONFIG_MAPPER</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_level&#39;</span><span class="p">],</span> <span class="p">[])</span>
+
+    <span class="n">logconfig</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;log_handler&#39;</span><span class="p">]</span>
+
+    <span class="n">logging_configurations</span> <span class="o">=</span> <span class="n">DEFAULT_LOG_CONFIGURATION</span> <span class="o">+</span> <span class="n">pseudo_config</span> <span class="o">+</span> <span class="n">logconfig</span>
+    <span class="k">for</span> <span class="n">logconfig_item</span> <span class="ow">in</span> <span class="n">logging_configurations</span><span class="p">:</span>
+        <span class="n">loggername</span><span class="p">,</span> <span class="n">level</span> <span class="o">=</span> <span class="n">logconfig_item</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">logging</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">loggername</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">logconfig_item</span> <span class="ow">in</span> <span class="n">logging_configurations</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;logger level set: &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="n">logconfig_item</span><span class="p">)</span></div>
+
+
+
+<span class="n">DEFAULT_LOG_CONFIGURATION</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;odoo.http.rpc.request:INFO&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;odoo.http.rpc.response:INFO&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;:INFO&#39;</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="n">PSEUDOCONFIG_MAPPER</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;debug_rpc_answer&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:DEBUG&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.sql_db:INFO&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.http.rpc:DEBUG&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;debug_rpc&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:DEBUG&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.sql_db:INFO&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.http.rpc.request:DEBUG&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;debug&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:DEBUG&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.sql_db:INFO&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;debug_sql&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo.sql_db:DEBUG&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;info&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;runbot&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:RUNBOT&#39;</span><span class="p">,</span> <span class="s1">&#39;werkzeug:WARNING&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;warn&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:WARNING&#39;</span><span class="p">,</span> <span class="s1">&#39;werkzeug:WARNING&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:ERROR&#39;</span><span class="p">,</span> <span class="s1">&#39;werkzeug:ERROR&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;critical&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;odoo:CRITICAL&#39;</span><span class="p">,</span> <span class="s1">&#39;werkzeug:CRITICAL&#39;</span><span class="p">],</span>
+<span class="p">}</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">RUNBOT</span> <span class="o">=</span> <span class="mi">25</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">addLevelName</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">RUNBOT</span><span class="p">,</span> <span class="s2">&quot;INFO&quot;</span><span class="p">)</span> <span class="c1"># displayed as info in log</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">captureWarnings</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># must be after `loggin.captureWarnings` so we override *that* instead of the</span>
+<span class="c1"># other way around</span>
+<span class="n">showwarning</span> <span class="o">=</span> <span class="n">warnings</span><span class="o">.</span><span class="n">showwarning</span>
+<span class="n">IGNORE</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;Comparison between bytes and int&#39;</span><span class="p">,</span> <span class="c1"># a.foo != False or some shit, we don&#39;t care</span>
+<span class="p">}</span>
+<div class="viewcode-block" id="showwarning_with_traceback">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.showwarning_with_traceback">[docs]</a>
+<span class="k">def</span> <span class="nf">showwarning_with_traceback</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">category</span> <span class="ow">is</span> <span class="ne">BytesWarning</span> <span class="ow">and</span> <span class="n">message</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">IGNORE</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="c1"># find the stack frame matching (filename, lineno)</span>
+    <span class="n">filtered</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">traceback</span><span class="o">.</span><span class="n">extract_stack</span><span class="p">():</span>
+        <span class="k">if</span> <span class="s1">&#39;importlib&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">filename</span><span class="p">:</span>
+            <span class="n">filtered</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">filename</span> <span class="o">==</span> <span class="n">filename</span> <span class="ow">and</span> <span class="n">frame</span><span class="o">.</span><span class="n">lineno</span> <span class="o">==</span> <span class="n">lineno</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">showwarning</span><span class="p">(</span>
+        <span class="n">message</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span>
+        <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_list</span><span class="p">(</span><span class="n">filtered</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+<span class="n">warnings</span><span class="o">.</span><span class="n">showwarning</span> <span class="o">=</span> <span class="n">showwarning_with_traceback</span>
+
+<div class="viewcode-block" id="runbot">
+<a class="viewcode-back" href="../../odoo.html#odoo.netsvc.runbot">[docs]</a>
+<span class="k">def</span> <span class="nf">runbot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kws</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">RUNBOT</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kws</span><span class="p">)</span></div>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">runbot</span> <span class="o">=</span> <span class="n">runbot</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

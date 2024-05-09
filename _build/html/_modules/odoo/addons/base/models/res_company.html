@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.res_company &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.res_company</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.res_company</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Command</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">html2plaintext</span><span class="p">,</span> <span class="n">file_open</span><span class="p">,</span> <span class="n">ormcache</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Company">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company">[docs]</a>
+<span class="k">class</span> <span class="nc">Company</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;res.company&quot;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Companies&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;sequence, name&#39;</span>
+    <span class="n">_parent_store</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="Company.copy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.copy">[docs]</a>
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Duplicating a company is not allowed. Please create a new company instead.&#39;</span><span class="p">))</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_logo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">file_open</span><span class="p">(</span><span class="s1">&#39;base/static/img/res_company_logo.png&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_default_currency_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">company_id</span><span class="o">.</span><span class="n">currency_id</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.name&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Company Name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sequence</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="n">help</span><span class="o">=</span><span class="s1">&#39;Used to order Companies in the company switcher&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">parent_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Parent Company&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">child_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">One2many</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="s1">&#39;parent_id&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Branches&#39;</span><span class="p">)</span>
+    <span class="n">all_child_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">One2many</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="s1">&#39;parent_id&#39;</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;active_test&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+    <span class="n">parent_path</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">unaccent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">parent_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2many</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_parent_ids&#39;</span><span class="p">,</span> <span class="n">compute_sudo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">root_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_parent_ids&#39;</span><span class="p">,</span> <span class="n">compute_sudo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">partner_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Partner&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">report_header</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Html</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Company Tagline&#39;</span><span class="p">,</span> <span class="n">translate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Company tagline, which is included in a printed document&#39;s header or footer (depending on the selected layout).&quot;</span><span class="p">)</span>
+    <span class="n">report_footer</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Html</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Report Footer&#39;</span><span class="p">,</span> <span class="n">translate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Footer text displayed at the bottom of all reports.&quot;</span><span class="p">)</span>
+    <span class="n">company_details</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Html</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Company Details&#39;</span><span class="p">,</span> <span class="n">translate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Header text displayed at the top of all reports.&quot;</span><span class="p">)</span>
+    <span class="n">is_company_details_empty</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_empty_company_details&#39;</span><span class="p">)</span>
+    <span class="n">logo</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.image_1920&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">_get_logo</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Company Logo&quot;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="c1"># logo_web: do not store in attachments, since the image is retrieved in SQL for</span>
+    <span class="c1"># performance reasons (see addons/web/controllers/main.py, Binary.company_logo)</span>
+    <span class="n">logo_web</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_logo_web&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">uses_default_logo</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_uses_default_logo&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">currency_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.currency&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Currency&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_currency_id</span><span class="p">())</span>
+    <span class="n">user_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2many</span><span class="p">(</span><span class="s1">&#39;res.users&#39;</span><span class="p">,</span> <span class="s1">&#39;res_company_users_rel&#39;</span><span class="p">,</span> <span class="s1">&#39;cid&#39;</span><span class="p">,</span> <span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Accepted Users&#39;</span><span class="p">)</span>
+    <span class="n">street</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_street&#39;</span><span class="p">)</span>
+    <span class="n">street2</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_street2&#39;</span><span class="p">)</span>
+    <span class="nb">zip</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_zip&#39;</span><span class="p">)</span>
+    <span class="n">city</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_city&#39;</span><span class="p">)</span>
+    <span class="n">state_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span>
+        <span class="s1">&#39;res.country.state&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_state&#39;</span><span class="p">,</span>
+        <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Fed. State&quot;</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s2">&quot;[(&#39;country_id&#39;, &#39;=?&#39;, country_id)]&quot;</span>
+    <span class="p">)</span>
+    <span class="n">bank_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">One2many</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.bank_ids&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">country_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.country&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_address&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_country&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Country&quot;</span><span class="p">)</span>
+    <span class="n">email</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.email&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">phone</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.phone&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">mobile</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.mobile&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">website</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.website&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">vat</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.vat&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Tax ID&quot;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">company_registry</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">related</span><span class="o">=</span><span class="s1">&#39;partner_id.company_registry&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Company ID&quot;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">paperformat_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;report.paperformat&#39;</span><span class="p">,</span> <span class="s1">&#39;Paper format&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_euro&#39;</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+    <span class="n">external_report_layout_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">,</span> <span class="s1">&#39;Document Template&#39;</span><span class="p">)</span>
+    <span class="n">font</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s2">&quot;Lato&quot;</span><span class="p">,</span> <span class="s2">&quot;Lato&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Roboto&quot;</span><span class="p">,</span> <span class="s2">&quot;Roboto&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Open_Sans&quot;</span><span class="p">,</span> <span class="s2">&quot;Open Sans&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Montserrat&quot;</span><span class="p">,</span> <span class="s2">&quot;Montserrat&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Oswald&quot;</span><span class="p">,</span> <span class="s2">&quot;Oswald&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Raleway&quot;</span><span class="p">,</span> <span class="s2">&quot;Raleway&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Tajawal&#39;</span><span class="p">,</span> <span class="s1">&#39;Tajawal&#39;</span><span class="p">)],</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;Lato&quot;</span><span class="p">)</span>
+    <span class="n">primary_color</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">()</span>
+    <span class="n">secondary_color</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">()</span>
+    <span class="n">color</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_color&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_color&#39;</span><span class="p">)</span>
+    <span class="n">layout_background</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;Blank&#39;</span><span class="p">,</span> <span class="s1">&#39;Blank&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Geometric&#39;</span><span class="p">,</span> <span class="s1">&#39;Geometric&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Custom&#39;</span><span class="p">,</span> <span class="s1">&#39;Custom&#39;</span><span class="p">)],</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;Blank&quot;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">layout_background_image</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="s2">&quot;Background Image&quot;</span><span class="p">)</span>
+    <span class="n">_sql_constraints</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s1">&#39;name_uniq&#39;</span><span class="p">,</span> <span class="s1">&#39;unique (name)&#39;</span><span class="p">,</span> <span class="s1">&#39;The company name must be unique!&#39;</span><span class="p">)</span>
+    <span class="p">]</span>
+
+<div class="viewcode-block" id="Company.init">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.init">[docs]</a>
+    <span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;paperformat_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]):</span>
+            <span class="n">paperformat_euro</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_euro&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">paperformat_euro</span><span class="p">:</span>
+                <span class="n">company</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;paperformat_id&#39;</span><span class="p">:</span> <span class="n">paperformat_euro</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="n">sup</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Company</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sup</span><span class="p">,</span> <span class="s1">&#39;init&#39;</span><span class="p">):</span>
+            <span class="n">sup</span><span class="o">.</span><span class="n">init</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_company_root_delegated_field_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the set of fields delegated to the root company.</span>
+
+<span class="sd">        Some fields need to be identical on all branches of the company. All</span>
+<span class="sd">        fields listed by this function will be copied from the root company and</span>
+<span class="sd">        appear as readonly in the form view.</span>
+<span class="sd">        :rtype: set</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s1">&#39;currency_id&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_company_address_field_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a list of fields coming from the address partner to match</span>
+<span class="sd">        on company address fields. Fields are labeled same on both models. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s1">&#39;street&#39;</span><span class="p">,</span> <span class="s1">&#39;street2&#39;</span><span class="p">,</span> <span class="s1">&#39;city&#39;</span><span class="p">,</span> <span class="s1">&#39;zip&#39;</span><span class="p">,</span> <span class="s1">&#39;state_id&#39;</span><span class="p">,</span> <span class="s1">&#39;country_id&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_company_address_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">partner</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">((</span><span class="n">fname</span><span class="p">,</span> <span class="n">partner</span><span class="p">[</span><span class="n">fname</span><span class="p">])</span>
+                    <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_company_address_field_names</span><span class="p">())</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;parent_path&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_parent_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">parent_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">id</span><span class="p">)</span> <span class="k">if</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_path</span> <span class="k">else</span> <span class="n">company</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">root_id</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># TODO @api.depends(): currently now way to formulate the dependency on the</span>
+    <span class="c1"># partner&#39;s contact address</span>
+    <span class="k">def</span> <span class="nf">_compute_address</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">company</span><span class="p">:</span> <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="p">):</span>
+            <span class="n">address_data</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">address_get</span><span class="p">(</span><span class="n">adr_pref</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;contact&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">address_data</span><span class="p">[</span><span class="s1">&#39;contact&#39;</span><span class="p">]:</span>
+                <span class="n">partner</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">address_data</span><span class="p">[</span><span class="s1">&#39;contact&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+                <span class="n">company</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">company</span><span class="o">.</span><span class="n">_get_company_address_update</span><span class="p">(</span><span class="n">partner</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_street</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">street</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">street</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_street2</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">street2</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">street2</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_zip</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">zip</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">zip</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_city</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">city</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">city</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">state_id</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">state_id</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_country</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">country_id</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">country_id</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;partner_id.image_1920&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_logo_web</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">image_1920</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">logo_web</span> <span class="o">=</span> <span class="n">img</span> <span class="ow">and</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">image_process</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">img</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;partner_id.image_1920&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_uses_default_logo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">default_logo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_logo</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">uses_default_logo</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">company</span><span class="o">.</span><span class="n">logo</span> <span class="ow">or</span> <span class="n">company</span><span class="o">.</span><span class="n">logo</span> <span class="o">==</span> <span class="n">default_logo</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;root_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_color</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">root_id</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">color</span> <span class="ow">or</span> <span class="p">(</span><span class="n">company</span><span class="o">.</span><span class="n">root_id</span><span class="o">.</span><span class="n">_origin</span><span class="o">.</span><span class="n">id</span> <span class="o">%</span> <span class="mi">12</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_color</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">company</span><span class="o">.</span><span class="n">root_id</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">company</span><span class="o">.</span><span class="n">color</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="s1">&#39;state_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_onchange_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_id</span><span class="o">.</span><span class="n">country_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">country_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_id</span><span class="o">.</span><span class="n">country_id</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="s1">&#39;country_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_onchange_country_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">country_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">currency_id</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="s1">&#39;parent_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_onchange_parent_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">():</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span><span class="p">[</span><span class="n">fname</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">view_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">view_type</span><span class="o">=</span><span class="s1">&#39;form&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">make_delegated_fields_readonly</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">iterchildren</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">child</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;field&#39;</span> <span class="ow">and</span> <span class="n">child</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">delegated_fnames</span><span class="p">:</span>
+                    <span class="n">child</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;attrs&#39;</span><span class="p">,</span> <span class="s2">&quot;{&#39;readonly&#39;: [(&#39;parent_id&#39;, &#39;!=&#39;, False)]}&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">make_delegated_fields_readonly</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">node</span>
+
+        <span class="n">delegated_fnames</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">())</span>
+        <span class="n">arch</span><span class="p">,</span> <span class="n">view</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_view</span><span class="p">(</span><span class="n">view_id</span><span class="p">,</span> <span class="n">view_type</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">arch</span> <span class="o">=</span> <span class="n">make_delegated_fields_readonly</span><span class="p">(</span><span class="n">arch</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">arch</span><span class="p">,</span> <span class="n">view</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_name_search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
+        <span class="n">newself</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="k">if</span> <span class="n">context</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;user_preference&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="c1"># We browse as superuser. Otherwise, the user would be able to</span>
+            <span class="c1"># select only the currently visible companies (according to rules,</span>
+            <span class="c1"># which are probably to allow to see the child companies) even if</span>
+            <span class="c1"># she belongs to some other companies.</span>
+            <span class="n">companies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">company_ids</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="p">(</span><span class="n">domain</span> <span class="ow">or</span> <span class="p">[])</span> <span class="o">+</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">companies</span><span class="o">.</span><span class="n">ids</span><span class="p">)]</span>
+            <span class="n">newself</span> <span class="o">=</span> <span class="n">newself</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="bp">self</span> <span class="o">=</span> <span class="n">newself</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_name_search</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">returns</span><span class="p">(</span><span class="s1">&#39;self&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">value</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_company_default_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">object</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">field</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns the user&#39;s company</span>
+<span class="sd">            - Deprecated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;The method &#39;_company_default_get&#39; on res.company is deprecated and shouldn&#39;t be used anymore&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;company_details&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_empty_company_details</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># In recent change when an html field is empty a &lt;p&gt; balise remains with a &lt;br&gt; in it,</span>
+        <span class="c1"># but when company details is empty we want to put the info of the company</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">is_company_details_empty</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">html2plaintext</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">company_details</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Company.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+
+        <span class="c1"># create missing partners</span>
+        <span class="n">no_partner_vals_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">vals</span>
+            <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span>
+            <span class="k">if</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;partner_id&#39;</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">no_partner_vals_list</span><span class="p">:</span>
+            <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+                <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                    <span class="s1">&#39;is_company&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                    <span class="s1">&#39;image_1920&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;logo&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;phone&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;phone&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;website&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;website&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;vat&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;vat&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;country_id&#39;</span><span class="p">),</span>
+                <span class="p">}</span>
+                <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">no_partner_vals_list</span>
+            <span class="p">])</span>
+            <span class="c1"># compute stored fields, for example address dependent fields</span>
+            <span class="n">partners</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">vals</span><span class="p">,</span> <span class="n">partner</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">no_partner_vals_list</span><span class="p">,</span> <span class="n">partners</span><span class="p">):</span>
+                <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">partner</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">:</span>
+            <span class="c1"># Copy delegated fields from root to branches</span>
+            <span class="k">if</span> <span class="n">parent</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;parent_id&#39;</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">():</span>
+                    <span class="n">vals</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span><span class="o">.</span><span class="n">convert_to_write</span><span class="p">(</span><span class="n">parent</span><span class="p">[</span><span class="n">fname</span><span class="p">],</span> <span class="n">parent</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="n">companies</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+
+        <span class="c1"># The write is made on the user to set it automatically in the multi company group.</span>
+        <span class="k">if</span> <span class="n">companies</span><span class="p">:</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span> <span class="o">|</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">SUPERUSER_ID</span><span class="p">))</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;company_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">company</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="n">companies</span><span class="p">],</span>
+            <span class="p">})</span>
+
+        <span class="c1"># Make sure that the selected currencies are enabled</span>
+        <span class="n">companies</span><span class="o">.</span><span class="n">currency_id</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="ow">not</span> <span class="n">c</span><span class="o">.</span><span class="n">active</span><span class="p">)</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="n">companies</span></div>
+
+
+<div class="viewcode-block" id="Company.cache_invalidation_fields">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.cache_invalidation_fields">[docs]</a>
+    <span class="k">def</span> <span class="nf">cache_invalidation_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># This list is not well defined and tests should be improved</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="c1"># user._get_company_ids and other potential cached search</span>
+            <span class="s1">&#39;sequence&#39;</span><span class="p">,</span> <span class="c1"># user._get_company_ids and other potential cached search</span>
+        <span class="p">}</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">ondelete</span><span class="p">(</span><span class="n">at_uninstall</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_unlink_if_company_has_no_children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">company</span><span class="o">.</span><span class="n">child_ids</span> <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Companies that have associated branches cannot be deleted. Consider archiving them instead.&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Company.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="n">invalidation_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidation_fields</span><span class="p">()</span>
+        <span class="n">asset_invalidation_fields</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;font&#39;</span><span class="p">,</span> <span class="s1">&#39;primary_color&#39;</span><span class="p">,</span> <span class="s1">&#39;secondary_color&#39;</span><span class="p">,</span> <span class="s1">&#39;external_report_layout_id&#39;</span><span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">invalidation_fields</span><span class="o">.</span><span class="n">isdisjoint</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">asset_invalidation_fields</span><span class="o">.</span><span class="n">isdisjoint</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+            <span class="c1"># this is used in the content of an asset (see asset_styles_company_report)</span>
+            <span class="c1"># and thus needs to invalidate the assets cache when this is changed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">)</span>  <span class="c1"># not 100% it is useful a test is missing if it is the case</span>
+
+        <span class="k">if</span> <span class="s1">&#39;parent_id&#39;</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The company hierarchy cannot be changed.&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;currency_id&#39;</span><span class="p">):</span>
+            <span class="n">currency</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.currency&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;currency_id&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">currency</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+                <span class="n">currency</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Company</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="c1"># Archiving a company should also archive all of its branches</span>
+        <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">child_ids</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="c1"># Copy modified delegated fields from root to branches</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">changed</span> <span class="o">:=</span> <span class="nb">set</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">()))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_id</span><span class="p">:</span>
+                <span class="n">branches</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+                    <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;child_of&#39;</span><span class="p">,</span> <span class="n">company</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="n">company</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="p">])</span>
+                <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">changed</span><span class="p">):</span>
+                    <span class="n">branches</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">=</span> <span class="n">company</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+
+        <span class="c1"># invalidate company cache to recompute address based on updated partner</span>
+        <span class="n">company_address_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_company_address_field_names</span><span class="p">()</span>
+        <span class="n">company_address_fields_upd</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">company_address_fields</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">company_address_fields_upd</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">(</span><span class="n">company_address_fields</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">company</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+                <span class="n">company_active_users</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search_count</span><span class="p">([</span>
+                    <span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">company</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+                <span class="p">])</span>
+                <span class="k">if</span> <span class="n">company_active_users</span><span class="p">:</span>
+                    <span class="c1"># You cannot disable companies with active users</span>
+                    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+                        <span class="s1">&#39;The company </span><span class="si">%(company_name)s</span><span class="s1"> cannot be archived because it is still used &#39;</span>
+                        <span class="s1">&#39;as the default company of </span><span class="si">%(active_users)s</span><span class="s1"> users.&#39;</span><span class="p">,</span>
+                        <span class="n">company_name</span><span class="o">=</span><span class="n">company</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">active_users</span><span class="o">=</span><span class="n">company_active_users</span><span class="p">,</span>
+                    <span class="p">))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">()</span> <span class="o">+</span><span class="p">[</span><span class="s1">&#39;parent_id&#39;</span><span class="p">])</span>
+    <span class="k">def</span> <span class="nf">_check_root_delegated_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_id</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">company</span><span class="o">.</span><span class="n">_get_company_root_delegated_field_names</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">company</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">!=</span> <span class="n">company</span><span class="o">.</span><span class="n">parent_id</span><span class="p">[</span><span class="n">fname</span><span class="p">]:</span>
+                        <span class="n">description</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s2">&quot;res.company&quot;</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span><span class="o">.</span><span class="n">field_description</span>
+                        <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The </span><span class="si">%s</span><span class="s2"> of a subsidiary must be the same as it&#39;s root company.&quot;</span><span class="p">,</span> <span class="n">description</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Company.open_company_edit_report">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.open_company_edit_report">[docs]</a>
+    <span class="k">def</span> <span class="nf">open_company_edit_report</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Since 17.0.&quot;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.config.settings&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">open_company</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Company.write_company_and_print_report">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.write_company_and_print_report">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_company_and_print_report</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Since 17.0.&quot;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span>
+        <span class="n">report_name</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default_report_name&#39;</span><span class="p">)</span>
+        <span class="n">active_ids</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active_ids&#39;</span><span class="p">)</span>
+        <span class="n">active_model</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active_model&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">report_name</span> <span class="ow">and</span> <span class="n">active_ids</span> <span class="ow">and</span> <span class="n">active_model</span><span class="p">:</span>
+            <span class="n">docids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">active_model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">active_ids</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;report_name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">report_name</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                        <span class="o">.</span><span class="n">report_action</span><span class="p">(</span><span class="n">docids</span><span class="p">))</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_main_company</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">main_company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.main_company&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">main_company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">main_company</span>
+
+    <span class="nd">@ormcache</span><span class="p">(</span><span class="s1">&#39;tuple(self.env.companies.ids)&#39;</span><span class="p">,</span> <span class="s1">&#39;self.id&#39;</span><span class="p">,</span> <span class="s1">&#39;self.env.uid&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__accessible_branches</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Get branches of this company that the current user can use</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+
+        <span class="n">accessible_branch_ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">accessible</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">companies</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">current</span><span class="p">:</span>
+            <span class="n">accessible_branch_ids</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="n">current</span> <span class="o">&amp;</span> <span class="n">accessible</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">child_ids</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">accessible_branch_ids</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">uid</span> <span class="o">==</span> <span class="n">SUPERUSER_ID</span><span class="p">:</span>
+            <span class="c1"># Accessible companies will always be the same for super user when called in a cron.</span>
+            <span class="c1"># Because of that, the intersection between them and self might be empty. The super user anyway always has</span>
+            <span class="c1"># access to all companies (as it bypasses the record rules), so we return the current company in this case.</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ids</span>
+
+        <span class="k">return</span> <span class="n">accessible_branch_ids</span>
+
+    <span class="k">def</span> <span class="nf">_accessible_branches</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__accessible_branches</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_all_branches_selected</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether or all the branches of the companies in self are selected.</span>
+
+<span class="sd">        Is ``True`` if all the branches, and only those, are selected.</span>
+<span class="sd">        Can be used when some actions only make sense for whole companies regardless of the</span>
+<span class="sd">        branches.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;child_of&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">root_id</span><span class="o">.</span><span class="n">ids</span><span class="p">)])</span>
+
+<div class="viewcode-block" id="Company.action_all_company_branches">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_company.Company.action_all_company_branches">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_all_company_branches</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Branches&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.company&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;parent_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">)],</span>
+            <span class="s1">&#39;context&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;active_test&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;default_parent_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;views&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;tree&#39;</span><span class="p">],</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;kanban&#39;</span><span class="p">],</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">]],</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

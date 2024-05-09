@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.xml_utils &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.xml_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.xml_utils</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;Utilities for generating, parsing and checking XML/XSD files on top of the lxml.etree module.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">zipfile</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">BytesIO</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+<span class="kn">import</span> <span class="nn">contextlib</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="remove_control_characters">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.remove_control_characters">[docs]</a>
+<span class="k">def</span> <span class="nf">remove_control_characters</span><span class="p">(</span><span class="n">byte_node</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The characters to be escaped are the control characters #x0 to #x1F and #x7F (most of which cannot appear in XML)</span>
+<span class="sd">    [...] XML processors must accept any character in the range specified for Char:</span>
+<span class="sd">    `Char	   :: =   	#x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]`</span>
+<span class="sd">    source:https://www.w3.org/TR/xml/</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span>
+        <span class="s1">&#39;[^&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\u0009</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\u000A</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\u000D</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\u0020</span><span class="s1">-</span><span class="se">\uD7FF</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\uE000</span><span class="s1">-</span><span class="se">\uFFFD</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;</span><span class="se">\U00010000</span><span class="s1">-</span><span class="se">\U0010FFFF</span><span class="s1">&#39;</span>
+        <span class="s1">&#39;]&#39;</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
+        <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="n">byte_node</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="odoo_resolver">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.odoo_resolver">[docs]</a>
+<span class="k">class</span> <span class="nc">odoo_resolver</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">Resolver</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Odoo specific file resolver that can be added to the XML Parser.</span>
+
+<span class="sd">    It will search filenames in the ir.attachments</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">prefix</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="n">env</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
+
+<div class="viewcode-block" id="odoo_resolver.resolve">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.odoo_resolver.resolve">[docs]</a>
+    <span class="k">def</span> <span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="nb">id</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Search url in ``ir.attachment`` and return the resolved content.&quot;&quot;&quot;</span>
+        <span class="n">attachment_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s1">.</span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="k">else</span> <span class="n">url</span>
+        <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">attachment_name</span><span class="p">)])</span>
+        <span class="k">if</span> <span class="n">attachment</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolve_string</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span> <span class="nf">_check_with_xsd</span><span class="p">(</span><span class="n">tree_or_str</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check an XML against an XSD schema.</span>
+
+<span class="sd">    This will raise a UserError if the XML file is not valid according to the</span>
+<span class="sd">    XSD file.</span>
+
+<span class="sd">    :param str | etree._Element tree_or_str: representation of the tree to be checked</span>
+<span class="sd">    :param io.IOBase | str stream: the byte stream used to build the XSD schema.</span>
+<span class="sd">        If env is given, it can also be the name of an attachment in the filestore</span>
+<span class="sd">    :param odoo.api.Environment env: If it is given, it enables resolving the</span>
+<span class="sd">        imports of the schema in the filestore with ir.attachments.</span>
+<span class="sd">    :param str prefix: if given, provides a prefix to try when</span>
+<span class="sd">        resolving the imports of the schema. e.g. prefix=&#39;l10n_cl_edi&#39; will</span>
+<span class="sd">        enable &#39;SiiTypes_v10.xsd&#39; to be resolved to &#39;l10n_cl_edi.SiiTypes_v10.xsd&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tree_or_str</span><span class="p">,</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">):</span>
+        <span class="n">tree_or_str</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">tree_or_str</span><span class="p">)</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">XMLParser</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">env</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">resolvers</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">odoo_resolver</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">prefix</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">stream</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.xsd&#39;</span><span class="p">):</span>
+            <span class="n">attachment</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">stream</span><span class="p">)])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">attachment</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">()</span>
+            <span class="n">stream</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>
+    <span class="n">xsd_schema</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">XMLSchema</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="n">parser</span><span class="p">))</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">xsd_schema</span><span class="o">.</span><span class="n">assertValid</span><span class="p">(</span><span class="n">tree_or_str</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">etree</span><span class="o">.</span><span class="n">DocumentInvalid</span> <span class="k">as</span> <span class="n">xml_errors</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">xml_errors</span><span class="o">.</span><span class="n">error_log</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="create_xml_node_chain">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.create_xml_node_chain">[docs]</a>
+<span class="k">def</span> <span class="nf">create_xml_node_chain</span><span class="p">(</span><span class="n">first_parent_node</span><span class="p">,</span> <span class="n">nodes_list</span><span class="p">,</span> <span class="n">last_node_value</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a hierarchical chain of nodes.</span>
+
+<span class="sd">    Each new node being the child of the previous one based on the tags contained</span>
+<span class="sd">    in `nodes_list`, under the given node `first_parent_node`.</span>
+
+<span class="sd">    :param etree._Element first_parent_node: parent of the created tree/chain</span>
+<span class="sd">    :param iterable[str] nodes_list: tag names to be created</span>
+<span class="sd">    :param str last_node_value: if specified, set the last node&#39;s text to this value</span>
+<span class="sd">    :returns: the list of created nodes</span>
+<span class="sd">    :rtype: list[etree._Element]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">current_node</span> <span class="o">=</span> <span class="n">first_parent_node</span>
+    <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">nodes_list</span><span class="p">:</span>
+        <span class="n">current_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">SubElement</span><span class="p">(</span><span class="n">current_node</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_node</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">last_node_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">current_node</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">last_node_value</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+
+<div class="viewcode-block" id="create_xml_node">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.create_xml_node">[docs]</a>
+<span class="k">def</span> <span class="nf">create_xml_node</span><span class="p">(</span><span class="n">parent_node</span><span class="p">,</span> <span class="n">node_name</span><span class="p">,</span> <span class="n">node_value</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a new node.</span>
+
+<span class="sd">    :param etree._Element parent_node: parent of the created node</span>
+<span class="sd">    :param str node_name: name of the created node</span>
+<span class="sd">    :param str node_value: value of the created node (optional)</span>
+<span class="sd">    :rtype: etree._Element</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">create_xml_node_chain</span><span class="p">(</span><span class="n">parent_node</span><span class="p">,</span> <span class="p">[</span><span class="n">node_name</span><span class="p">],</span> <span class="n">node_value</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="cleanup_xml_node">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.cleanup_xml_node">[docs]</a>
+<span class="k">def</span> <span class="nf">cleanup_xml_node</span><span class="p">(</span><span class="n">xml_node_or_string</span><span class="p">,</span> <span class="n">remove_blank_text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">remove_blank_nodes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent_level</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">indent_space</span><span class="o">=</span><span class="s2">&quot;  &quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Clean up the sub-tree of the provided XML node.</span>
+
+<span class="sd">    If the provided XML node is of type:</span>
+<span class="sd">    - etree._Element, it is modified in-place.</span>
+<span class="sd">    - string/bytes, it is first parsed into an etree._Element</span>
+<span class="sd">    :param xml_node_or_string (etree._Element, str): XML node (or its string/bytes representation)</span>
+<span class="sd">    :param remove_blank_text (bool): if True, removes whitespace-only text from nodes</span>
+<span class="sd">    :param remove_blank_nodes (bool): if True, removes leaf nodes with no text (iterative, depth-first, done after remove_blank_text)</span>
+<span class="sd">    :param indent_level (int): depth or level of node within root tree (use -1 to leave indentation as-is)</span>
+<span class="sd">    :param indent_space (str): string to use for indentation (use &#39;&#39; to remove all indentation)</span>
+<span class="sd">    :returns (etree._Element): clean node, same instance that was received (if applicable)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">xml_node</span> <span class="o">=</span> <span class="n">xml_node_or_string</span>
+
+    <span class="c1"># Convert str/bytes to etree._Element</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">xml_node</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">xml_node</span> <span class="o">=</span> <span class="n">xml_node</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>  <span class="c1"># misnomer: fromstring actually reads bytes</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">xml_node</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="n">xml_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">remove_control_characters</span><span class="p">(</span><span class="n">xml_node</span><span class="p">))</span>
+
+    <span class="c1"># Process leaf nodes iteratively</span>
+    <span class="c1"># Depth-first, so any inner node may become a leaf too (if children are removed)</span>
+    <span class="k">def</span> <span class="nf">leaf_iter</span><span class="p">(</span><span class="n">parent_node</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">child_node</span> <span class="ow">in</span> <span class="n">node</span><span class="p">:</span>
+            <span class="n">leaf_iter</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">child_node</span><span class="p">,</span> <span class="n">level</span> <span class="k">if</span> <span class="n">level</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">level</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Indentation</span>
+        <span class="k">if</span> <span class="n">level</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">indent</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="n">indent_space</span> <span class="o">*</span> <span class="n">level</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">tail</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">tail</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="k">if</span> <span class="n">parent_node</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">indent</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                    <span class="c1"># First child&#39;s indentation is parent&#39;s text</span>
+                    <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">indent</span> <span class="o">+</span> <span class="n">indent_space</span>
+                <span class="n">last_child</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">last_child</span><span class="o">.</span><span class="n">tail</span> <span class="o">==</span> <span class="n">indent</span> <span class="o">+</span> <span class="n">indent_space</span><span class="p">:</span>
+                    <span class="c1"># Last child&#39;s tail is parent&#39;s closing tag indentation</span>
+                    <span class="n">last_child</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="n">indent</span>
+
+        <span class="c1"># Removal condition: node is leaf (not root nor inner node)</span>
+        <span class="k">if</span> <span class="n">parent_node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">remove_blank_text</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                <span class="c1"># node.text is None iff node.tag is self-closing (text=&#39;&#39; creates closing tag)</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+            <span class="k">if</span> <span class="n">remove_blank_nodes</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">):</span>
+                <span class="n">parent_node</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+    <span class="n">leaf_iter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">xml_node</span><span class="p">,</span> <span class="n">indent_level</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">xml_node</span></div>
+
+
+
+<div class="viewcode-block" id="load_xsd_files_from_url">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.load_xsd_files_from_url">[docs]</a>
+<span class="k">def</span> <span class="nf">load_xsd_files_from_url</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">file_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_reload</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">request_max_timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">xsd_name_prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">xsd_names_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">modify_xsd_content</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load XSD file or ZIP archive. Save XSD files as ir.attachment.</span>
+
+<span class="sd">    An XSD attachment is saved as {xsd_name_prefix}.{filename} where the filename is either the filename obtained</span>
+<span class="sd">    from the URL or from the ZIP archive, or the `file_name` param if it is specified and a single XSD is being downloaded.</span>
+<span class="sd">    A typical prefix is the calling module&#39;s name.</span>
+
+<span class="sd">    For ZIP archives, XSD files inside it will be saved as attachments, depending on the provided list of XSD names.</span>
+<span class="sd">    ZIP archive themselves are not saved.</span>
+
+<span class="sd">    The XSD files content can be modified by providing the `modify_xsd_content` function as argument.</span>
+<span class="sd">    Typically, this is used when XSD files depend on each other (with the schemaLocation attribute),</span>
+<span class="sd">    but it can be used for any purpose.</span>
+
+<span class="sd">    :param odoo.api.Environment env: environment of calling module</span>
+<span class="sd">    :param str url: URL of XSD file/ZIP archive</span>
+<span class="sd">    :param str file_name: used as attachment name if the URL leads to a single XSD, otherwise ignored</span>
+<span class="sd">    :param bool force_reload: Deprecated.</span>
+<span class="sd">    :param int request_max_timeout: maximum time (in seconds) before the request times out</span>
+<span class="sd">    :param str xsd_name_prefix: if provided, will be added as a prefix to every XSD file name</span>
+<span class="sd">    :param list | str xsd_names_filter: if provided, will only save the XSD files with these names</span>
+<span class="sd">    :param func modify_xsd_content: function that takes the xsd content as argument and returns a modified version of it</span>
+<span class="sd">    :rtype: odoo.api.ir.attachment | bool</span>
+<span class="sd">    :return: every XSD attachment created/fetched or False if an error occurred (see warning logs)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Fetching file/archive from given URL: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">request_max_timeout</span><span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">HTTPError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;HTTP error: </span><span class="si">%s</span><span class="s1"> with the given URL: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ConnectionError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Connection error: </span><span class="si">%s</span><span class="s1"> with the given URL: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">Timeout</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Request timeout: </span><span class="si">%s</span><span class="s1"> with the given URL: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">content</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">content</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">content</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;The HTTP response from </span><span class="si">%s</span><span class="s2"> is empty (no content)&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">archive</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="n">zipfile</span><span class="o">.</span><span class="n">BadZipFile</span><span class="p">):</span>
+        <span class="n">archive</span> <span class="o">=</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">content</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">archive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">modify_xsd_content</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">modify_xsd_content</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file_name</span><span class="p">:</span>
+            <span class="n">file_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;XSD name not provided, defaulting to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file_name</span><span class="p">)</span>
+
+        <span class="n">prefixed_xsd_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">xsd_name_prefix</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">xsd_name_prefix</span> <span class="k">else</span> <span class="n">file_name</span>
+        <span class="n">fetched_attachment</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fetched_attachment</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Updating the content of ir.attachment with name: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)</span>
+            <span class="n">fetched_attachment</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">content</span>
+            <span class="k">return</span> <span class="n">fetched_attachment</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Saving XSD file as ir.attachment, with name: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">prefixed_xsd_name</span><span class="p">,</span>
+                <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">,</span>
+                <span class="s1">&#39;public&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="p">})</span>
+
+    <span class="n">saved_attachments</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">archive</span><span class="o">.</span><span class="n">namelist</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.xsd&#39;</span><span class="p">):</span>
+            <span class="k">continue</span>
+
+        <span class="n">file_name</span> <span class="o">=</span> <span class="n">file_path</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">xsd_names_filter</span> <span class="ow">and</span> <span class="n">file_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xsd_names_filter</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skipping file with name </span><span class="si">%s</span><span class="s2"> in ZIP archive&quot;</span><span class="p">,</span> <span class="n">file_name</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">archive</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to retrieve XSD file with name </span><span class="si">%s</span><span class="s2"> from ZIP archive&quot;</span><span class="p">,</span> <span class="n">file_name</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">modify_xsd_content</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">modify_xsd_content</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+
+        <span class="n">prefixed_xsd_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">xsd_name_prefix</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">xsd_name_prefix</span> <span class="k">else</span> <span class="n">file_name</span>
+        <span class="n">fetched_attachment</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fetched_attachment</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Updating the content of ir.attachment with name: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)</span>
+            <span class="n">fetched_attachment</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">content</span>
+            <span class="n">saved_attachments</span> <span class="o">|=</span> <span class="n">fetched_attachment</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Saving XSD file as ir.attachment, with name: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">)</span>
+            <span class="n">saved_attachments</span> <span class="o">|=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">prefixed_xsd_name</span><span class="p">,</span>
+                <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">,</span>
+                <span class="s1">&#39;public&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">saved_attachments</span></div>
+
+
+
+<div class="viewcode-block" id="validate_xml_from_attachment">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.validate_xml_from_attachment">[docs]</a>
+<span class="k">def</span> <span class="nf">validate_xml_from_attachment</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">xml_content</span><span class="p">,</span> <span class="n">xsd_name</span><span class="p">,</span> <span class="n">reload_files_function</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Try and validate the XML content with an XSD attachment.</span>
+<span class="sd">    If the XSD attachment cannot be found in database, skip validation without raising.</span>
+<span class="sd">    If the skip_xsd context key is truthy, skip validation.</span>
+
+<span class="sd">    :param odoo.api.Environment env: environment of calling module</span>
+<span class="sd">    :param xml_content: the XML content to validate</span>
+<span class="sd">    :param xsd_name: the XSD file name in database</span>
+<span class="sd">    :param reload_files_function: Deprecated.</span>
+<span class="sd">    :return: the result of the function :func:`odoo.tools.xml_utils._check_with_xsd`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;skip_xsd&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span>
+
+    <span class="n">prefixed_xsd_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">xsd_name</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">prefix</span> <span class="k">else</span> <span class="n">xsd_name</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Validating with XSD...&quot;</span><span class="p">)</span>
+        <span class="n">_check_with_xsd</span><span class="p">(</span><span class="n">xml_content</span><span class="p">,</span> <span class="n">prefixed_xsd_name</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;XSD validation successful!&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;XSD file not found, skipping validation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="find_xml_value">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.xml_utils.find_xml_value">[docs]</a>
+<span class="k">def</span> <span class="nf">find_xml_value</span><span class="p">(</span><span class="n">xpath</span><span class="p">,</span> <span class="n">xml_element</span><span class="p">,</span> <span class="n">namespaces</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">element</span> <span class="o">=</span> <span class="n">xml_element</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="n">xpath</span><span class="p">,</span> <span class="n">namespaces</span><span class="o">=</span><span class="n">namespaces</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">element</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span> <span class="k">if</span> <span class="n">element</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

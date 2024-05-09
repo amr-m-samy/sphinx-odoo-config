@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.registry &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.registry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.registry</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot; Models registries.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">deque</span>
+<span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">closing</span><span class="p">,</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">attrgetter</span>
+
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.modules.db</span> <span class="kn">import</span> <span class="n">FunctionStatus</span>
+<span class="kn">from</span> <span class="nn">odoo.osv.expression</span> <span class="kn">import</span> <span class="n">get_unaccent_wrapper</span>
+<span class="kn">from</span> <span class="nn">..</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span>
+<span class="kn">from</span> <span class="nn">odoo.sql_db</span> <span class="kn">import</span> <span class="n">TestCursor</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">config</span><span class="p">,</span> <span class="n">existing_tables</span><span class="p">,</span> <span class="n">lazy_classproperty</span><span class="p">,</span>
+    <span class="n">lazy_property</span><span class="p">,</span> <span class="n">sql</span><span class="p">,</span> <span class="n">Collector</span><span class="p">,</span> <span class="n">OrderedSet</span><span class="p">,</span> <span class="n">SQL</span><span class="p">,</span>
+    <span class="n">format_frame</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.func</span> <span class="kn">import</span> <span class="n">locked</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.lru</span> <span class="kn">import</span> <span class="n">LRU</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_schema</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.schema&#39;</span><span class="p">)</span>
+
+
+<span class="n">_REGISTRY_CACHES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="mi">8192</span><span class="p">,</span>
+    <span class="s1">&#39;assets&#39;</span><span class="p">:</span> <span class="mi">512</span><span class="p">,</span> <span class="c1"># arbitrary</span>
+    <span class="s1">&#39;templates&#39;</span><span class="p">:</span> <span class="mi">1024</span><span class="p">,</span> <span class="c1"># arbitrary</span>
+    <span class="s1">&#39;routing&#39;</span><span class="p">:</span> <span class="mi">1024</span><span class="p">,</span>  <span class="c1"># 2 entries per website</span>
+    <span class="s1">&#39;routing.rewrites&#39;</span><span class="p">:</span> <span class="mi">8192</span><span class="p">,</span>  <span class="c1"># url_rewrite entries</span>
+    <span class="s1">&#39;templates.cached_values&#39;</span><span class="p">:</span> <span class="mi">2048</span><span class="p">,</span> <span class="c1"># arbitrary</span>
+<span class="p">}</span>
+
+<span class="c1"># cache invalidation dependencies, as follows:</span>
+<span class="c1"># { &#39;cache_key&#39;: (&#39;cache_container_1&#39;, &#39;cache_container_3&#39;, ...) }</span>
+<span class="n">_CACHES_BY_KEY</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="s1">&#39;templates.cached_values&#39;</span><span class="p">),</span>
+    <span class="s1">&#39;assets&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">,</span> <span class="s1">&#39;templates.cached_values&#39;</span><span class="p">),</span>
+    <span class="s1">&#39;templates&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;templates&#39;</span><span class="p">,</span> <span class="s1">&#39;templates.cached_values&#39;</span><span class="p">),</span>
+    <span class="s1">&#39;routing&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;routing&#39;</span><span class="p">,</span> <span class="s1">&#39;routing.rewrites&#39;</span><span class="p">,</span> <span class="s1">&#39;templates.cached_values&#39;</span><span class="p">),</span>
+<span class="p">}</span>
+
+<div class="viewcode-block" id="Registry">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry">[docs]</a>
+<span class="k">class</span> <span class="nc">Registry</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Model registry for a particular database.</span>
+
+<span class="sd">    The registry is essentially a mapping between model names and model classes.</span>
+<span class="sd">    There is one registry instance per database.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
+    <span class="n">_saved_lock</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@lazy_classproperty</span>
+    <span class="k">def</span> <span class="nf">registries</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; A mapping from database names to registries. &quot;&quot;&quot;</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;registry_lru_size&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">size</span><span class="p">:</span>
+            <span class="c1"># Size the LRU depending of the memory limits</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+                <span class="c1"># cannot specify the memory limit soft on windows...</span>
+                <span class="n">size</span> <span class="o">=</span> <span class="mi">42</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># A registry takes 10MB of memory on average, so we reserve</span>
+                <span class="c1"># 10Mb (registry) + 5Mb (working memory) per registry</span>
+                <span class="n">avgsz</span> <span class="o">=</span> <span class="mi">15</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>
+                <span class="n">size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;limit_memory_soft&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">avgsz</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">LRU</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">db_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the registry for the given database name.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">[</span><span class="n">db_name</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="c1"># set db tracker - cleaned up at the WSGI dispatching phase in</span>
+                <span class="c1"># odoo.http.root</span>
+                <span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">()</span><span class="o">.</span><span class="n">dbname</span> <span class="o">=</span> <span class="n">db_name</span>
+
+<div class="viewcode-block" id="Registry.new">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.new">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">new</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">force_demo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create and return a new registry for the given database name. &quot;&quot;&quot;</span>
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+
+        <span class="c1"># Initializing a registry will call general code which will in</span>
+        <span class="c1"># turn call Registry() to obtain the registry being initialized.</span>
+        <span class="c1"># Make it available in the registries dictionary then remove it</span>
+        <span class="c1"># if an exception is raised.</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">[</span><span class="n">db_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">registry</span>  <span class="c1"># pylint: disable=unsupported-assignment-operation</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">registry</span><span class="o">.</span><span class="n">setup_signaling</span><span class="p">()</span>
+            <span class="c1"># This should be a method on Registry</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">load_modules</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">force_demo</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span> <span class="n">update_module</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">reset_modules_state</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+                <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;Failed to load registry&#39;</span><span class="p">)</span>
+            <span class="k">del</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">[</span><span class="n">db_name</span><span class="p">]</span>     <span class="c1"># pylint: disable=unsupported-delete-operation</span>
+            <span class="k">raise</span>
+
+        <span class="c1"># load_modules() above can replace the registry by calling</span>
+        <span class="c1"># indirectly new() again (when modules have to be uninstalled).</span>
+        <span class="c1"># Yeah, crazy.</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">[</span><span class="n">db_name</span><span class="p">]</span>  <span class="c1"># pylint: disable=unsubscriptable-object</span>
+
+        <span class="n">registry</span><span class="o">.</span><span class="n">_init</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">ready</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">registry_invalidated</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">update_module</span><span class="p">)</span>
+        <span class="n">registry</span><span class="o">.</span><span class="n">new</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">init</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">registries</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Registry loaded in </span><span class="si">%.3f</span><span class="s2">s&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">registry</span></div>
+
+
+<div class="viewcode-block" id="Registry.init">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.init">[docs]</a>
+    <span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">models</span> <span class="o">=</span> <span class="p">{}</span>    <span class="c1"># model name/model instance mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sql_constraints</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_database_translated_fields</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># names of translated fields in database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_assertion_report</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">OdooTestResult</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fields_by_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ordinary_tables</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_constraint_queue</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span> <span class="o">=</span> <span class="p">{</span><span class="n">cache_name</span><span class="p">:</span> <span class="n">LRU</span><span class="p">(</span><span class="n">cache_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">cache_name</span><span class="p">,</span> <span class="n">cache_size</span> <span class="ow">in</span> <span class="n">_REGISTRY_CACHES</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="c1"># modules fully loaded (maintained during init phase by `loading` module)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_modules</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">updated_modules</span> <span class="o">=</span> <span class="p">[]</span>       <span class="c1"># installed/updated modules</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loaded_xmlids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">db_name</span> <span class="o">=</span> <span class="n">db_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+
+        <span class="c1"># cursor for test mode; None means &quot;normal&quot; mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_lock</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Indicates that the registry is</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loaded</span> <span class="o">=</span> <span class="kc">False</span>             <span class="c1"># whether all modules are loaded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ready</span> <span class="o">=</span> <span class="kc">False</span>              <span class="c1"># whether everything is set up</span>
+
+        <span class="c1"># field dependencies</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_depends</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_depends_context</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_inverses</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">()</span>
+
+        <span class="c1"># cache of methods get_field_trigger_tree() and is_modifying_relations()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Inter-process signaling:</span>
+        <span class="c1"># The `base_registry_signaling` sequence indicates the whole registry</span>
+        <span class="c1"># must be reloaded.</span>
+        <span class="c1"># The `base_cache_signaling sequence` indicates all caches must be</span>
+        <span class="c1"># invalidated (i.e. cleared).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Flags indicating invalidation of the registry or the cache.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_invalidation_flags</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">has_unaccent</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">has_unaccent</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">has_trigram</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">has_trigram</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.delete">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.delete">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">db_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Delete the registry linked to a given database. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">db_name</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">:</span>  <span class="c1"># pylint: disable=unsupported-membership-test</span>
+            <span class="k">del</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="p">[</span><span class="n">db_name</span><span class="p">]</span>  <span class="c1"># pylint: disable=unsupported-delete-operation</span></div>
+
+
+<div class="viewcode-block" id="Registry.delete_all">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.delete_all">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">delete_all</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Delete all the registries. &quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">registries</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+    <span class="c1">#</span>
+    <span class="c1"># Mapping abstract methods implementation</span>
+    <span class="c1"># =&gt; mixin provides methods keys, items, values, get, __eq__, and __ne__</span>
+    <span class="c1">#</span>
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the size of the registry. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return an iterator over all model names. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the model with the given name or raise KeyError if it doesn&#39;t exist.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Same as ``self[model_name]``. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add or replace a model in the registry.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span>
+
+    <span class="k">def</span> <span class="fm">__delitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Remove a (custom) model from the registry. &quot;&quot;&quot;</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
+        <span class="c1"># the custom model can inherit from mixins (&#39;mail.thread&#39;, ...)</span>
+        <span class="k">for</span> <span class="n">Model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">Model</span><span class="o">.</span><span class="n">_inherit_children</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Registry.descendants">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.descendants">[docs]</a>
+    <span class="k">def</span> <span class="nf">descendants</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_names</span><span class="p">,</span> <span class="o">*</span><span class="n">kinds</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the models corresponding to ``model_names`` and all those</span>
+<span class="sd">        that inherit/inherits from them.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;_inherit&#39;</span><span class="p">,</span> <span class="s1">&#39;_inherits&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">kinds</span><span class="p">)</span>
+        <span class="n">funcs</span> <span class="o">=</span> <span class="p">[</span><span class="n">attrgetter</span><span class="p">(</span><span class="n">kind</span> <span class="o">+</span> <span class="s1">&#39;_children&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">kinds</span><span class="p">]</span>
+
+        <span class="n">models</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">()</span>
+        <span class="n">queue</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">queue</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()]</span>
+            <span class="n">models</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
+                <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">func</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">models</span></div>
+
+
+<div class="viewcode-block" id="Registry.load">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.load">[docs]</a>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">module</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Load a given module in the registry, and return the names of the</span>
+<span class="sd">        modified models.</span>
+
+<span class="sd">        At the Python level, the modules are already loaded, but not yet on a</span>
+<span class="sd">        per-registry level. This method populates a registry with the given</span>
+<span class="sd">        modules, i.e. it instantiates all the classes of a the given module</span>
+<span class="sd">        and registers them in the registry.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">..</span> <span class="kn">import</span> <span class="n">models</span>
+
+        <span class="c1"># clear cache to ensure consistency, but do not signal it</span>
+        <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="n">lazy_property</span><span class="o">.</span><span class="n">reset_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="c1"># Instantiate registered classes (via the MetaModel automatic discovery</span>
+        <span class="c1"># or via explicit constructor call), and add them to the pool.</span>
+        <span class="n">model_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="n">models</span><span class="o">.</span><span class="n">MetaModel</span><span class="o">.</span><span class="n">module_to_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="c1"># models register themselves in self.models</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_build_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">)</span>
+            <span class="n">model_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">descendants</span><span class="p">(</span><span class="n">model_names</span><span class="p">,</span> <span class="s1">&#39;_inherit&#39;</span><span class="p">,</span> <span class="s1">&#39;_inherits&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.setup_models">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.setup_models">[docs]</a>
+    <span class="nd">@locked</span>
+    <span class="k">def</span> <span class="nf">setup_models</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Complete the setup of models.</span>
+<span class="sd">            This must be called after loading modules and before using the ORM.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="c1"># Uninstall registry hooks. Because of the condition, this only happens</span>
+        <span class="c1"># on a fully loaded registry, and not on a registry being loaded.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ready</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">_unregister_hook</span><span class="p">()</span>
+
+        <span class="c1"># clear cache to ensure consistency, but do not signal it</span>
+        <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="n">lazy_property</span><span class="o">.</span><span class="n">reset_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># we must setup ir.model before adding manual fields because _add_manual_models may</span>
+        <span class="c1"># depend on behavior that is implemented through overrides, such as is_mail_thread which</span>
+        <span class="c1"># is implemented through an override to env[&#39;ir.model&#39;]._instanciate</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_prepare_setup</span><span class="p">()</span>
+
+        <span class="c1"># add manual models</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_modules</span><span class="p">:</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_add_manual_models</span><span class="p">()</span>
+
+        <span class="c1"># prepare the setup on all models</span>
+        <span class="n">models</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_prepare_setup</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_depends</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_depends_context</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_inverses</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="c1"># do the actual setup</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_setup_base</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_m2m</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_setup_fields</span><span class="p">()</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_m2m</span>
+
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_setup_complete</span><span class="p">()</span>
+
+        <span class="c1"># determine field_depends and field_depends_context</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">depends</span><span class="p">,</span> <span class="n">depends_context</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get_depends</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">field_depends</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">depends</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">field_depends_context</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">depends_context</span><span class="p">)</span>
+
+        <span class="c1"># clean the lazy_property again in case they are cached by another ongoing registry readonly request</span>
+        <span class="n">lazy_property</span><span class="o">.</span><span class="n">reset_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="c1"># Reinstall registry hooks. Because of the condition, this only happens</span>
+        <span class="c1"># on a fully loaded registry, and not on a registry being loaded.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ready</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">_register_hook</span><span class="p">()</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span></div>
+
+
+    <span class="nd">@lazy_property</span>
+    <span class="k">def</span> <span class="nf">field_computed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a dict mapping each field to the fields computed by the same method. &quot;&quot;&quot;</span>
+        <span class="n">computed</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">Model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">groups</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">compute</span><span class="p">:</span>
+                    <span class="n">computed</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">group</span> <span class="o">=</span> <span class="n">groups</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">compute</span><span class="p">]</span>
+                    <span class="n">group</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fields</span> <span class="ow">in</span> <span class="n">groups</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">({</span><span class="n">field</span><span class="o">.</span><span class="n">compute_sudo</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">})</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">fnames</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">)</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">: inconsistent &#39;compute_sudo&#39; for computed fields </span><span class="si">{</span><span class="n">fnames</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Either set &#39;compute_sudo&#39; to the same value on all those fields, or &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;use distinct compute methods for sudoed and non-sudoed fields.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">({</span><span class="n">field</span><span class="o">.</span><span class="n">precompute</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">})</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">fnames</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">)</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">: inconsistent &#39;precompute&#39; for computed fields </span><span class="si">{</span><span class="n">fnames</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Either set all fields as precompute=True (if possible), or &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;use distinct compute methods for precomputed and non-precomputed fields.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">({</span><span class="n">field</span><span class="o">.</span><span class="n">store</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">})</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">fnames1</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span><span class="o">.</span><span class="n">store</span><span class="p">)</span>
+                    <span class="n">fnames2</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span> <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">store</span><span class="p">)</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">: inconsistent &#39;store&#39; for computed fields, &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;accessing </span><span class="si">{</span><span class="n">fnames1</span><span class="si">}</span><span class="s2"> may recompute and update </span><span class="si">{</span><span class="n">fnames2</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Use distinct compute methods for stored and non-stored fields.&quot;</span>
+                    <span class="p">)</span>
+        <span class="k">return</span> <span class="n">computed</span>
+
+<div class="viewcode-block" id="Registry.get_trigger_tree">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.get_trigger_tree">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_trigger_tree</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">select</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TriggerTree&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the trigger tree to traverse when ``fields`` have been modified.</span>
+<span class="sd">        The function ``select`` is called on every field to determine which fields</span>
+<span class="sd">        should be kept in the tree nodes.  This enables to discard some unnecessary</span>
+<span class="sd">        fields from the tree nodes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">trees</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_field_trigger_tree</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_triggers</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">TriggerTree</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">trees</span><span class="p">,</span> <span class="n">select</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.get_dependent_fields">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.get_dependent_fields">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_dependent_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return an iterable on the fields that depend on ``field``. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_triggers</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">dependent</span>
+            <span class="k">for</span> <span class="n">tree</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_field_trigger_tree</span><span class="p">(</span><span class="n">field</span><span class="p">)</span><span class="o">.</span><span class="n">depth_first</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">dependent</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">root</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_discard_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Discard the given fields from the registry&#39;s internal data structures. &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+            <span class="c1"># tests usually don&#39;t reload the registry, so when they create</span>
+            <span class="c1"># custom fields those may not have the entire dependency setup, and</span>
+            <span class="c1"># may be missing from these maps</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field_depends</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># discard fields from field triggers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_field_triggers&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="c1"># discard fields from field inverses</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_inverses</span><span class="o">.</span><span class="n">discard_keys_and_values</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Registry.get_field_trigger_tree">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.get_field_trigger_tree">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_field_trigger_tree</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TriggerTree&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the trigger tree of a field by computing it from the transitive</span>
+<span class="sd">        closure of field triggers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="n">triggers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_triggers</span>
+
+        <span class="k">if</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">triggers</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">TriggerTree</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">transitive_triggers</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="p">(),</span> <span class="n">seen</span><span class="o">=</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">seen</span> <span class="ow">or</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">triggers</span><span class="p">:</span>
+                <span class="k">return</span>
+            <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">targets</span> <span class="ow">in</span> <span class="n">triggers</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">full_path</span> <span class="o">=</span> <span class="n">concat</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">targets</span>
+                <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">targets</span><span class="p">:</span>
+                    <span class="k">yield from</span> <span class="n">transitive_triggers</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">seen</span> <span class="o">+</span> <span class="p">(</span><span class="n">field</span><span class="p">,))</span>
+
+        <span class="k">def</span> <span class="nf">concat</span><span class="p">(</span><span class="n">seq1</span><span class="p">,</span> <span class="n">seq2</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">seq1</span> <span class="ow">and</span> <span class="n">seq2</span><span class="p">:</span>
+                <span class="n">f1</span><span class="p">,</span> <span class="n">f2</span> <span class="o">=</span> <span class="n">seq1</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">seq2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">f1</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span> <span class="ow">and</span> <span class="n">f2</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span>
+                    <span class="ow">and</span> <span class="n">f1</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">f2</span><span class="o">.</span><span class="n">inverse_name</span>
+                    <span class="ow">and</span> <span class="n">f1</span><span class="o">.</span><span class="n">model_name</span> <span class="o">==</span> <span class="n">f2</span><span class="o">.</span><span class="n">comodel_name</span>
+                    <span class="ow">and</span> <span class="n">f1</span><span class="o">.</span><span class="n">comodel_name</span> <span class="o">==</span> <span class="n">f2</span><span class="o">.</span><span class="n">model_name</span>
+                <span class="p">):</span>
+                    <span class="k">return</span> <span class="n">concat</span><span class="p">(</span><span class="n">seq1</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">seq2</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+            <span class="k">return</span> <span class="n">seq1</span> <span class="o">+</span> <span class="n">seq2</span>
+
+        <span class="n">tree</span> <span class="o">=</span> <span class="n">TriggerTree</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">targets</span> <span class="ow">in</span> <span class="n">transitive_triggers</span><span class="p">(</span><span class="n">field</span><span class="p">):</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">tree</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="n">current</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">current</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
+                <span class="n">current</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">current</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_trigger_trees</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">tree</span>
+
+        <span class="k">return</span> <span class="n">tree</span></div>
+
+
+    <span class="nd">@lazy_property</span>
+    <span class="k">def</span> <span class="nf">_field_triggers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the field triggers, i.e., the inverse of field dependencies,</span>
+<span class="sd">        as a dictionary like ``{field: {path: fields}}``, where ``field`` is a</span>
+<span class="sd">        dependency, ``path`` is a sequence of fields to inverse and ``fields``</span>
+<span class="sd">        is a collection of fields that depend on ``field``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">triggers</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">OrderedSet</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">Model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">Model</span><span class="o">.</span><span class="n">_abstract</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">resolve_depends</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="c1"># dependencies of custom fields may not exist; ignore that case</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span><span class="o">.</span><span class="n">base_field</span><span class="o">.</span><span class="n">manual</span><span class="p">:</span>
+                        <span class="k">raise</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">dependency</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">:</span>
+                        <span class="o">*</span><span class="n">path</span><span class="p">,</span> <span class="n">dep_field</span> <span class="o">=</span> <span class="n">dependency</span>
+                        <span class="n">triggers</span><span class="p">[</span><span class="n">dep_field</span><span class="p">][</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">path</span><span class="p">))]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">triggers</span>
+
+<div class="viewcode-block" id="Registry.is_modifying_relations">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.is_modifying_relations">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_modifying_relations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return whether ``field`` has dependent fields on some records, and</span>
+<span class="sd">        that modifying ``field`` might change the dependent records.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_triggers</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="n">field</span><span class="o">.</span><span class="n">relational</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">field_inverses</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="n">dep</span><span class="o">.</span><span class="n">relational</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">field_inverses</span><span class="p">[</span><span class="n">dep</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dependent_fields</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_modifying_relations</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+            <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="Registry.post_init">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.post_init">[docs]</a>
+    <span class="k">def</span> <span class="nf">post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Register a function to call at the end of :meth:`~.init_models`. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_post_init_queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Registry.post_constraint">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.post_constraint">[docs]</a>
+    <span class="k">def</span> <span class="nf">post_constraint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Call the given function, and delay it if it fails during an upgrade. &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_constraint_queue</span><span class="p">:</span>
+                <span class="c1"># Module A may try to apply a constraint and fail but another module B inheriting</span>
+                <span class="c1"># from Module A may try to reapply the same constraint and succeed, however the</span>
+                <span class="c1"># constraint would already be in the _constraint_queue and would be executed again</span>
+                <span class="c1"># at the end of the registry cycle, this would fail (already-existing constraint)</span>
+                <span class="c1"># and generate an error, therefore a constraint should only be applied if it&#39;s</span>
+                <span class="c1"># not already marked as &quot;to be applied&quot;.</span>
+                <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_install</span><span class="p">:</span>
+                <span class="n">_schema</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="o">*</span><span class="n">e</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_schema</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="o">*</span><span class="n">e</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_constraint_queue</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Registry.finalize_constraints">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.finalize_constraints">[docs]</a>
+    <span class="k">def</span> <span class="nf">finalize_constraints</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Call the delayed functions from above. &quot;&quot;&quot;</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_constraint_queue</span><span class="p">:</span>
+            <span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_constraint_queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="c1"># warn only, this is not a deployment showstopper, and</span>
+                <span class="c1"># can sometimes be a transient error</span>
+                <span class="n">_schema</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="o">*</span><span class="n">e</span><span class="o">.</span><span class="n">args</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.init_models">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.init_models">[docs]</a>
+    <span class="k">def</span> <span class="nf">init_models</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">model_names</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="n">install</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Initialize a list of models (given by their name). Call methods</span>
+<span class="sd">            ``_auto_init`` and ``init`` on each model to create or update the</span>
+<span class="sd">            database tables supporting the models.</span>
+
+<span class="sd">            The ``context`` may contain the following items:</span>
+<span class="sd">             - ``module``: the name of the module being installed/updated, if any;</span>
+<span class="sd">             - ``update_custom_fields``: whether custom fields should be updated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">model_names</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="s1">&#39;module&#39;</span> <span class="ow">in</span> <span class="n">context</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%s</span><span class="s1">: creating or updating database tables&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;models_to_check&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;verifying fields for every extended model&quot;</span><span class="p">)</span>
+
+        <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+        <span class="n">models</span> <span class="o">=</span> <span class="p">[</span><span class="n">env</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span> <span class="k">for</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="n">model_names</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_post_init_queue</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_install</span> <span class="o">=</span> <span class="n">install</span>
+
+            <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">_auto_init</span><span class="p">()</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">init</span><span class="p">()</span>
+
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_models</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_fields</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields.selection&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_selections</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.constraint&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_constraints</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.inherit&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_inherits</span><span class="p">(</span><span class="n">model_names</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ordinary_tables</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_post_init_queue</span><span class="p">:</span>
+                <span class="n">func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_post_init_queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+                <span class="n">func</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_indexes</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">model_names</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_foreign_keys</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+            <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+            <span class="c1"># make sure all tables are present</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_tables_exist</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_post_init_queue</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_install</span></div>
+
+
+<div class="viewcode-block" id="Registry.check_indexes">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.check_indexes">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_indexes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">model_names</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create or drop column indexes for the given models. &quot;&quot;&quot;</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">make_index_name</span><span class="p">(</span><span class="n">Model</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">Model</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;unaccent&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="n">model_names</span>
+            <span class="k">for</span> <span class="n">Model</span> <span class="ow">in</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">model_name</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="n">Model</span><span class="o">.</span><span class="n">_auto</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">Model</span><span class="o">.</span><span class="n">_abstract</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">column_type</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">store</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">expected</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># retrieve existing indexes with their corresponding table</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT indexname, tablename FROM pg_indexes WHERE indexname IN </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                   <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">expected</span><span class="p">)])</span>
+        <span class="n">existing</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+
+        <span class="k">for</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">unaccent</span> <span class="ow">in</span> <span class="n">expected</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">index</span>
+            <span class="k">assert</span> <span class="n">index</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;btree&#39;</span><span class="p">,</span> <span class="s1">&#39;btree_not_null&#39;</span><span class="p">,</span> <span class="s1">&#39;trigram&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="ow">and</span> <span class="n">indexname</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">existing</span> <span class="ow">and</span> \
+                    <span class="p">((</span><span class="ow">not</span> <span class="n">field</span><span class="o">.</span><span class="n">translate</span> <span class="ow">and</span> <span class="n">index</span> <span class="o">!=</span> <span class="s1">&#39;trigram&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">index</span> <span class="o">==</span> <span class="s1">&#39;trigram&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_trigram</span><span class="p">)):</span>
+                <span class="n">column_expression</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot;&#39;</span>
+                <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="s1">&#39;trigram&#39;</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">translate</span><span class="p">:</span>
+                        <span class="n">column_expression</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;(jsonb_path_query_array(</span><span class="si">{</span><span class="n">column_expression</span><span class="si">}</span><span class="s1">, &#39;$.*&#39;)::text)&#39;&#39;&#39;</span>
+                    <span class="c1"># add `unaccent` to the trigram index only because the</span>
+                    <span class="c1"># trigram indexes are mainly used for (i/=)like search and</span>
+                    <span class="c1"># unaccent is added only in these cases when searching</span>
+                    <span class="k">if</span> <span class="n">unaccent</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_unaccent</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_unaccent</span> <span class="o">==</span> <span class="n">FunctionStatus</span><span class="o">.</span><span class="n">INDEXABLE</span><span class="p">:</span>
+                            <span class="n">column_expression</span> <span class="o">=</span> <span class="n">get_unaccent_wrapper</span><span class="p">(</span><span class="n">cr</span><span class="p">)(</span><span class="n">column_expression</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                                <span class="s2">&quot;PostgreSQL function &#39;unaccent&#39; is present but not immutable, &quot;</span>
+                                <span class="s2">&quot;therefore trigram indexes may not be effective.&quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                    <span class="n">expression</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">column_expression</span><span class="si">}</span><span class="s1"> gin_trgm_ops&#39;</span>
+                    <span class="n">method</span> <span class="o">=</span> <span class="s1">&#39;gin&#39;</span>
+                    <span class="n">where</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+                <span class="k">else</span><span class="p">:</span>  <span class="c1"># index in [&#39;btree&#39;, &#39;btree_not_null&#39;， True]</span>
+                    <span class="n">expression</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">column_expression</span><span class="si">}</span><span class="s1">&#39;</span>
+                    <span class="n">method</span> <span class="o">=</span> <span class="s1">&#39;btree&#39;</span>
+                    <span class="n">where</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">column_expression</span><span class="si">}</span><span class="s1"> IS NOT NULL&#39;</span> <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="s1">&#39;btree_not_null&#39;</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                        <span class="n">sql</span><span class="o">.</span><span class="n">create_index</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="p">[</span><span class="n">expression</span><span class="p">],</span> <span class="n">method</span><span class="p">,</span> <span class="n">where</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">OperationalError</span><span class="p">:</span>
+                    <span class="n">_schema</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Unable to add index for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">index</span> <span class="ow">and</span> <span class="n">tablename</span> <span class="o">==</span> <span class="n">existing</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">indexname</span><span class="p">):</span>
+                <span class="n">_schema</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Keep unexpected index </span><span class="si">%s</span><span class="s2"> on table </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.add_foreign_key">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.add_foreign_key">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_foreign_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">,</span>
+                        <span class="n">model</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Specify an expected foreign key. &quot;&quot;&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">)</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="p">(</span><span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">force</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.check_foreign_keys">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.check_foreign_keys">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_foreign_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create or update the expected foreign keys. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># determine existing foreign keys on the tables</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT fk.conname, c1.relname, a1.attname, c2.relname, a2.attname, fk.confdeltype</span>
+<span class="s2">            FROM pg_constraint AS fk</span>
+<span class="s2">            JOIN pg_class AS c1 ON fk.conrelid = c1.oid</span>
+<span class="s2">            JOIN pg_class AS c2 ON fk.confrelid = c2.oid</span>
+<span class="s2">            JOIN pg_attribute AS a1 ON a1.attrelid = c1.oid AND fk.conkey[1] = a1.attnum</span>
+<span class="s2">            JOIN pg_attribute AS a2 ON a2.attrelid = c2.oid AND fk.confkey[1] = a2.attnum</span>
+<span class="s2">            WHERE fk.contype = &#39;f&#39; AND c1.relname IN </span><span class="si">%s</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">({</span><span class="n">table</span> <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span><span class="p">})])</span>
+        <span class="n">existing</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="p">(</span><span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">):</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">deltype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">deltype</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+        <span class="p">}</span>
+
+        <span class="c1"># create or update foreign keys</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_foreign_keys</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span> <span class="o">=</span> <span class="n">key</span>
+            <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">module</span> <span class="o">=</span> <span class="n">val</span>
+            <span class="n">deltype</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">_CONFDELTYPES</span><span class="p">[</span><span class="n">ondelete</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+            <span class="n">spec</span> <span class="o">=</span> <span class="n">existing</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">spec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">sql</span><span class="o">.</span><span class="n">add_foreign_key</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)</span>
+                <span class="n">conname</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">get_foreign_keys</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.constraint&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_constraint</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">conname</span><span class="p">,</span> <span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">spec</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">spec</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">!=</span> <span class="p">(</span><span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">deltype</span><span class="p">):</span>
+                <span class="n">sql</span><span class="o">.</span><span class="n">drop_constraint</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="n">sql</span><span class="o">.</span><span class="n">add_foreign_key</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)</span>
+                <span class="n">conname</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">get_foreign_keys</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table1</span><span class="p">,</span> <span class="n">column1</span><span class="p">,</span> <span class="n">table2</span><span class="p">,</span> <span class="n">column2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.constraint&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_reflect_constraint</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">conname</span><span class="p">,</span> <span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.check_tables_exist">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.check_tables_exist">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_tables_exist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Verify that all tables are present and try to initialize those that are missing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">table2model</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">_table</span><span class="p">:</span> <span class="n">name</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">model</span><span class="o">.</span><span class="n">_abstract</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">_table_query</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">}</span>
+        <span class="n">missing_tables</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">table2model</span><span class="p">)</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">existing_tables</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table2model</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">missing_tables</span><span class="p">:</span>
+            <span class="n">missing</span> <span class="o">=</span> <span class="p">{</span><span class="n">table2model</span><span class="p">[</span><span class="n">table</span><span class="p">]</span> <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">missing_tables</span><span class="p">}</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Models have no table: </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">missing</span><span class="p">))</span>
+            <span class="c1"># recreate missing tables</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">missing</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Recreate table of model </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">env</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">init</span><span class="p">()</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="c1"># check again, and log errors if tables are still missing</span>
+            <span class="n">missing_tables</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">table2model</span><span class="p">)</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">existing_tables</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table2model</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">missing_tables</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Model </span><span class="si">%s</span><span class="s2"> has no table.&quot;</span><span class="p">,</span> <span class="n">table2model</span><span class="p">[</span><span class="n">table</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="Registry.clear_cache">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.clear_cache">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">cache_names</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Clear the caches associated to methods decorated with</span>
+<span class="sd">        ``tools.ormcache``if cache is in `cache_name` subset. &quot;&quot;&quot;</span>
+        <span class="n">cache_names</span> <span class="o">=</span> <span class="n">cache_names</span> <span class="ow">or</span> <span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,)</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">cache_name</span> <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="n">cache_names</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="n">cache_names</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="p">[</span><span class="n">cache</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cache_name</span><span class="p">)</span>
+
+        <span class="c1"># log information about invalidation_cause</span>
+        <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+            <span class="c1"># could be interresting to log in info but this will need to minimize invalidation first,</span>
+            <span class="c1"># mainly in some setupclass and crons</span>
+            <span class="n">caller_info</span> <span class="o">=</span> <span class="n">format_frame</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()</span><span class="o">.</span><span class="n">f_back</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Invalidating </span><span class="si">%s</span><span class="s1"> model caches from </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cache_names</span><span class="p">),</span> <span class="n">caller_info</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.clear_all_caches">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.clear_all_caches">[docs]</a>
+    <span class="k">def</span> <span class="nf">clear_all_caches</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Clear the caches associated to methods decorated with</span>
+<span class="sd">        ``tools.ormcache``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">cache_name</span><span class="p">,</span> <span class="n">caches</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">caches</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="p">[</span><span class="n">cache</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cache_name</span><span class="p">)</span>
+
+        <span class="n">caller_info</span> <span class="o">=</span> <span class="n">format_frame</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()</span><span class="o">.</span><span class="n">f_back</span><span class="p">)</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">_logger</span><span class="o">.</span><span class="n">info</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">loaded</span> <span class="k">else</span> <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span>
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;Invalidating all model caches from </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">caller_info</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.is_an_ordinary_table">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.is_an_ordinary_table">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_an_ordinary_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return whether the given model has an ordinary table. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ordinary_tables</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cr</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT c.relname</span>
+<span class="s2">                  FROM pg_class c</span>
+<span class="s2">                  JOIN pg_namespace n ON (n.oid = c.relnamespace)</span>
+<span class="s2">                 WHERE c.relname IN </span><span class="si">%s</span>
+<span class="s2">                   AND c.relkind = &#39;r&#39;</span>
+<span class="s2">                   AND n.nspname = &#39;public&#39;</span>
+<span class="s2">            &quot;&quot;&quot;</span>
+            <span class="n">tables</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">_table</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">[</span><span class="n">tables</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ordinary_tables</span> <span class="o">=</span> <span class="p">{</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
+
+        <span class="k">return</span> <span class="n">model</span><span class="o">.</span><span class="n">_table</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ordinary_tables</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">registry_invalidated</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Determine whether the current thread has modified the registry. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_invalidation_flags</span><span class="p">,</span> <span class="s1">&#39;registry&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="nd">@registry_invalidated</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">registry_invalidated</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_invalidation_flags</span><span class="o">.</span><span class="n">registry</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cache_invalidated</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Determine whether the current thread has modified the cache. &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_invalidation_flags</span><span class="o">.</span><span class="n">cache</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_invalidation_flags</span><span class="o">.</span><span class="n">cache</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">names</span>
+
+<div class="viewcode-block" id="Registry.setup_signaling">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.setup_signaling">[docs]</a>
+    <span class="k">def</span> <span class="nf">setup_signaling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Setup the inter-process signaling on this registry. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_test_mode</span><span class="p">():</span>
+            <span class="k">return</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="c1"># The `base_registry_signaling` sequence indicates when the registry</span>
+            <span class="c1"># must be reloaded.</span>
+            <span class="c1"># The `base_cache_signaling_...` sequences indicates when caches must</span>
+            <span class="c1"># be invalidated (i.e. cleared).</span>
+            <span class="n">sequence_names</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;base_registry_signaling&#39;</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;base_cache_signaling_</span><span class="si">{</span><span class="n">cache_name</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">))</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT sequence_name FROM information_schema.sequences WHERE sequence_name IN </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">sequence_names</span><span class="p">])</span>
+            <span class="n">existing_sequences</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>  <span class="c1"># could be a set but not efficient with such a little list</span>
+
+            <span class="k">for</span> <span class="n">sequence_name</span> <span class="ow">in</span> <span class="n">sequence_names</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">sequence_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">existing_sequences</span><span class="p">:</span>
+                    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+                        <span class="s2">&quot;CREATE SEQUENCE </span><span class="si">%s</span><span class="s2"> INCREMENT BY 1 START WITH 1&quot;</span><span class="p">,</span>
+                        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">sequence_name</span><span class="p">),</span>
+                    <span class="p">))</span>
+                    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;SELECT nextval(</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">sequence_name</span><span class="p">))</span>
+
+            <span class="n">db_registry_sequence</span><span class="p">,</span> <span class="n">db_cache_sequences</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_sequences</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">=</span> <span class="n">db_registry_sequence</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">db_cache_sequences</span><span class="p">)</span>
+
+            <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Multiprocess load registry signaling: [Registry: </span><span class="si">%s</span><span class="s2">] </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                          <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;[Cache </span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1">]&#39;</span> <span class="o">%</span> <span class="n">cs</span> <span class="k">for</span> <span class="n">cs</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span></div>
+
+
+<div class="viewcode-block" id="Registry.get_sequences">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.get_sequences">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+        <span class="n">cache_sequences_query</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;base_cache_signaling_</span><span class="si">{</span><span class="n">cache_name</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">])</span>
+        <span class="n">cache_sequences_values_query</span> <span class="o">=</span> <span class="s1">&#39;,</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;base_cache_signaling_</span><span class="si">{</span><span class="n">cache_name</span><span class="si">}</span><span class="s1">.last_value&#39;</span> <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">])</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT base_registry_signaling.last_value, </span><span class="si">{</span><span class="n">cache_sequences_values_query</span><span class="si">}</span>
+<span class="s2">            FROM base_registry_signaling, </span><span class="si">{</span><span class="n">cache_sequences_query</span><span class="si">}</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">)</span>
+        <span class="n">registry_sequence</span><span class="p">,</span> <span class="o">*</span><span class="n">cache_sequences_values</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+        <span class="n">cache_sequences</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">_CACHES_BY_KEY</span><span class="p">,</span> <span class="n">cache_sequences_values</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">registry_sequence</span><span class="p">,</span> <span class="n">cache_sequences</span></div>
+
+
+<div class="viewcode-block" id="Registry.check_signaling">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.check_signaling">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_signaling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check whether the registry has changed, and performs all necessary</span>
+<span class="sd">        operations to update the registry. Return an up-to-date registry.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_test_mode</span><span class="p">():</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">db_registry_sequence</span><span class="p">,</span> <span class="n">db_cache_sequences</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_sequences</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="n">changes</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+            <span class="c1"># Check if the model registry must be reloaded</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">!=</span> <span class="n">db_registry_sequence</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Reloading the model registry after database signaling.&quot;</span><span class="p">)</span>
+                <span class="bp">self</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">=</span> <span class="n">db_registry_sequence</span>
+                <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+                    <span class="n">changes</span> <span class="o">+=</span> <span class="s2">&quot;[Registry - </span><span class="si">%s</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2">]&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span><span class="p">,</span> <span class="n">db_registry_sequence</span><span class="p">)</span>
+            <span class="c1"># Check if the model caches must be invalidated.</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">invalidated</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">cache_name</span><span class="p">,</span> <span class="n">cache_sequence</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">expected_sequence</span> <span class="o">=</span> <span class="n">db_cache_sequences</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">cache_sequence</span> <span class="o">!=</span> <span class="n">expected_sequence</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]:</span> <span class="c1"># don&#39;t call clear_cache to avoid signal loop</span>
+                            <span class="k">if</span> <span class="n">cache</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">invalidated</span><span class="p">:</span>
+                                <span class="n">invalidated</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="p">[</span><span class="n">cache</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">expected_sequence</span>
+                        <span class="k">if</span> <span class="n">_logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">):</span>
+                            <span class="n">changes</span> <span class="o">+=</span> <span class="s2">&quot;[Cache </span><span class="si">%s</span><span class="s2"> - </span><span class="si">%s</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2">]&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cache_name</span><span class="p">,</span> <span class="n">cache_sequence</span><span class="p">,</span> <span class="n">expected_sequence</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">invalidated</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Invalidating caches after database signaling: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">invalidated</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">changes</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Multiprocess signaling check: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">changes</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="Registry.signal_changes">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.signal_changes">[docs]</a>
+    <span class="k">def</span> <span class="nf">signal_changes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Notifies other processes if registry or cache has been invalidated. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_test_mode</span><span class="p">():</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span> <span class="ow">or</span> <span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Registry changed, signaling through the database&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;select nextval(&#39;base_registry_signaling&#39;)&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">registry_sequence</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># no need to notify cache invalidation in case of registry invalidation,</span>
+        <span class="c1"># because reloading the registry implies starting with an empty cache</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Caches invalidated, signaling through the database: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="p">))</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="p">:</span>
+                    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;select nextval(</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;base_cache_signaling_</span><span class="si">{</span><span class="n">cache_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cache_sequences</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Registry.reset_changes">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.reset_changes">[docs]</a>
+    <span class="k">def</span> <span class="nf">reset_changes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Reset the registry and cancel all invalidations. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_models</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">registry_invalidated</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">cache_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">_CACHES_BY_KEY</span><span class="p">[</span><span class="n">cache_name</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__caches</span><span class="p">[</span><span class="n">cache</span><span class="p">]</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_invalidated</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Registry.manage_changes">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.manage_changes">[docs]</a>
+    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">manage_changes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Context manager to signal/discard registry and cache invalidations. &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">signal_changes</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset_changes</span><span class="p">()</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="Registry.in_test_mode">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.in_test_mode">[docs]</a>
+    <span class="k">def</span> <span class="nf">in_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test whether the registry is in &#39;test&#39; mode. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Registry.enter_test_mode">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.enter_test_mode">[docs]</a>
+    <span class="k">def</span> <span class="nf">enter_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Enter the &#39;test&#39; mode, where one cursor serves several requests. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="o">=</span> <span class="n">cr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">Registry</span><span class="o">.</span><span class="n">_saved_lock</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">_saved_lock</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">_lock</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">DummyRLock</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Registry.leave_test_mode">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.leave_test_mode">[docs]</a>
+    <span class="k">def</span> <span class="nf">leave_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Leave the test mode. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">Registry</span><span class="o">.</span><span class="n">_saved_lock</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">_saved_lock</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">_saved_lock</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Registry.cursor">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.Registry.cursor">[docs]</a>
+    <span class="k">def</span> <span class="nf">cursor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a new cursor for the database. The cursor itself may be used</span>
+<span class="sd">            as a context manager to commit/rollback and close automatically.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># in test mode we use a proxy object that uses &#39;self.test_cr&#39; underneath</span>
+            <span class="k">return</span> <span class="n">TestCursor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_cr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_lock</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DummyRLock">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.DummyRLock">[docs]</a>
+<span class="k">class</span> <span class="nc">DummyRLock</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Dummy reentrant lock, to be used while running rpc and js tests &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="DummyRLock.acquire">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.DummyRLock.acquire">[docs]</a>
+    <span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="DummyRLock.release">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.DummyRLock.release">[docs]</a>
+    <span class="k">def</span> <span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="TriggerTree">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.TriggerTree">[docs]</a>
+<span class="k">class</span> <span class="nc">TriggerTree</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; The triggers of a field F is a tree that contains the fields that</span>
+<span class="sd">    depend on F, together with the fields to inverse to find out which records</span>
+<span class="sd">    to recompute.</span>
+
+<span class="sd">    For instance, assume that G depends on F, H depends on X.F, I depends on</span>
+<span class="sd">    W.X.F, and J depends on Y.F. The triggers of F will be the tree:</span>
+
+<span class="sd">                                 [G]</span>
+<span class="sd">                               X/   \\Y</span>
+<span class="sd">                             [H]     [J]</span>
+<span class="sd">                           W/</span>
+<span class="sd">                         [I]</span>
+
+<span class="sd">    This tree provides perfect support for the trigger mechanism:</span>
+<span class="sd">    when F is # modified on records,</span>
+<span class="sd">     - mark G to recompute on records,</span>
+<span class="sd">     - mark H to recompute on inverse(X, records),</span>
+<span class="sd">     - mark I to recompute on inverse(W, inverse(X, records)),</span>
+<span class="sd">     - mark J to recompute on inverse(Y, records).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;root&#39;</span><span class="p">]</span>
+
+    <span class="c1"># pylint: disable=keyword-arg-before-vararg</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="p">(),</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">root</span>
+
+    <span class="k">def</span> <span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;TriggerTree(root=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__repr__</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+<div class="viewcode-block" id="TriggerTree.increase">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.TriggerTree.increase">[docs]</a>
+    <span class="k">def</span> <span class="nf">increase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">subtree</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">TriggerTree</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">subtree</span></div>
+
+
+<div class="viewcode-block" id="TriggerTree.depth_first">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.TriggerTree.depth_first">[docs]</a>
+    <span class="k">def</span> <span class="nf">depth_first</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="bp">self</span>
+        <span class="k">for</span> <span class="n">subtree</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">yield from</span> <span class="n">subtree</span><span class="o">.</span><span class="n">depth_first</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TriggerTree.merge">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.registry.TriggerTree.merge">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">merge</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">trees</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">select</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;TriggerTree&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Merge trigger trees into a single tree. The function ``select`` is</span>
+<span class="sd">        called on every field to determine which fields should be kept in the</span>
+<span class="sd">        tree nodes. This enables to discard some fields from the tree nodes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">root_fields</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">()</span>              <span class="c1"># fields in the root node</span>
+        <span class="n">subtrees_to_merge</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>   <span class="c1"># subtrees to merge grouped by key</span>
+
+        <span class="k">for</span> <span class="n">tree</span> <span class="ow">in</span> <span class="n">trees</span><span class="p">:</span>
+            <span class="n">root_fields</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tree</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">subtree</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">subtrees_to_merge</span><span class="p">[</span><span class="n">label</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subtree</span><span class="p">)</span>
+
+        <span class="c1"># the root node contains the collected fields for which select is true</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">([</span><span class="n">field</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">root_fields</span> <span class="k">if</span> <span class="n">select</span><span class="p">(</span><span class="n">field</span><span class="p">)])</span>
+        <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">subtrees</span> <span class="ow">in</span> <span class="n">subtrees_to_merge</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">subtree</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">subtrees</span><span class="p">,</span> <span class="n">select</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">subtree</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="n">subtree</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

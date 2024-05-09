@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_profiler &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_profiler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_profiler</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">BaseCase</span><span class="p">,</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">tagged</span><span class="p">,</span> <span class="n">new_test_user</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">profiler</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.profiler</span> <span class="kn">import</span> <span class="n">Profiler</span><span class="p">,</span> <span class="n">ExecutionContext</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.speedscope</span> <span class="kn">import</span> <span class="n">Speedscope</span>
+
+
+<div class="viewcode-block" id="TestProfileAccess">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfileAccess">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;profiling&#39;</span><span class="p">)</span>
+<span class="c1"># post_install to ensure mail is already loaded if installed (new_test_user would fail otherwise because of notification_type)</span>
+<span class="k">class</span> <span class="nc">TestProfileAccess</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestProfileAccess.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfileAccess.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">test_profile</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.profile&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span></div>
+
+
+<div class="viewcode-block" id="TestProfileAccess.test_admin_has_access">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfileAccess.test_admin_has_access">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_admin_has_access</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.profile&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_profile</span><span class="o">.</span><span class="n">id</span><span class="p">)]),</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_profile</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_profile</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestProfileAccess.test_user_no_access">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfileAccess.test_user_no_access">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_no_access</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">new_test_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">login</span><span class="o">=</span><span class="s1">&#39;noProfile&#39;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="s1">&#39;noProfile&#39;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.profile&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_profile</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestSpeedscope">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;profiling&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestSpeedscope</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestSpeedscope.example_profile">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.example_profile">[docs]</a>
+    <span class="k">def</span> <span class="nf">example_profile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;init_stack_trace&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">135</span><span class="p">,</span> <span class="s1">&#39;__main__&#39;</span><span class="p">,</span> <span class="s1">&#39;main()&#39;</span><span class="p">]],</span>
+            <span class="s1">&#39;result&#39;</span><span class="p">:</span> <span class="p">[{</span>  <span class="c1"># init frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1(test=do_tests)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">,</span> <span class="s1">&#39;cr.execute(query, params)&#39;</span><span class="p">],</span>
+                <span class="p">],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1(test=do_tests)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">,</span> <span class="s1">&#39;cr.execute(query, params)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/sql_db.py&#39;</span><span class="p">,</span> <span class="mi">650</span><span class="p">,</span> <span class="s1">&#39;execute&#39;</span><span class="p">,</span> <span class="s1">&#39;res = self._obj.execute(query, params)&#39;</span><span class="p">],</span>
+                <span class="p">],</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># duplicate frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1(test=do_tests)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">,</span> <span class="s1">&#39;cr.execute(query, params)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/sql_db.py&#39;</span><span class="p">,</span> <span class="mi">650</span><span class="p">,</span> <span class="s1">&#39;execute&#39;</span><span class="p">,</span> <span class="s1">&#39;res = self._obj.execute(query, params)&#39;</span><span class="p">],</span>
+                <span class="p">],</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># other frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">6.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1(test=do_tests)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">,</span> <span class="s1">&#39;check&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/sql_db.py&#39;</span><span class="p">,</span> <span class="mi">650</span><span class="p">,</span> <span class="s1">&#39;check&#39;</span><span class="p">,</span> <span class="s1">&#39;assert x = y&#39;</span><span class="p">],</span>
+                <span class="p">],</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># out of frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1(test=do_tests)&#39;</span><span class="p">],</span>
+                    <span class="p">[</span><span class="s1">&#39;/path/to/file_1.py&#39;</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">,</span> <span class="s1">&#39;for i in range(10):&#39;</span><span class="p">],</span>
+                <span class="p">],</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># final frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.35</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}],</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_convert_empty">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_convert_empty">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_convert_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Speedscope</span><span class="p">()</span><span class="o">.</span><span class="n">make</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_profile_simple">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_profile_simple">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_profile_simple</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_profile</span><span class="p">()</span>
+
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+
+        <span class="n">frames</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">frames</span><span class="p">),</span> <span class="mi">4</span><span class="p">)</span>
+
+        <span class="n">profile_combined</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /main</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1/execute</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1/check</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /main</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;at&#39;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;at&#39;</span><span class="p">],</span> <span class="mf">8.35</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_profile_no_end">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_profile_no_end">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_profile_no_end</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_profile</span><span class="p">()</span>
+        <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">profile_combined</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">]]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /main</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1/execute</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1/check</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /main</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;at&#39;</span><span class="p">],</span> <span class="mi">8</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_init_stack_trace">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_init_stack_trace">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_init_stack_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_profile</span><span class="p">()</span>
+
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+
+        <span class="n">profile_combined</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">]]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>  <span class="c1"># /__main__/</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /__main__/main</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /__main__/main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /__main__/main/do_stuff1/execute</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>  <span class="c1"># /__main__/main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /__main__/main/do_stuff1/check</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># /__main__/main/do_stuff1</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># /__main__/main</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># /__main__/</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>  <span class="c1"># /</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;at&#39;</span><span class="p">],</span> <span class="mf">8.35</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_end_priority">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_end_priority">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_end_priority</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If a sample as a time (usually a query) we expect to keep the complete frame</span>
+<span class="sd">        even if another concurent frame tics before the end of the current one:</span>
+<span class="sd">        frame duration should always be more reliable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">async_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_profile</span><span class="p">()[</span><span class="s1">&#39;result&#39;</span><span class="p">]</span>
+        <span class="n">sql_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_profile</span><span class="p">()[</span><span class="s1">&#39;result&#39;</span><span class="p">]</span>
+        <span class="c1"># make sql_profile a single frame from 2.5 to 5.5</span>
+        <span class="n">sql_profile</span> <span class="o">=</span> <span class="p">[</span><span class="n">sql_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="n">sql_profile</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;start&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.5</span>
+        <span class="n">sql_profile</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;time&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="n">sql_profile</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;query&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;SELECT 1&#39;</span>
+        <span class="n">sql_profile</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;full_query&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;SELECT 1&#39;</span>
+        <span class="c1"># some check to ensure the take makes sence</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">async_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;start&#39;</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">async_profile</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;start&#39;</span><span class="p">],</span> <span class="mi">4</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;query&#39;</span><span class="p">,</span> <span class="n">async_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;stack&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;time&#39;</span><span class="p">,</span> <span class="n">async_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;stack&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">async_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;stack&#39;</span><span class="p">],</span> <span class="n">async_profile</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;stack&#39;</span><span class="p">])</span>
+        <span class="c1"># this last assertion is not really useful but ensures that the samples</span>
+        <span class="c1"># are consistent with the sql one, just missing tue query</span>
+
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="p">[])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;sql&#39;</span><span class="p">,</span> <span class="n">async_profile</span><span class="p">)</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;traces&#39;</span><span class="p">,</span> <span class="n">sql_profile</span><span class="p">)</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;sql&#39;</span><span class="p">,</span> <span class="s1">&#39;traces&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">profile_combined</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;at&#39;</span><span class="p">]</span><span class="o">+</span><span class="mi">2</span><span class="p">,</span> <span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">][</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">]][</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">profile_combined</span><span class="p">[</span><span class="s1">&#39;events&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-continuation</span>
+            <span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">2.5</span><span class="p">,</span> <span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;execute&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">2.5</span><span class="p">,</span> <span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s2">&quot;sql(&#39;SELECT 1&#39;)&quot;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">5.5</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s2">&quot;sql(&#39;SELECT 1&#39;)&quot;</span><span class="p">),</span>  <span class="c1"># select ends at 5.5 as expected despite another concurent frame at 3 and 4</span>
+                    <span class="p">(</span><span class="mf">5.5</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;execute&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">6.0</span><span class="p">,</span> <span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;check&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;check&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">10.35</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;do_stuff1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="mf">10.35</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;main&#39;</span><span class="p">),</span>
+        <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_context">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_context">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;init_stack_trace&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">,</span> <span class="s1">&#39;level0)&#39;</span><span class="p">]],</span>
+            <span class="s1">&#39;result&#39;</span><span class="p">:</span> <span class="p">[{</span>  <span class="c1"># init frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">})),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">stack</span><span class="p">),</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="s1">&#39;2&#39;</span><span class="p">})),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">stack</span><span class="p">),</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># final frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.35</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}],</span>
+        <span class="p">}</span>
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">][</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">]][</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;events&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-continuation</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;a=1&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;b=2&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;b=2&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;a=1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">),</span>
+        <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_context_nested">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_context_nested">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_context_nested</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;init_stack_trace&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">,</span> <span class="s1">&#39;level0)&#39;</span><span class="p">]],</span>
+            <span class="s1">&#39;result&#39;</span><span class="p">:</span> <span class="p">[{</span>  <span class="c1"># init frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">})),</span>  <span class="c1"># two contexts at the same level</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">stack</span><span class="p">),</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># final frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.35</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}],</span>
+        <span class="p">}</span>
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">][</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">]][</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;events&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-continuation</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;a=1&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;a=1&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">),</span>
+        <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_context_lower">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_context_lower">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_context_lower</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;init_stack_trace&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level3&#39;</span><span class="p">,</span> <span class="s1">&#39;level3&#39;</span><span class="p">],</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;result&#39;</span><span class="p">:</span> <span class="p">[{</span>  <span class="c1"># init frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">})),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">stack</span><span class="p">),</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># final frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.35</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}],</span>
+        <span class="p">}</span>
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">][</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">]][</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;events&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-continuation</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;b=1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">),</span>
+        <span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestSpeedscope.test_converts_no_context">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestSpeedscope.test_converts_no_context">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_converts_no_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;init_stack_trace&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">,</span> <span class="s1">&#39;level0&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">,</span> <span class="s1">&#39;level1&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">,</span> <span class="s1">&#39;level2&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file.py&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;level3&#39;</span><span class="p">,</span> <span class="s1">&#39;level3&#39;</span><span class="p">],</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;result&#39;</span><span class="p">:</span> <span class="p">[{</span>  <span class="c1"># init frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">})),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">stack</span><span class="p">),</span>
+            <span class="p">},</span> <span class="p">{</span>  <span class="c1"># final frame</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="mf">10.35</span><span class="p">,</span>
+                <span class="s1">&#39;exec_context&#39;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s1">&#39;stack&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}],</span>
+        <span class="p">}</span>
+        <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">profile</span><span class="p">[</span><span class="s1">&#39;init_stack_trace&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;profile&#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">])</span>
+        <span class="n">sp</span><span class="o">.</span><span class="n">add_output</span><span class="p">([</span><span class="s1">&#39;profile&#39;</span><span class="p">],</span> <span class="n">complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_context</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">make</span><span class="p">()</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">][</span><span class="s1">&#39;frames&#39;</span><span class="p">][</span><span class="n">e</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">]][</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;profiles&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;events&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-continuation</span>
+            <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;O&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level5&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;level4&#39;</span><span class="p">),</span>
+        <span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestProfiling">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;profiling&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestProfiling</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestProfiling.test_default_values">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_default_values">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_default_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Profiler</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">db</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_env_profiler_database">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_env_profiler_database">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_env_profiler_database</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">db</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_env_profiler_description">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_env_profiler_description">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_env_profiler_description</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;test_env_profiler_description&#39;</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">description</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_execution_context_save">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_execution_context_save">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_execution_context_save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;sql&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">):</span>
+                <span class="n">stack_level</span> <span class="o">=</span> <span class="n">profiler</span><span class="o">.</span><span class="n">stack_size</span><span class="p">()</span>
+                <span class="k">with</span> <span class="n">ExecutionContext</span><span class="p">(</span><span class="n">letter</span><span class="o">=</span><span class="n">letter</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT 1&#39;</span><span class="p">)</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}),))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">}),))</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_execution_context_nested">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_execution_context_nested">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_execution_context_nested</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This test checks that an execution can be nested at the same level of the stack.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;sql&#39;</span><span class="p">])</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">stack_level</span> <span class="o">=</span> <span class="n">profiler</span><span class="o">.</span><span class="n">stack_size</span><span class="p">()</span>
+            <span class="k">with</span> <span class="n">ExecutionContext</span><span class="p">(</span><span class="n">letter</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT 1&#39;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">ExecutionContext</span><span class="p">(</span><span class="n">letter</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT 1&#39;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">ExecutionContext</span><span class="p">(</span><span class="n">letter</span><span class="o">=</span><span class="s1">&#39;c&#39;</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT 1&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT 1&#39;</span><span class="p">)</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}),))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;b&#39;</span><span class="p">})))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}),</span> <span class="p">(</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">})))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">entries</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="s1">&#39;exec_context&#39;</span><span class="p">],</span> <span class="p">((</span><span class="n">stack_level</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;letter&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">}),))</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_sync_recorder">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_sync_recorder">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_sync_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">a</span><span class="p">():</span>
+            <span class="n">b</span><span class="p">()</span>
+            <span class="n">c</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">b</span><span class="p">():</span>
+            <span class="k">pass</span>
+
+        <span class="k">def</span> <span class="nf">c</span><span class="p">():</span>
+            <span class="n">d</span><span class="p">()</span>
+            <span class="n">d</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">d</span><span class="p">():</span>
+            <span class="k">pass</span>
+
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;traces_sync&#39;</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">a</span><span class="p">()</span>
+
+        <span class="n">stacks</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;stack&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">]</span>
+
+        <span class="c1"># map stack frames to their function name, and check</span>
+        <span class="n">stacks_methods</span> <span class="o">=</span> <span class="p">[[</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">]</span> <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">stacks_methods</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="s1">&#39;d&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="s1">&#39;d&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">],</span>
+            <span class="p">[],</span>
+        <span class="p">])</span>
+
+        <span class="c1"># map stack frames to their line number, and check</span>
+        <span class="n">stacks_lines</span> <span class="o">=</span> <span class="p">[[</span><span class="n">frame</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">]</span> <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">stacks_lines</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">stacks_lines</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                         <span class="s2">&quot;Call of b() in a() should be one line before call of c()&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_qweb_recorder">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_qweb_recorder">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_qweb_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;qweb&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="s1">&#39;root&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;arch_db&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;&#39;&lt;t t-name=&quot;root&quot;&gt;</span>
+<span class="s1">                &lt;t t-foreach=&quot;{&#39;a&#39;: 3, &#39;b&#39;: 2, &#39;c&#39;: 1}&quot; t-as=&quot;item&quot;&gt;</span>
+<span class="s1">                    [&lt;t t-out=&quot;item_index&quot;/&gt;: &lt;t t-set=&quot;record&quot; t-value=&quot;item&quot;/&gt;&lt;t t-call=&quot;base.dummy&quot;/&gt; &lt;t t-out=&quot;item_value&quot;/&gt;]</span>
+<span class="s1">                    &lt;b t-out=&quot;add_one_query()&quot;/&gt;&lt;/t&gt;</span>
+<span class="s1">            &lt;/t&gt;&#39;&#39;&#39;</span>
+        <span class="p">})</span>
+        <span class="n">child_template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;qweb&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="s1">&#39;dummy&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;arch_db&#39;</span><span class="p">:</span> <span class="s1">&#39;&lt;t t-name=&quot;dummy&quot;&gt;&lt;span t-attf-class=&quot;myclass&quot;&gt;&lt;t t-out=&quot;record&quot;/&gt; &lt;t t-out=&quot;add_one_query()&quot;/&gt;&lt;/span&gt;&lt;/t&gt;&#39;</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;INSERT INTO ir_model_data(name, model, res_id, module)&quot;</span>
+                            <span class="s2">&quot;VALUES (&#39;dummy&#39;, &#39;ir.ui.view&#39;, </span><span class="si">%s</span><span class="s2">, &#39;base&#39;)&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">])</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;add_one_query&#39;</span><span class="p">:</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT id FROM ir_ui_view LIMIT 1&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;query&#39;</span><span class="p">}</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="sa">u</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    [0: &lt;span class=&quot;myclass&quot;&gt;a query&lt;/span&gt; 3]</span>
+<span class="s2">                    &lt;b&gt;query&lt;/b&gt;</span>
+<span class="s2">                    [1: &lt;span class=&quot;myclass&quot;&gt;b query&lt;/span&gt; 2]</span>
+<span class="s2">                    &lt;b&gt;query&lt;/b&gt;</span>
+<span class="s2">                    [2: &lt;span class=&quot;myclass&quot;&gt;c query&lt;/span&gt; 1]</span>
+<span class="s2">                    &lt;b&gt;query&lt;/b&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># test rendering without profiling</span>
+        <span class="n">rendered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rendered</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">result</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="s1">&#39;Without profiling&#39;</span><span class="p">)</span>
+
+        <span class="c1"># This rendering is used to cache the compiled template method so as</span>
+        <span class="c1"># not to have a number of requests that vary according to the modules</span>
+        <span class="c1"># installed.</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;qweb&#39;</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;qweb&#39;</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">rendered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+            <span class="c1"># check if qweb is ok</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rendered</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">result</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+        <span class="c1"># check if the arch of all used templates is includes in the result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;results&#39;</span><span class="p">][</span><span class="s1">&#39;archs&#39;</span><span class="p">],</span> <span class="p">{</span>
+            <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">arch_db</span><span class="p">,</span>
+            <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">arch_db</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># check all directives without duration information</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;results&#39;</span><span class="p">][</span><span class="s1">&#39;data&#39;</span><span class="p">]:</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;delay&#39;</span><span class="p">)</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;results&#39;</span><span class="p">][</span><span class="s1">&#39;data&#39;</span><span class="p">]</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># pylint: disable=bad-whitespace</span>
+            <span class="c1"># first template and first directive</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t&#39;</span><span class="p">,</span>         <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;t-foreach=&quot;{&#39;a&#39;: 3, &#39;b&#39;: 2, &#39;c&#39;: 1}&quot; t-as=&#39;item&#39;&quot;&quot;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="c1"># first pass in the loop</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[1]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_index&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[2]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-set=&#39;record&#39; t-value=&#39;item&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[3]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-call=&#39;base.dummy&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span> <span class="c1"># 0 because the template is in ir.ui.view cache</span>
+            <span class="c1"># first pass in the loop: content of the child template</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span&#39;</span><span class="p">,</span>      <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-attf-class=&#39;myclass&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[1]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;record&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[2]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[4]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_value&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/b&#39;</span><span class="p">,</span>       <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span><span class="mi">1</span><span class="p">},</span>
+            <span class="c1"># second pass in the loop</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[1]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_index&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[2]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-set=&#39;record&#39; t-value=&#39;item&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[3]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-call=&#39;base.dummy&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span&#39;</span><span class="p">,</span>      <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-attf-class=&#39;myclass&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[1]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;record&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[2]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[4]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_value&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/b&#39;</span><span class="p">,</span>       <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span><span class="mi">1</span><span class="p">},</span>
+            <span class="c1"># third pass in the loop</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[1]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_index&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[2]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-set=&#39;record&#39; t-value=&#39;item&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[3]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-call=&#39;base.dummy&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span&#39;</span><span class="p">,</span>      <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-attf-class=&#39;myclass&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[1]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;record&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">child_template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/span/t[2]&#39;</span><span class="p">,</span> <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/t[4]&#39;</span><span class="p">,</span>    <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;item_value&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;view_id&#39;</span><span class="p">:</span> <span class="n">template</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>       <span class="s1">&#39;xpath&#39;</span><span class="p">:</span> <span class="s1">&#39;/t/t/b&#39;</span><span class="p">,</span>       <span class="s1">&#39;directive&#39;</span><span class="p">:</span> <span class="s2">&quot;t-out=&#39;add_one_query()&#39;&quot;</span><span class="p">,</span> <span class="s1">&#39;query&#39;</span><span class="p">:</span><span class="mi">1</span><span class="p">},</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestProfiling.test_default_recorders">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestProfiling.test_default_recorders">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_default_recorders</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">queries_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;snail</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="n">total_queries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">sql_log_count</span> <span class="o">-</span> <span class="n">queries_start</span>
+
+        <span class="n">rq</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">collectors</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;sql&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">entries</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;test_default_recorders&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;test_profiler.py&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rq</span><span class="p">),</span> <span class="n">total_queries</span><span class="p">)</span>
+        <span class="n">first_query</span> <span class="o">=</span> <span class="n">rq</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">first_query</span><span class="p">[</span><span class="s1">&#39;stack&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;create&#39;</span><span class="p">)</span>
+        <span class="c1">#self.assertIn(&quot;self.env[&#39;res.partner&#39;].create({&quot;, first_query[&#39;stack&#39;][0][3])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreater</span><span class="p">(</span><span class="n">first_query</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">first_query</span><span class="p">[</span><span class="s1">&#39;stack&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;execute&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">first_query</span><span class="p">[</span><span class="s1">&#39;stack&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sql_db.py&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="deep_call">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.deep_call">[docs]</a>
+<span class="k">def</span> <span class="nf">deep_call</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">depth</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Call the given function at the given call depth. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">deep_call</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">depth</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">func</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="TestPerformance">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestPerformance">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;-standard&#39;</span><span class="p">,</span> <span class="s1">&#39;profiling_performance&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestPerformance</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestPerformance.test_collector_max_frequency">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestPerformance.test_collector_max_frequency">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_collector_max_frequency</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the creation time of an entry</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">collector</span> <span class="o">=</span> <span class="n">profiler</span><span class="o">.</span><span class="n">Collector</span><span class="p">()</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="n">collector</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">collect</span><span class="p">():</span>
+            <span class="n">collector</span><span class="o">.</span><span class="n">add</span><span class="p">()</span>
+
+        <span class="c1"># collect on changing stack</span>
+        <span class="k">with</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="k">while</span> <span class="n">start</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">():</span>
+                <span class="n">deep_call</span><span class="p">(</span><span class="n">collect</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreater</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">),</span> <span class="mi">20000</span><span class="p">)</span>  <span class="c1"># ~40000</span>
+
+        <span class="c1"># collect on identical stack</span>
+        <span class="n">collector</span> <span class="o">=</span> <span class="n">profiler</span><span class="o">.</span><span class="n">Collector</span><span class="p">()</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="n">collector</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">collect_1_s</span><span class="p">():</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="k">while</span> <span class="n">start</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">():</span>
+                <span class="n">collector</span><span class="o">.</span><span class="n">add</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">deep_call</span><span class="p">(</span><span class="n">collect_1_s</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreater</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">collector</span><span class="o">.</span><span class="n">entries</span><span class="p">),</span> <span class="mi">50000</span><span class="p">)</span>  <span class="c1"># ~70000</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_frequencies_1ms_sleep">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestPerformance.test_frequencies_1ms_sleep">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_frequencies_1ms_sleep</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the number of entries generated in 1s at 1kHz</span>
+<span class="sd">        we need to artificially change the frame as often as possible to avoid</span>
+<span class="sd">        triggering the memory optimisation skipping identical frames</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">sleep_1</span><span class="p">():</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.0001</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">sleep_2</span><span class="p">():</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.0001</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;traces_async&#39;</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">res</span><span class="p">:</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="k">while</span> <span class="n">start</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">():</span>
+                <span class="n">sleep_1</span><span class="p">()</span>
+                <span class="n">sleep_2</span><span class="p">()</span>
+
+        <span class="n">entry_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreater</span><span class="p">(</span><span class="n">entry_count</span><span class="p">,</span> <span class="mi">700</span><span class="p">)</span>  <span class="c1"># ~920</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_traces_async_memory_optimisation">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_profiler.TestPerformance.test_traces_async_memory_optimisation">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_traces_async_memory_optimisation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Identical frames should be saved only once.</span>
+<span class="sd">        We should only have a few entries on a 1 second sleep.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">collectors</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;traces_async&#39;</span><span class="p">],</span> <span class="n">db</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">as</span> <span class="n">res</span><span class="p">:</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">entry_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">collectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertLess</span><span class="p">(</span><span class="n">entry_count</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>  <span class="c1"># ~3</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

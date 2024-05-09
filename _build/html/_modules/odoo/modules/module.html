@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.module &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.module</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.module</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">collections.abc</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">importlib</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pkg_resources</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span> <span class="k">as</span> <span class="n">opj</span><span class="p">,</span> <span class="n">normpath</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.tools</span> <span class="k">as</span> <span class="nn">tools</span>
+<span class="kn">import</span> <span class="nn">odoo.release</span> <span class="k">as</span> <span class="nn">release</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">pycompat</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">file_path</span>
+
+
+<span class="n">MANIFEST_NAMES</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;__manifest__.py&#39;</span><span class="p">,</span> <span class="s1">&#39;__openerp__.py&#39;</span><span class="p">)</span>
+<span class="n">README</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;README.rst&#39;</span><span class="p">,</span> <span class="s1">&#39;README.md&#39;</span><span class="p">,</span> <span class="s1">&#39;README.txt&#39;</span><span class="p">]</span>
+
+<span class="n">_DEFAULT_MANIFEST</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="c1">#addons_path: f&#39;/path/to/the/addons/path/of/{module}&#39;,  # automatic</span>
+    <span class="s1">&#39;application&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;bootstrap&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>  <span class="c1"># web</span>
+    <span class="s1">&#39;assets&#39;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="s1">&#39;author&#39;</span><span class="p">:</span> <span class="s1">&#39;Odoo S.A.&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;auto_install&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;category&#39;</span><span class="p">:</span> <span class="s1">&#39;Uncategorized&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;configurator_snippets&#39;</span><span class="p">:</span> <span class="p">{},</span>  <span class="c1"># website themes</span>
+    <span class="s1">&#39;countries&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;demo&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;demo_xml&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;depends&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;description&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;external_dependencies&#39;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="c1">#icon: f&#39;/{module}/static/description/icon.png&#39;,  # automatic</span>
+    <span class="s1">&#39;init_xml&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;installable&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s1">&#39;images&#39;</span><span class="p">:</span> <span class="p">[],</span>  <span class="c1"># website</span>
+    <span class="s1">&#39;images_preview_theme&#39;</span><span class="p">:</span> <span class="p">{},</span>  <span class="c1"># website themes</span>
+    <span class="c1">#license, mandatory</span>
+    <span class="s1">&#39;live_test_url&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>  <span class="c1"># website themes</span>
+    <span class="s1">&#39;new_page_templates&#39;</span><span class="p">:</span> <span class="p">{},</span>  <span class="c1"># website themes</span>
+    <span class="c1">#name, mandatory</span>
+    <span class="s1">&#39;post_init_hook&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;post_load&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;pre_init_hook&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="s1">&#39;summary&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;test&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;update_xml&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s1">&#39;uninstall_hook&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="s1">&#39;1.0&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;web&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;website&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="UpgradeHook">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.UpgradeHook">[docs]</a>
+<span class="k">class</span> <span class="nc">UpgradeHook</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Makes the legacy `migrations` package being `odoo.upgrade`&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="UpgradeHook.find_spec">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.UpgradeHook.find_spec">[docs]</a>
+    <span class="k">def</span> <span class="nf">find_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fullname</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^odoo\.addons\.base\.maintenance\.migrations\b&quot;</span><span class="p">,</span> <span class="n">fullname</span><span class="p">):</span>
+            <span class="c1"># We can&#39;t trigger a DeprecationWarning in this case.</span>
+            <span class="c1"># In order to be cross-versions, the multi-versions upgrade scripts (0.0.0 scripts),</span>
+            <span class="c1"># the tests, and the common files (utility functions) still needs to import from the</span>
+            <span class="c1"># legacy name.</span>
+            <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">spec_from_loader</span><span class="p">(</span><span class="n">fullname</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="UpgradeHook.load_module">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.UpgradeHook.load_module">[docs]</a>
+    <span class="k">def</span> <span class="nf">load_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span>
+
+        <span class="n">canonical_upgrade</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;odoo.addons.base.maintenance.migrations&quot;</span><span class="p">,</span> <span class="s2">&quot;odoo.upgrade&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">canonical_upgrade</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+            <span class="n">mod</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">canonical_upgrade</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mod</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">canonical_upgrade</span><span class="p">)</span>
+
+        <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">mod</span>
+
+        <span class="k">return</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="initialize_sys_path">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.initialize_sys_path">[docs]</a>
+<span class="k">def</span> <span class="nf">initialize_sys_path</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Setup the addons path ``odoo.addons.__path__`` with various defaults</span>
+<span class="sd">    and explicit directories.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># hook odoo.addons on data dir</span>
+    <span class="n">dd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normcase</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">addons_data_dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">)</span> <span class="ow">and</span> <span class="n">dd</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dd</span><span class="p">)</span>
+
+    <span class="c1"># hook odoo.addons on addons paths</span>
+    <span class="k">for</span> <span class="n">ad</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+        <span class="n">ad</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normcase</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">ad</span><span class="o">.</span><span class="n">strip</span><span class="p">())))</span>
+        <span class="k">if</span> <span class="n">ad</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ad</span><span class="p">)</span>
+
+    <span class="c1"># hook odoo.addons on base module path</span>
+    <span class="n">base_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normcase</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)),</span> <span class="s1">&#39;addons&#39;</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">base_path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">base_path</span><span class="p">):</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base_path</span><span class="p">)</span>
+
+    <span class="c1"># hook odoo.upgrade on upgrade-path</span>
+    <span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">upgrade</span>
+    <span class="n">legacy_upgrade_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">base_path</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="s1">&#39;maintenance&#39;</span><span class="p">,</span> <span class="s1">&#39;migrations&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">up</span> <span class="ow">in</span> <span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;upgrade_path&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">legacy_upgrade_path</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+        <span class="n">up</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normcase</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">up</span><span class="o">.</span><span class="n">strip</span><span class="p">())))</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">up</span><span class="p">)</span> <span class="ow">and</span> <span class="n">up</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">upgrade</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+            <span class="n">upgrade</span><span class="o">.</span><span class="n">__path__</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">up</span><span class="p">)</span>
+
+    <span class="c1"># create decrecated module alias from odoo.addons.base.maintenance.migrations to odoo.upgrade</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">machinery</span><span class="o">.</span><span class="n">ModuleSpec</span><span class="p">(</span><span class="s2">&quot;odoo.addons.base.maintenance&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">is_package</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">maintenance_pkg</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">module_from_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+    <span class="n">maintenance_pkg</span><span class="o">.</span><span class="n">migrations</span> <span class="o">=</span> <span class="n">upgrade</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s2">&quot;odoo.addons.base.maintenance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">maintenance_pkg</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s2">&quot;odoo.addons.base.maintenance.migrations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">upgrade</span>
+
+    <span class="c1"># hook deprecated module alias from openerp to odoo and &quot;crm&quot;-like to odoo.addons</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">initialize_sys_path</span><span class="p">,</span> <span class="s1">&#39;called&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span> <span class="c1"># only initialize once</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">meta_path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">UpgradeHook</span><span class="p">())</span>
+        <span class="n">initialize_sys_path</span><span class="o">.</span><span class="n">called</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="get_module_path">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_module_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_module_path</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">downloaded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">display_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the path of the given module.</span>
+
+<span class="sd">    Search the addons paths and return the first path where the given</span>
+<span class="sd">    module is found. If downloaded is True, return the default addons</span>
+<span class="sd">    path if nothing else is found.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[\/</span><span class="se">\\</span><span class="s2">]&quot;</span><span class="p">,</span> <span class="n">module</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">adp</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+        <span class="n">files</span> <span class="o">=</span> <span class="p">[</span><span class="n">opj</span><span class="p">(</span><span class="n">adp</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">manifest</span><span class="p">)</span> <span class="k">for</span> <span class="n">manifest</span> <span class="ow">in</span> <span class="n">MANIFEST_NAMES</span><span class="p">]</span> <span class="o">+</span>\
+                <span class="p">[</span><span class="n">opj</span><span class="p">(</span><span class="n">adp</span><span class="p">,</span> <span class="n">module</span> <span class="o">+</span> <span class="s1">&#39;.zip&#39;</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">opj</span><span class="p">(</span><span class="n">adp</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">downloaded</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">opj</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">addons_data_dir</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">display_warning</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%s</span><span class="s1">: module not found&#39;</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="get_module_filetree">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_module_filetree">[docs]</a>
+<span class="k">def</span> <span class="nf">get_module_filetree</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="nb">dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">):</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s2">&quot;Since 16.0: use os.walk or a recursive glob or something&quot;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span>
+    <span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">get_module_path</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nb">dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="nb">dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">dir</span> <span class="o">==</span> <span class="s1">&#39;.&#39;</span><span class="p">:</span>
+        <span class="nb">dir</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">if</span> <span class="nb">dir</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;..&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">dir</span> <span class="ow">and</span> <span class="nb">dir</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Cannot access file outside the module&#39;</span><span class="p">)</span>
+
+    <span class="n">files</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">osutil</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">tree</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">f</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="nb">dir</span><span class="p">):</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="nb">dir</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="nb">dir</span><span class="p">)</span><span class="o">+</span><span class="nb">int</span><span class="p">(</span><span class="ow">not</span> <span class="nb">dir</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)):]</span>
+        <span class="n">lst</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">)</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">tree</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">lst</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">lst</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="p">{})</span>
+        <span class="n">current</span><span class="p">[</span><span class="n">lst</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">tree</span></div>
+
+
+<div class="viewcode-block" id="get_resource_path">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_resource_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_resource_path</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the full path of a resource of the given module.</span>
+
+<span class="sd">    :param module: module name</span>
+<span class="sd">    :param list(str) args: resource path components within module</span>
+
+<span class="sd">    :rtype: str</span>
+<span class="sd">    :return: absolute path to the resource</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Since 17.0: use tools.misc.file_path instead of get_resource_path(</span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">args</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">resource_path</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">file_path</span><span class="p">(</span><span class="n">resource_path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<span class="c1"># backwards compatibility</span>
+<span class="n">get_module_resource</span> <span class="o">=</span> <span class="n">get_resource_path</span>
+<span class="n">check_resource_path</span> <span class="o">=</span> <span class="n">get_resource_path</span>
+
+<div class="viewcode-block" id="get_resource_from_path">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_resource_from_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_resource_from_path</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tries to extract the module name and the resource&#39;s relative path</span>
+<span class="sd">    out of an absolute resource path.</span>
+
+<span class="sd">    If operation is successful, returns a tuple containing the module name, the relative path</span>
+<span class="sd">    to the resource using &#39;/&#39; as filesystem seperator[1] and the same relative path using</span>
+<span class="sd">    os.path.sep seperators.</span>
+
+<span class="sd">    [1] same convention as the resource path declaration in manifests</span>
+
+<span class="sd">    :param path: absolute resource path</span>
+
+<span class="sd">    :rtype: tuple</span>
+<span class="sd">    :return: tuple(module_name, relative_path, os_relative_path) if possible, else None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">resource</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">sorted_paths</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="nb">len</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">adpath</span> <span class="ow">in</span> <span class="n">sorted_paths</span><span class="p">:</span>
+        <span class="c1"># force trailing separator</span>
+        <span class="n">adpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">adpath</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">commonprefix</span><span class="p">([</span><span class="n">adpath</span><span class="p">,</span> <span class="n">path</span><span class="p">])</span> <span class="o">==</span> <span class="n">adpath</span><span class="p">:</span>
+            <span class="n">resource</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">adpath</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">resource</span><span class="p">:</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="n">resource</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">relative</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">relative</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="n">relative</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">relative</span><span class="p">),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">relative</span><span class="p">))</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="get_module_icon">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_module_icon">[docs]</a>
+<span class="k">def</span> <span class="nf">get_module_icon</span><span class="p">(</span><span class="n">module</span><span class="p">):</span>
+    <span class="n">fpath</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">/static/description/icon.png&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">file_path</span><span class="p">(</span><span class="n">fpath</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">fpath</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;/base/static/description/icon.png&quot;</span></div>
+
+
+<div class="viewcode-block" id="get_module_icon_path">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_module_icon_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_module_icon_path</span><span class="p">(</span><span class="n">module</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">file_path</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">/static/description/icon.png&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">file_path</span><span class="p">(</span><span class="s2">&quot;base/static/description/icon.png&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="module_manifest">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.module_manifest">[docs]</a>
+<span class="k">def</span> <span class="nf">module_manifest</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns path to module manifest if one can be found under `path`, else `None`.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">manifest_name</span> <span class="ow">in</span> <span class="n">MANIFEST_NAMES</span><span class="p">:</span>
+        <span class="n">candidate</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">manifest_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">candidate</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">manifest_name</span> <span class="o">==</span> <span class="s1">&#39;__openerp__.py&#39;</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;__openerp__.py manifests are deprecated since 17.0, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;rename </span><span class="si">{</span><span class="n">candidate</span><span class="si">!r}</span><span class="s2"> to __manifest__.py &quot;</span>
+                    <span class="s2">&quot;(valid since 10.0)&quot;</span><span class="p">,</span>
+                    <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">candidate</span></div>
+
+
+<div class="viewcode-block" id="get_module_root">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_module_root">[docs]</a>
+<span class="k">def</span> <span class="nf">get_module_root</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get closest module&#39;s root beginning from path</span>
+
+<span class="sd">        # Given:</span>
+<span class="sd">        # /foo/bar/module_dir/static/src/...</span>
+
+<span class="sd">        get_module_root(&#39;/foo/bar/module_dir/static/&#39;)</span>
+<span class="sd">        # returns &#39;/foo/bar/module_dir&#39;</span>
+
+<span class="sd">        get_module_root(&#39;/foo/bar/module_dir/&#39;)</span>
+<span class="sd">        # returns &#39;/foo/bar/module_dir&#39;</span>
+
+<span class="sd">        get_module_root(&#39;/foo/bar&#39;)</span>
+<span class="sd">        # returns None</span>
+
+<span class="sd">    @param path: Path from which the lookup should start</span>
+
+<span class="sd">    @return:  Module root path or None if not found</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">module_manifest</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="n">new_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">pardir</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="o">==</span> <span class="n">new_path</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">new_path</span>
+    <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="load_manifest">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.load_manifest">[docs]</a>
+<span class="k">def</span> <span class="nf">load_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Load the module manifest from the file system. &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mod_path</span><span class="p">:</span>
+        <span class="n">mod_path</span> <span class="o">=</span> <span class="n">get_module_path</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">downloaded</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">manifest_file</span> <span class="o">=</span> <span class="n">module_manifest</span><span class="p">(</span><span class="n">mod_path</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest_file</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%s</span><span class="s1">: no manifest file found </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">MANIFEST_NAMES</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">_DEFAULT_MANIFEST</span><span class="p">)</span>
+
+    <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;icon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_module_icon</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">tools</span><span class="o">.</span><span class="n">file_open</span><span class="p">(</span><span class="n">manifest_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()))</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]:</span>
+        <span class="n">readme_path</span> <span class="o">=</span> <span class="p">[</span><span class="n">opj</span><span class="p">(</span><span class="n">mod_path</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">README</span>
+                       <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">mod_path</span><span class="p">,</span> <span class="n">x</span><span class="p">))]</span>
+        <span class="k">if</span> <span class="n">readme_path</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">tools</span><span class="o">.</span><span class="n">file_open</span><span class="p">(</span><span class="n">readme_path</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fd</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;license&#39;</span><span class="p">):</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;license&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;LGPL-3&#39;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Missing `license` key in manifest for </span><span class="si">%r</span><span class="s2">, defaulting to LGPL-3&quot;</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+
+    <span class="c1"># auto_install is either `False` (by default) in which case the module</span>
+    <span class="c1"># is opt-in, either a list of dependencies in which case the module is</span>
+    <span class="c1"># automatically installed if all dependencies are (special case: [] to</span>
+    <span class="c1"># always install the module), either `True` to auto-install the module</span>
+    <span class="c1"># in case all dependencies declared in `depends` are installed.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">],</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Iterable</span><span class="p">):</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">])</span>
+        <span class="n">non_dependencies</span> <span class="o">=</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">])</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">non_dependencies</span><span class="p">,</span>\
+            <span class="s2">&quot;auto_install triggers must be dependencies, found &quot;</span> \
+            <span class="s2">&quot;non-dependencies [</span><span class="si">%s</span><span class="s2">] for module </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">non_dependencies</span><span class="p">),</span> <span class="n">module</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">])</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adapt_version</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;version&#39;</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;installable&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Module </span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">: invalid manifest&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+    <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">normpath</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">mod_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">pardir</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">manifest</span></div>
+
+
+<div class="viewcode-block" id="get_manifest">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_manifest">[docs]</a>
+<span class="k">def</span> <span class="nf">get_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get the module manifest.</span>
+
+<span class="sd">    :param str module: The name of the module (sale, purchase, ...).</span>
+<span class="sd">    :param Optional[str] mod_path: The optional path to the module on</span>
+<span class="sd">        the file-system. If not set, it is determined by scanning the</span>
+<span class="sd">        addons-paths.</span>
+<span class="sd">    :returns: The module manifest as a dict or an empty dict</span>
+<span class="sd">        when the manifest was not found.</span>
+<span class="sd">    :rtype: dict</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">_get_manifest_cached</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="p">))</span></div>
+
+
+<span class="nd">@functools</span><span class="o">.</span><span class="n">lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_get_manifest_cached</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">load_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="p">)</span>
+
+<div class="viewcode-block" id="load_information_from_description_file">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.load_information_from_description_file">[docs]</a>
+<span class="k">def</span> <span class="nf">load_information_from_description_file</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s1">&#39;load_information_from_description_file() is a deprecated &#39;</span>
+        <span class="s1">&#39;alias to get_manifest()&#39;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">get_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">mod_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_openerp_module">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.load_openerp_module">[docs]</a>
+<span class="k">def</span> <span class="nf">load_openerp_module</span><span class="p">(</span><span class="n">module_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Load an OpenERP module, if not already loaded.</span>
+
+<span class="sd">    This loads the module and register all of its models, thanks to either</span>
+<span class="sd">    the MetaModel metaclass, or the explicit instantiation of the model.</span>
+<span class="sd">    This is also used to load server-wide module (i.e. it is also used</span>
+<span class="sd">    when there is no model to register).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">qualname</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;odoo.addons.</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s1">&#39;</span>
+    <span class="k">if</span> <span class="n">qualname</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">__import__</span><span class="p">(</span><span class="n">qualname</span><span class="p">)</span>
+
+        <span class="c1"># Call the module&#39;s post-load hook. This can done before any model or</span>
+        <span class="c1"># data has been initialized. This is ok as the post-load hook is for</span>
+        <span class="c1"># server-wide (instead of registry-specific) functionalities.</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">get_manifest</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;post_load&#39;</span><span class="p">]:</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">qualname</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;post_load&#39;</span><span class="p">])()</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t load module </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
+        <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="get_modules">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_modules">[docs]</a>
+<span class="k">def</span> <span class="nf">get_modules</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the list of module names</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">listdir</span><span class="p">(</span><span class="nb">dir</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">:]</span> <span class="o">==</span> <span class="s1">&#39;.zip&#39;</span><span class="p">:</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">name</span>
+
+        <span class="k">def</span> <span class="nf">is_really_module</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">mname</span> <span class="ow">in</span> <span class="n">MANIFEST_NAMES</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mname</span><span class="p">)):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="n">clean</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="nb">dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_really_module</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="p">]</span>
+
+    <span class="n">plist</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">ad</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">ad</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;addons path does not exist: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ad</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">plist</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">listdir</span><span class="p">(</span><span class="n">ad</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">plist</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="get_modules_with_version">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.get_modules_with_version">[docs]</a>
+<span class="k">def</span> <span class="nf">get_modules_with_version</span><span class="p">():</span>
+    <span class="n">modules</span> <span class="o">=</span> <span class="n">get_modules</span><span class="p">()</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">modules</span><span class="p">,</span> <span class="n">adapt_version</span><span class="p">(</span><span class="s1">&#39;1.0&#39;</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">modules</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">info</span> <span class="o">=</span> <span class="n">get_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">module</span><span class="p">]</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;version&#39;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">continue</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="adapt_version">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.adapt_version">[docs]</a>
+<span class="k">def</span> <span class="nf">adapt_version</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+    <span class="n">serie</span> <span class="o">=</span> <span class="n">release</span><span class="o">.</span><span class="n">major_version</span>
+    <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="n">serie</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">serie</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span><span class="p">):</span>
+        <span class="n">base_version</span> <span class="o">=</span> <span class="n">version</span>
+        <span class="n">version</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">serie</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">base_version</span> <span class="o">=</span> <span class="n">version</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">serie</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^[0-9]+\.[0-9]+(?:\.[0-9]+)?$&quot;</span><span class="p">,</span> <span class="n">base_version</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid version </span><span class="si">{</span><span class="n">base_version</span><span class="si">!r}</span><span class="s2">. Modules should have a version in format `x.y`, `x.y.z`,&quot;</span>
+                         <span class="sa">f</span><span class="s2">&quot; `</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s2">.x.y` or `</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s2">.x.y.z`.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">version</span></div>
+
+
+
+<span class="n">current_test</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="check_python_external_dependency">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.check_python_external_dependency">[docs]</a>
+<span class="k">def</span> <span class="nf">check_python_external_dependency</span><span class="p">(</span><span class="n">pydep</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">pkg_resources</span><span class="o">.</span><span class="n">get_distribution</span><span class="p">(</span><span class="n">pydep</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">pkg_resources</span><span class="o">.</span><span class="n">DistributionNotFound</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">pydep</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;python external dependency on &#39;</span><span class="si">%s</span><span class="s2">&#39; does not appear to be a valid PyPI package. Using a PyPI package name is recommended.&quot;</span><span class="p">,</span> <span class="n">pydep</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="c1"># backward compatibility attempt failed</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;DistributionNotFound: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Python library not installed: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pydep</span><span class="p">,))</span>
+    <span class="k">except</span> <span class="n">pkg_resources</span><span class="o">.</span><span class="n">VersionConflict</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;VersionConflict: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Python library version conflict: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pydep</span><span class="p">,))</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;get_distribution(</span><span class="si">%s</span><span class="s2">) failed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">pydep</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Error finding python library </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pydep</span><span class="p">,))</span></div>
+
+
+
+<div class="viewcode-block" id="check_manifest_dependencies">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.module.check_manifest_dependencies">[docs]</a>
+<span class="k">def</span> <span class="nf">check_manifest_dependencies</span><span class="p">(</span><span class="n">manifest</span><span class="p">):</span>
+    <span class="n">depends</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;external_dependencies&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">depends</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">for</span> <span class="n">pydep</span> <span class="ow">in</span> <span class="n">depends</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;python&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">check_python_external_dependency</span><span class="p">(</span><span class="n">pydep</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">binary</span> <span class="ow">in</span> <span class="n">depends</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bin&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">find_in_path</span><span class="p">(</span><span class="n">binary</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Unable to find </span><span class="si">%r</span><span class="s1"> in path&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">binary</span><span class="p">,))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

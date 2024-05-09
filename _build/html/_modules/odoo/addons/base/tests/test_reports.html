@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_reports &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_reports</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_reports</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">base64</span> <span class="kn">import</span> <span class="n">b64decode</span>
+<span class="kn">from</span> <span class="nn">unittest</span> <span class="kn">import</span> <span class="n">skipIf</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.tests</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.converter</span> <span class="kn">import</span> <span class="n">PDFPageAggregator</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.layout</span> <span class="kn">import</span> <span class="n">LAParams</span><span class="p">,</span> <span class="n">LTFigure</span><span class="p">,</span> <span class="n">LTTextBox</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.pdfdocument</span> <span class="kn">import</span> <span class="n">PDFDocument</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.pdfinterp</span> <span class="kn">import</span> <span class="n">PDFResourceManager</span><span class="p">,</span> <span class="n">PDFPageInterpreter</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.pdfpage</span> <span class="kn">import</span> <span class="n">PDFPage</span>
+    <span class="kn">from</span> <span class="nn">pdfminer.pdfparser</span> <span class="kn">import</span> <span class="n">PDFParser</span>
+    <span class="n">pdfminer</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">pdfminer</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TestReports">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReports">[docs]</a>
+<span class="nd">@odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;post_install_l10n&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestReports</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestReports.test_reports">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReports.test_reports">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_reports</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">invoice_domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;move_type&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;out_invoice&#39;</span><span class="p">,</span> <span class="s1">&#39;out_refund&#39;</span><span class="p">,</span> <span class="s1">&#39;out_receipt&#39;</span><span class="p">,</span> <span class="s1">&#39;in_invoice&#39;</span><span class="p">,</span> <span class="s1">&#39;in_refund&#39;</span><span class="p">,</span> <span class="s1">&#39;in_receipt&#39;</span><span class="p">))]</span>
+        <span class="n">specific_model_domains</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;account.report_original_vendor_bill&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;move_type&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;in_invoice&#39;</span><span class="p">,</span> <span class="s1">&#39;in_receipt&#39;</span><span class="p">))],</span>
+            <span class="s1">&#39;account.report_invoice_with_payments&#39;</span><span class="p">:</span> <span class="n">invoice_domain</span><span class="p">,</span>
+            <span class="s1">&#39;account.report_invoice&#39;</span><span class="p">:</span> <span class="n">invoice_domain</span><span class="p">,</span>
+            <span class="s1">&#39;l10n_th.report_commercial_invoice&#39;</span><span class="p">:</span> <span class="n">invoice_domain</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">Report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="n">Report</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;report_type&#39;</span><span class="p">,</span> <span class="s1">&#39;like&#39;</span><span class="p">,</span> <span class="s1">&#39;qweb&#39;</span><span class="p">)]):</span>
+            <span class="n">report_model</span> <span class="o">=</span> <span class="s1">&#39;report.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">report</span><span class="o">.</span><span class="n">report_name</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">report_model</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="c1"># Only test the generic reports here</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;testing report </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">)</span>
+                <span class="n">report_model_domain</span> <span class="o">=</span> <span class="n">specific_model_domains</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="n">report_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">report_model_domain</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">report_records</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;no record found skipping report </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">)</span>
+
+                <span class="c1"># Test report generation</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">report</span><span class="o">.</span><span class="n">multi</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">report_records</span><span class="p">:</span>
+                        <span class="n">Report</span><span class="o">.</span><span class="n">_render_qweb_html</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">Report</span><span class="o">.</span><span class="n">_render_qweb_html</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">report_records</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">continue</span></div>
+
+
+<div class="viewcode-block" id="TestReports.test_report_reload_from_attachment">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReports.test_report_reload_from_attachment">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_report_reload_from_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">get_attachments</span><span class="p">(</span><span class="n">res_id</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.attachment&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="s2">&quot;res.partner&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;res_id&quot;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="n">res_id</span><span class="p">)])</span>
+
+        <span class="n">Report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">force_report_rendering</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">report</span> <span class="o">=</span> <span class="n">Report</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test report&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;report_name&#39;</span><span class="p">:</span> <span class="s1">&#39;base.test_report&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;qweb&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;base.test_report&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="s1">&#39;base.test_report&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;arch&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;main&gt;</span>
+<span class="s1">                    &lt;div class=&quot;article&quot; data-oe-model=&quot;res.partner&quot; t-att-data-oe-id=&quot;docs.id&quot;&gt;</span>
+<span class="s1">                        &lt;span t-field=&quot;docs.display_name&quot; /&gt;</span>
+<span class="s1">                    &lt;/div&gt;</span>
+<span class="s1">                &lt;/main&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+        <span class="p">})</span>
+
+        <span class="n">pdf_text</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+        <span class="k">def</span> <span class="nf">_run_wkhtmltopdf</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">pdf_text</span><span class="p">,</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">Report</span><span class="p">),</span> <span class="s2">&quot;_run_wkhtmltopdf&quot;</span><span class="p">,</span> <span class="n">_run_wkhtmltopdf</span><span class="p">)</span>
+
+        <span class="c1"># sanity check: the report is not set to save attachment</span>
+        <span class="c1"># assert that there are no pre-existing attachment</span>
+        <span class="n">partner_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">get_attachments</span><span class="p">(</span><span class="n">partner_id</span><span class="p">))</span>
+        <span class="n">pdf</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">_render_qweb_pdf</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">partner_id</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">get_attachments</span><span class="p">(</span><span class="n">partner_id</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pdf</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="sa">b</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>
+
+        <span class="c1"># set the report to reload from attachment and make one</span>
+        <span class="n">pdf_text</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+        <span class="n">report</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="s2">&quot;&#39;test_attach&#39;&quot;</span>
+        <span class="n">report</span><span class="o">.</span><span class="n">attachment_use</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">report</span><span class="o">.</span><span class="n">_render_qweb_pdf</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">partner_id</span><span class="p">])</span>
+        <span class="n">attach_1</span> <span class="o">=</span> <span class="n">get_attachments</span><span class="p">(</span><span class="n">partner_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">attach_1</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="c1"># use the context key to not reload from attachment</span>
+        <span class="c1"># and not create another one</span>
+        <span class="n">pdf_text</span> <span class="o">=</span> <span class="s2">&quot;2&quot;</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">report_pdf_no_attachment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">pdf</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">_render_qweb_pdf</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">partner_id</span><span class="p">])</span>
+        <span class="n">attach_2</span> <span class="o">=</span> <span class="n">get_attachments</span><span class="p">(</span><span class="n">partner_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">attach_2</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">attach_1</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">b64decode</span><span class="p">(</span><span class="n">attach_1</span><span class="o">.</span><span class="n">datas</span><span class="p">),</span> <span class="sa">b</span><span class="s2">&quot;1&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pdf</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="sa">b</span><span class="s2">&quot;2&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="c1"># Some paper format examples</span>
+<span class="n">PAPER_SIZES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="p">(</span><span class="mi">842</span><span class="p">,</span> <span class="mi">1190</span><span class="p">):</span> <span class="s1">&#39;A3&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">595</span><span class="p">,</span> <span class="mi">842</span><span class="p">):</span> <span class="s1">&#39;A4&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">420</span><span class="p">,</span> <span class="mi">595</span><span class="p">):</span> <span class="s1">&#39;A5&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">297</span><span class="p">,</span> <span class="mi">420</span><span class="p">):</span> <span class="s1">&#39;A6&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">612</span><span class="p">,</span> <span class="mi">792</span><span class="p">):</span> <span class="s1">&#39;Letter&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">612</span><span class="p">,</span> <span class="mi">1008</span><span class="p">):</span> <span class="s1">&#39;Legal&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="mi">792</span><span class="p">,</span> <span class="mi">1224</span><span class="p">):</span> <span class="s1">&#39;Ledger&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<div class="viewcode-block" id="Box">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.Box">[docs]</a>
+<span class="k">class</span> <span class="nc">Box</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Utility class to help assertions</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">page_height</span><span class="p">,</span> <span class="n">page_width</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x1</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">x0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y1</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">page_height</span><span class="o">-</span><span class="n">obj</span><span class="o">.</span><span class="n">y1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x2</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">x1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y2</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">page_height</span><span class="o">-</span><span class="n">obj</span><span class="o">.</span><span class="n">y0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">page_height</span> <span class="o">=</span> <span class="n">page_height</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">page_width</span> <span class="o">=</span> <span class="n">page_width</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">height</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">width</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">x2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">top</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">left</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">x1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">end_top</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y2</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">end_left</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">x2</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">right</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">page_width</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x2</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bottom</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">page_height</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y2</span>
+
+    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">y1</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">x1</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">y2</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">x2</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TestReportsRenderingCommon">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon">[docs]</a>
+<span class="nd">@skipIf</span><span class="p">(</span><span class="n">pdfminer</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;pdfminer not installed&quot;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestReportsRenderingCommon</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">HttpCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestReportsRenderingCommon.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Report Partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;report_name&#39;</span><span class="p">:</span> <span class="s1">&#39;test_report.test_report_partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;paperformat_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_euro&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Report record </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+        <span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">report_view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;qweb&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test_report_partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="s1">&#39;test_report.test_report_partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;arch&#39;</span><span class="p">:</span> <span class="s2">&quot;&lt;t&gt;&lt;/t&gt;&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content_saved</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_addError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content_saved</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content_saved</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_pdf</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_addError</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestReportsRenderingCommon.get_paper_format">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon.get_paper_format">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_paper_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mediabox</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            :param: mediabox: a page mediabox. (Example: (0, 0, 595, 842))</span>
+<span class="sd">            :return: a (format, orientation). Example (&#39;A4&#39;, &#39;portait&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="n">mediabox</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">((</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="s2">&quot;Expecting top corner to be 0, 0 &quot;</span><span class="p">)</span>
+        <span class="n">orientation</span> <span class="o">=</span> <span class="s1">&#39;portait&#39;</span>
+        <span class="n">paper_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="o">&gt;</span> <span class="n">height</span><span class="p">:</span>
+            <span class="n">orientation</span> <span class="o">=</span> <span class="s1">&#39;landscape&#39;</span>
+            <span class="n">paper_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">PAPER_SIZES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">paper_size</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;custom</span><span class="si">{</span><span class="n">paper_size</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">),</span> <span class="n">orientation</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRenderingCommon.create_pdf">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon.create_pdf">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">partners</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">header_content</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">page_content</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">footer_content</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">header_content</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">header_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;img t-if=&quot;company.logo&quot; t-att-src=&quot;image_data_uri(company.logo)&quot; style=&quot;max-height: 45px;&quot; alt=&quot;Logo&quot;/&gt;</span>
+<span class="s1">                &lt;span&gt;Some header Text&lt;/span&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="n">footer_content</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">footer_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;div style=&quot;text-align:center&quot;&gt;Footer for &lt;t t-esc=&quot;o.name&quot;/&gt; Page: &lt;span class=&quot;page&quot;/&gt; / &lt;span class=&quot;topage&quot;/&gt;&lt;/div&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="n">page_content</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">page_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;div class=&quot;page&quot;&gt;</span>
+<span class="s1">                    &lt;div style=&quot;background-color:red&quot;&gt;</span>
+<span class="s1">                        Name: &lt;t t-esc=&quot;o.name&quot;/&gt;</span>
+<span class="s1">                    &lt;/div&gt;</span>
+<span class="s1">                &lt;/div&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">report_view</span><span class="o">.</span><span class="n">arch</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;t t-name=&quot;test_report.test_report_partner&quot;&gt;</span>
+<span class="s1">                    &lt;t t-set=&quot;company&quot; t-value=&quot;res_company&quot;/&gt;</span>
+<span class="s1">                    &lt;t t-call=&quot;web.html_container&quot;&gt;</span>
+<span class="s1">                        &lt;t t-foreach=&quot;docs&quot; t-as=&quot;o&quot;&gt;</span>
+<span class="s1">                            &lt;div class=&quot;header&quot; style=&quot;font-family:Sans&quot;&gt;</span>
+<span class="s1">                                </span><span class="si">{</span><span class="n">header_content</span><span class="si">}</span>
+<span class="s1">                            &lt;/div&gt;</span>
+<span class="s1">                            &lt;div class=&quot;article&quot; style=&quot;font-family:Sans&quot;&gt;</span>
+
+<span class="s1">                                </span><span class="si">{</span><span class="n">page_content</span><span class="si">}</span>
+<span class="s1">                            &lt;/div&gt;</span>
+<span class="s1">                            &lt;div class=&quot;footer&quot; style=&quot;font-family:Sans&quot;&gt;</span>
+<span class="s1">                                </span><span class="si">{</span><span class="n">footer_content</span><span class="si">}</span>
+<span class="s1">                            &lt;/div&gt;</span>
+<span class="s1">                        &lt;/t&gt;</span>
+<span class="s1">                    &lt;/t&gt;</span>
+<span class="s1">                &lt;/t&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+        <span class="c1"># this templates doesn&#39;t use the &quot;web.external_layout&quot; in order to simplify the final result and make the edition of footer and header easier</span>
+        <span class="c1"># this test does not aims to test company base.document.layout, but the rendering only.</span>
+        <span class="k">if</span> <span class="n">partners</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">force_report_rendering</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">_render_qweb_pdf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">,</span> <span class="n">partners</span><span class="o">.</span><span class="n">ids</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRenderingCommon.save_pdf">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon.save_pdf">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">save_test_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_testMethodName</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pdf_content</span><span class="p">,</span> <span class="s1">&#39;pdf_&#39;</span><span class="p">,</span> <span class="s1">&#39;pdf&#39;</span><span class="p">,</span> <span class="n">document_type</span><span class="o">=</span><span class="s1">&#39;Report PDF&#39;</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">_logger</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_pdf_pages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pdf_content</span><span class="p">):</span>
+        <span class="n">ioBytes</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+        <span class="n">parser</span> <span class="o">=</span> <span class="n">PDFParser</span><span class="p">(</span><span class="n">ioBytes</span><span class="p">)</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">PDFDocument</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">PDFPage</span><span class="o">.</span><span class="n">create_pages</span><span class="p">(</span><span class="n">doc</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_parse_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pdf_content</span><span class="p">,</span> <span class="n">expected_format</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;A4&#39;</span><span class="p">,</span> <span class="s1">&#39;portait&#39;</span><span class="p">)):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            :param: pdf_content: the bdf binary content</span>
+<span class="sd">            :param: expected_format: a get_paper_format like format.</span>
+<span class="sd">            :return: list[list[(box, Element)]] a list of element per page</span>
+<span class="sd">            Note: box is a 4 float tuple based on the top left corner to ease ordering of elements.</span>
+<span class="sd">            The result is also rounded to one digit</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pdf_pages</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+        <span class="n">ressource_manager</span> <span class="o">=</span> <span class="n">PDFResourceManager</span><span class="p">()</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">PDFPageAggregator</span><span class="p">(</span><span class="n">ressource_manager</span><span class="p">,</span> <span class="n">laparams</span><span class="o">=</span><span class="n">LAParams</span><span class="p">())</span>
+        <span class="n">interpreter</span> <span class="o">=</span> <span class="n">PDFPageInterpreter</span><span class="p">(</span><span class="n">ressource_manager</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+        <span class="n">parsed_pages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">get_paper_format</span><span class="p">(</span><span class="n">page</span><span class="o">.</span><span class="n">mediabox</span><span class="p">),</span>
+                <span class="n">expected_format</span><span class="p">,</span>
+                <span class="s2">&quot;Expecting pdf to be in A4 portait format&quot;</span><span class="p">,</span>
+            <span class="p">)</span> <span class="c1"># this is the default expected format and other layout assertions are based on this one.</span>
+            <span class="n">interpreter</span><span class="o">.</span><span class="n">process_page</span><span class="p">(</span><span class="n">page</span><span class="p">)</span>
+            <span class="n">layout</span> <span class="o">=</span> <span class="n">device</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span>
+            <span class="n">elements</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">parsed_pages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">elements</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">layout</span><span class="p">:</span>
+                <span class="n">box</span> <span class="o">=</span> <span class="n">Box</span><span class="p">(</span>
+                    <span class="n">obj</span><span class="p">,</span>
+                    <span class="n">page_height</span><span class="o">=</span><span class="n">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mediabox</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                    <span class="n">page_width</span><span class="o">=</span><span class="n">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mediabox</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">LTTextBox</span><span class="p">):</span>
+                    <span class="c1">#inverse x to start from top left corner</span>
+                    <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">box</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">get_text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()))</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">LTFigure</span><span class="p">):</span>
+                    <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">box</span><span class="p">,</span> <span class="s1">&#39;LTFigure&#39;</span><span class="p">))</span>
+            <span class="n">elements</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">parsed_pages</span>
+
+<div class="viewcode-block" id="TestReportsRenderingCommon.assertPageFormat">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingCommon.assertPageFormat">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertPageFormat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paper_format</span><span class="p">,</span> <span class="n">orientation</span><span class="p">):</span>
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">()</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pdf_pages</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">get_paper_format</span><span class="p">(</span><span class="n">page</span><span class="o">.</span><span class="n">mediabox</span><span class="p">),</span>
+                <span class="p">(</span><span class="n">paper_format</span><span class="p">,</span> <span class="n">orientation</span><span class="p">),</span>
+                <span class="sa">f</span><span class="s2">&quot;Expecting pdf to be in </span><span class="si">{</span><span class="n">paper_format</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">orientation</span><span class="si">}</span><span class="s2"> format&quot;</span><span class="p">,</span>
+            <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestReportsRendering">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering">[docs]</a>
+<span class="nd">@odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;pdf_rendering&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestReportsRendering</span><span class="p">(</span><span class="n">TestReportsRenderingCommon</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This test aims to test as much as possible the current pdf rendering,</span>
+<span class="sd">        especially multipage headers and footers</span>
+<span class="sd">        (the main reason why we are currently using wkhtmltopdf with patched qt)</span>
+<span class="sd">        A custom template without web.external_layout is used on purpose in order to</span>
+<span class="sd">        easily test headers and footer regarding rendering only,</span>
+<span class="sd">        without using any comany document.layout logic</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestReportsRendering.test_format_A4">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_format_A4">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_format_A4</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">paperformat_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_euro&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertPageFormat</span><span class="p">(</span><span class="s1">&#39;A4&#39;</span><span class="p">,</span> <span class="s1">&#39;portait&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_format_letter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_format_letter">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_format_letter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">paperformat_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_us&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertPageFormat</span><span class="p">(</span><span class="s1">&#39;Letter&#39;</span><span class="p">,</span> <span class="s1">&#39;portait&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_format_landscape">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_format_landscape">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_format_landscape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">paper_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.paperformat_euro&#39;</span><span class="p">)</span>
+        <span class="n">paper_format</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="s1">&#39;Landscape&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">paperformat_id</span> <span class="o">=</span> <span class="n">paper_format</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertPageFormat</span><span class="p">(</span><span class="s1">&#39;A4&#39;</span><span class="p">,</span> <span class="s1">&#39;landscape&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_layout">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_layout">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_layout</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">()</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pdf</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">page_contents</span> <span class="o">=</span> <span class="p">[[</span><span class="n">elem</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">page</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">]</span>
+
+        <span class="n">expected_pages_content</span> <span class="o">=</span> <span class="p">[[</span>
+            <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;Name: </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 1 / 1&#39;</span><span class="p">,</span>
+        <span class="p">]</span> <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">page_contents</span><span class="p">,</span>
+            <span class="n">expected_pages_content</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">page_positions</span> <span class="o">=</span> <span class="p">[[</span><span class="n">elem</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">page</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">]</span>
+        <span class="n">logo</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">content</span><span class="p">,</span> <span class="n">footer</span> <span class="o">=</span> <span class="n">page_positions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># leaving this as reference but this is to fragile to make a strict assertion</span>
+        <span class="c1"># 14.3, 29.6, 43.1, 137.2     # logo</span>
+        <span class="c1"># 19.1, 137.2, 32.5, 214.2   # header</span>
+        <span class="c1"># 111.3, 29.6, 124.8, 123.7   # content</span>
+        <span class="c1"># 751.6, 220.1, 765.1, 375.0  # footer</span>
+
+        <span class="c1">#</span>
+        <span class="c1">#   \ \ / // _ \ | | | || _ \  | |</span>
+        <span class="c1">#    \ V /| (_) || |_| ||   /  | |__ / _ \/ _` |/ _ \     Some header Text</span>
+        <span class="c1">#     |_|  \___/  \___/ |_|_\  |____|\___/\__, |\___/</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#   Name: Report record 0</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+        <span class="c1">#             Footer for Report record 0 Page: 1 / 1</span>
+        <span class="c1">#</span>
+        <span class="c1">#</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">logo</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">content</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="s1">&#39;Logo and content should have the same left margin&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">logo</span><span class="o">.</span><span class="n">end_left</span><span class="p">,</span> <span class="s1">&#39;Header starts after logo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">top</span><span class="p">,</span> <span class="n">logo</span><span class="o">.</span><span class="n">top</span><span class="p">,</span> <span class="s1">&#39;header is vertically centered on logo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="n">logo</span><span class="o">.</span><span class="n">end_top</span><span class="p">,</span> <span class="n">header</span><span class="o">.</span><span class="n">end_top</span><span class="p">,</span> <span class="s1">&#39;header is vertically centered on logo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">top</span><span class="p">,</span> <span class="n">logo</span><span class="o">.</span><span class="n">end_top</span><span class="p">,</span> <span class="s1">&#39;Content is bellow logo&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="n">footer</span><span class="o">.</span><span class="n">top</span><span class="p">,</span> <span class="n">content</span><span class="o">.</span><span class="n">end_top</span><span class="p">,</span> <span class="s1">&#39;Footer is bellow content&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">footer</span><span class="o">.</span><span class="n">bottom</span><span class="p">,</span> <span class="s1">&#39;Footer is on the bottom of the page&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertAlmostEqual</span><span class="p">(</span><span class="n">footer</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">footer</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;Footer is centered on the page&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_report_pdf_page_break">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_report_pdf_page_break">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_report_pdf_page_break</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">page_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">                &lt;div class=&quot;page&quot;&gt;</span>
+<span class="s1">                    &lt;div style=&quot;background-color:red&quot;&gt;</span>
+<span class="s1">                        Name: &lt;t t-esc=&quot;o.name&quot;/&gt;</span>
+<span class="s1">                    &lt;/div&gt;</span>
+<span class="s1">                    &lt;div style=&quot;page-break-before:always;background-color:blue&quot;&gt;</span>
+<span class="s1">                        Last page for &lt;t t-esc=&quot;o.name&quot;/&gt;</span>
+<span class="s1">                    &lt;/div&gt;</span>
+<span class="s1">                &lt;/div&gt;</span>
+<span class="s1">            &#39;&#39;&#39;</span>
+
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">(</span><span class="n">partners</span><span class="o">=</span><span class="n">partners</span><span class="p">,</span> <span class="n">page_content</span><span class="o">=</span><span class="n">page_content</span><span class="p">)</span>
+
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pdf</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;Expecting 2 pages * 2 partners&quot;</span><span class="p">)</span>
+
+        <span class="n">expected_pages_contents</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span><span class="p">:</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">&#39;Name: </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 1 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">&#39;Last page for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 2 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+        <span class="n">pages_contents</span> <span class="o">=</span> <span class="p">[[</span><span class="n">elem</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">page</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pages_contents</span><span class="p">,</span> <span class="n">expected_pages_contents</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_pdf_render_page_overflow">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_pdf_render_page_overflow">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_pdf_render_page_overflow</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">nb_lines</span> <span class="o">=</span> <span class="mi">80</span>
+
+        <span class="n">page_content</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">            &lt;div class=&quot;page&quot;&gt;</span>
+<span class="s1">                &lt;div style=&quot;background-color:red&quot;&gt;</span>
+<span class="s1">                    Name: &lt;t t-esc=&quot;o.name&quot;/&gt;</span>
+<span class="s1">                    &lt;div t-foreach=&quot;range(</span><span class="si">{</span><span class="n">nb_lines</span><span class="si">}</span><span class="s1">)&quot; t-as=&quot;pos&quot; t-esc=&quot;pos&quot;/&gt;</span>
+<span class="s1">                &lt;/div&gt;</span>
+<span class="s1">            &lt;/div&gt;</span>
+<span class="s1">        &#39;&#39;&#39;</span>
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">(</span><span class="n">page_content</span><span class="o">=</span><span class="n">page_content</span><span class="p">)</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pdf</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;4 pages are expected, 2 per record (you may ensure `nb_lines` has a correct value to generate an oveflow)&#39;</span><span class="p">)</span>
+        <span class="n">page_break_at</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># This element should be the first line, 61 when this test was written</span>
+
+        <span class="n">expected_pages_contents</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span><span class="p">:</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">&#39;Name: </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">page_break_at</span><span class="p">)]),</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 1 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">page_break_at</span><span class="p">,</span> <span class="n">nb_lines</span><span class="p">)]),</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 2 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+        <span class="n">pages_contents</span> <span class="o">=</span> <span class="p">[[</span><span class="n">elem</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">page</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pages_contents</span><span class="p">,</span> <span class="n">expected_pages_contents</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestReportsRendering.test_thead_tbody_repeat">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRendering.test_thead_tbody_repeat">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_thead_tbody_repeat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Check that thead and t-foot are repeated after page break inside a tbody</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nb_lines</span> <span class="o">=</span> <span class="mi">50</span>
+        <span class="n">page_content</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">            &lt;div class=&quot;page&quot;&gt;</span>
+<span class="s1">                &lt;table class=&quot;table&quot;&gt;</span>
+<span class="s1">                    &lt;thead&gt;&lt;tr&gt;&lt;th&gt; T1 &lt;/th&gt;&lt;th&gt; T2 &lt;/th&gt;&lt;th&gt; T3 &lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;</span>
+<span class="s1">                    &lt;tbody&gt;</span>
+<span class="s1">                    &lt;t t-foreach=&quot;range(</span><span class="si">{</span><span class="n">nb_lines</span><span class="si">}</span><span class="s1">)&quot; t-as=&quot;pos&quot;&gt;</span>
+<span class="s1">                        &lt;tr&gt;&lt;td&gt;&lt;t t-esc=&quot;pos&quot;/&gt;&lt;/td&gt;&lt;td&gt;&lt;t t-esc=&quot;pos&quot;/&gt;&lt;/td&gt;&lt;td&gt;&lt;t t-esc=&quot;pos&quot;/&gt;&lt;/td&gt;&lt;/tr&gt;</span>
+<span class="s1">                    &lt;/t&gt;</span>
+<span class="s1">                    &lt;/tbody&gt;</span>
+<span class="s1">                    &lt;tfoot&gt;&lt;tr&gt;&lt;th&gt; T1 &lt;/th&gt;&lt;th&gt; T2 &lt;/th&gt;&lt;th&gt; T3 &lt;/th&gt;&lt;/tr&gt;&lt;/tfoot&gt;</span>
+<span class="s1">                &lt;/table&gt;</span>
+<span class="s1">            &lt;/div&gt;</span>
+<span class="s1">        &#39;&#39;&#39;</span>
+
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">(</span><span class="n">page_content</span><span class="o">=</span><span class="n">page_content</span><span class="p">)</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pdf</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;4 pages are expected, 2 per record (you may ensure `nb_lines` has a correct value to generate an oveflow)&#39;</span><span class="p">)</span>
+        <span class="n">page_break_at</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">5</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># This element should be the first line of the table, 28 when this test was written</span>
+
+        <span class="k">def</span> <span class="nf">expected_table</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+            <span class="n">table</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;T1&#39;</span><span class="p">,</span> <span class="s1">&#39;T2&#39;</span><span class="p">,</span> <span class="s1">&#39;T3&#39;</span><span class="p">]</span> <span class="c1"># thead</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+                <span class="n">table</span> <span class="o">+=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span>
+            <span class="n">table</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;T1&#39;</span><span class="p">,</span> <span class="s1">&#39;T2&#39;</span><span class="p">,</span> <span class="s1">&#39;T3&#39;</span><span class="p">]</span> <span class="c1"># tfoot</span>
+            <span class="k">return</span> <span class="n">table</span>
+
+        <span class="n">expected_pages_contents</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partners</span><span class="p">:</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="o">*</span> <span class="n">expected_table</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">page_break_at</span><span class="p">),</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 1 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+            <span class="n">expected_pages_contents</span><span class="o">.</span><span class="n">append</span><span class="p">([</span>
+                <span class="s1">&#39;LTFigure&#39;</span><span class="p">,</span> <span class="c1">#logo</span>
+                <span class="s1">&#39;Some header Text&#39;</span><span class="p">,</span>
+                <span class="o">*</span> <span class="n">expected_table</span><span class="p">(</span><span class="n">page_break_at</span><span class="p">,</span> <span class="n">nb_lines</span><span class="p">),</span>
+                <span class="sa">f</span><span class="s1">&#39;Footer for </span><span class="si">{</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> Page: 2 / 2&#39;</span><span class="p">,</span>
+            <span class="p">])</span>
+
+        <span class="n">pages_contents</span> <span class="o">=</span> <span class="p">[[</span><span class="n">elem</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">page</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pages_contents</span><span class="p">,</span> <span class="n">expected_pages_contents</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestReportsRenderingLimitations">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingLimitations">[docs]</a>
+<span class="nd">@odoo</span><span class="o">.</span><span class="n">tests</span><span class="o">.</span><span class="n">tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-standard&#39;</span><span class="p">,</span> <span class="s1">&#39;pdf_rendering&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestReportsRenderingLimitations</span><span class="p">(</span><span class="n">TestReportsRenderingCommon</span><span class="p">):</span>
+<div class="viewcode-block" id="TestReportsRenderingLimitations.test_no_clip">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_reports.TestReportsRenderingLimitations.test_no_clip">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_no_clip</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Current version will add a fixed margin on top of document</span>
+<span class="sd">            This test demonstrates this limitation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">header_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">            &lt;div style=&quot;background-color:blue&quot;&gt;</span>
+<span class="s1">                &lt;div t-foreach=&quot;range(15)&quot; t-as=&quot;pos&quot; t-esc=&quot;&#39;Header </span><span class="si">%s</span><span class="s1">&#39; % pos&quot;/&gt;</span>
+<span class="s1">            &lt;/div&gt;</span>
+<span class="s1">        &#39;&#39;&#39;</span>
+        <span class="n">page_content</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">            &lt;div class=&quot;page&quot;&gt;</span>
+<span class="s1">                &lt;div style=&quot;background-color:red; margin-left:100px&quot;&gt;</span>
+<span class="s1">                    &lt;div t-foreach=&quot;range(10)&quot; t-as=&quot;pos&quot; t-esc=&quot;&#39;Content </span><span class="si">%s</span><span class="s1">&#39; % pos&quot;/&gt;</span>
+<span class="s1">                &lt;/div&gt;</span>
+<span class="s1">            &lt;/div&gt;</span>
+<span class="s1">        &#39;&#39;&#39;</span>
+        <span class="c1"># adding a margin on page to avoid bot block to me considered as the same</span>
+        <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pdf</span><span class="p">(</span><span class="n">page_content</span><span class="o">=</span><span class="n">page_content</span><span class="p">,</span> <span class="n">header_content</span><span class="o">=</span><span class="n">header_content</span><span class="p">)</span>
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pdf</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">),</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;2 partners&quot;</span><span class="p">)</span>
+        <span class="n">page</span> <span class="o">=</span> <span class="n">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">page</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;Expecting 3 box per page, Header, body, footer&quot;</span><span class="p">)</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreaterEqual</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">top</span><span class="p">,</span> <span class="n">header</span><span class="o">.</span><span class="n">end_top</span><span class="p">,</span> <span class="s2">&quot;EXISTING LIMITATION: large header shouldn&#39;t overflow on body, but they do&quot;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.cloc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.cloc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.cloc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.config</span> <span class="kn">import</span> <span class="n">config</span>
+
+<span class="n">VERSION</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">DEFAULT_EXCLUDE</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;__manifest__.py&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;__openerp__.py&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;tests/**/*&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;static/lib/**/*&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;static/tests/**/*&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;migrations/**/*&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;upgrades/**/*&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">STANDARD_MODULES</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;web&#39;</span><span class="p">,</span> <span class="s1">&#39;web_enterprise&#39;</span><span class="p">,</span> <span class="s1">&#39;theme_common&#39;</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">]</span>
+<span class="n">MAX_FILE_SIZE</span> <span class="o">=</span> <span class="mi">25</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span> <span class="c1"># 25 MB</span>
+<span class="n">MAX_LINE_SIZE</span> <span class="o">=</span> <span class="mi">100000</span>
+<span class="n">VALID_EXTENSION</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;.py&#39;</span><span class="p">,</span> <span class="s1">&#39;.js&#39;</span><span class="p">,</span> <span class="s1">&#39;.xml&#39;</span><span class="p">,</span> <span class="s1">&#39;.css&#39;</span><span class="p">,</span> <span class="s1">&#39;.scss&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Cloc">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc">[docs]</a>
+<span class="k">class</span> <span class="nc">Cloc</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">modules</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_width</span> <span class="o">=</span> <span class="mi">70</span>
+
+    <span class="c1">#------------------------------------------------------</span>
+    <span class="c1"># Parse</span>
+    <span class="c1">#------------------------------------------------------</span>
+<div class="viewcode-block" id="Cloc.parse_xml">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_xml">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="c1"># Unbalanced xml comments inside a CDATA are not supported, and xml</span>
+        <span class="c1"># comments inside a CDATA will (wrongly) be considered as comment</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;(&lt;!--.*?--&gt;)&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\s*\n\s*&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\n&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">),</span> <span class="n">total</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse_py">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_py">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_py</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">s</span><span class="p">)):</span>
+                <span class="c1"># we only count 1 for a long string or a docstring</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="s1">&#39;lineno&#39;</span><span class="p">):</span>
+                    <span class="n">lines</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">lineno</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="n">total</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Syntax Error&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse_c_like">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_c_like">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_c_like</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">regex</span><span class="p">):</span>
+        <span class="c1"># Based on https://stackoverflow.com/questions/241327</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># To avoid to use too much memory we don&#39;t try to count file</span>
+        <span class="c1"># with very large line, usually minified file</span>
+        <span class="k">if</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">))</span> <span class="o">&gt;</span> <span class="n">MAX_LINE_SIZE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Max line size exceeded&quot;</span>
+
+        <span class="k">def</span> <span class="nf">replacer</span><span class="p">(</span><span class="n">match</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">return</span> <span class="s2">&quot; &quot;</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">s</span>
+
+        <span class="n">comments_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">comments_re</span><span class="p">,</span> <span class="n">replacer</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\s*\n\s*&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\n&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">),</span> <span class="n">total</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse_js">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_js">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_js</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_c_like</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;//.*?$|(?&lt;!</span><span class="se">\\</span><span class="s1">)/\*.*?\*/|</span><span class="se">\&#39;</span><span class="s1">(</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\\&#39;</span><span class="s1">])*</span><span class="se">\&#39;</span><span class="s1">|&quot;(</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\</span><span class="s1">&quot;])*&quot;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse_scss">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_scss">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_scss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_c_like</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;//.*?$|/\*.*?\*/|</span><span class="se">\&#39;</span><span class="s1">(?:</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\\&#39;</span><span class="s1">])*</span><span class="se">\&#39;</span><span class="s1">|&quot;(?:</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\</span><span class="s1">&quot;])*&quot;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse_css">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse_css">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_css</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_c_like</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;/\*.*?\*/|</span><span class="se">\&#39;</span><span class="s1">(?:</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\\&#39;</span><span class="s1">])*</span><span class="se">\&#39;</span><span class="s1">|&quot;(?:</span><span class="se">\\</span><span class="s1">.|[^</span><span class="se">\\</span><span class="s1">&quot;])*&quot;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.parse">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.parse">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">ext</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_py</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.js&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_js</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.xml&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_xml</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.css&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_css</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.scss&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_scss</span><span class="p">(</span><span class="n">s</span><span class="p">)</span></div>
+
+
+    <span class="c1">#------------------------------------------------------</span>
+    <span class="c1"># Enumeration</span>
+    <span class="c1">#------------------------------------------------------</span>
+<div class="viewcode-block" id="Cloc.book">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.book">[docs]</a>
+    <span class="k">def</span> <span class="nf">book</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">exclude</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">count</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">module</span><span class="p">][</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">exclude</span> <span class="ow">and</span> <span class="n">item</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="p">[</span><span class="n">module</span><span class="p">][</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="n">item</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">module</span><span class="p">][</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">[</span><span class="n">module</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">count</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="n">module</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">count</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_width</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_width</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">module</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="o">+</span> <span class="mi">4</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.count_path">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.count_path">[docs]</a>
+    <span class="k">def</span> <span class="nf">count_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+        <span class="n">exclude_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">MANIFEST_NAMES</span><span class="p">:</span>
+            <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">manifest</span><span class="p">:</span>
+                    <span class="n">exclude_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">DEFAULT_EXCLUDE</span><span class="p">)</span>
+                    <span class="n">d</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">manifest</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;latin1&#39;</span><span class="p">))</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;cloc_exclude&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;demo_xml&#39;</span><span class="p">]:</span>
+                        <span class="n">exclude_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="p">[]))</span>
+                    <span class="k">break</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">exclude</span><span class="p">:</span>
+            <span class="n">exclude</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">filter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_list</span><span class="p">):</span>
+            <span class="n">exclude</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+
+        <span class="n">module_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">file_name</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">file_name</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">exclude</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">file_path</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">ext</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">VALID_EXTENSION</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_FILE_SIZE</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Max file size exceeded&quot;</span><span class="p">))</span>
+                    <span class="k">continue</span>
+
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="c1"># Decode using latin1 to avoid error that may raise by decoding with utf8</span>
+                    <span class="c1"># The chars not correctly decoded in latin1 have no impact on how many lines will be counted</span>
+                    <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;latin1&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">ext</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Cloc.count_modules">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.count_modules">[docs]</a>
+    <span class="k">def</span> <span class="nf">count_modules</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="c1"># Exclude standard addons paths</span>
+        <span class="n">exclude_heuristic</span> <span class="o">=</span> <span class="p">[</span><span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get_module_path</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">display_warning</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">STANDARD_MODULES</span><span class="p">]</span>
+        <span class="n">exclude_path</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">m</span><span class="p">))</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">exclude_heuristic</span> <span class="k">if</span> <span class="n">m</span><span class="p">])</span>
+
+        <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">)]</span>
+        <span class="c1"># if base_import_module is present</span>
+        <span class="k">if</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;imported&#39;</span><span class="p">):</span>
+            <span class="n">domain</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;imported&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="n">module_list</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">module_name</span> <span class="ow">in</span> <span class="n">module_list</span><span class="p">:</span>
+            <span class="n">module_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get_module_path</span><span class="p">(</span><span class="n">module_name</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">module_path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">module_path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">exclude_path</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">count_path</span><span class="p">(</span><span class="n">module_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.count_customization">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.count_customization">[docs]</a>
+    <span class="k">def</span> <span class="nf">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="n">imported_module_sa</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;imported&#39;</span><span class="p">):</span>
+            <span class="n">imported_module_sa</span> <span class="o">=</span> <span class="s2">&quot;OR (m.imported = TRUE AND m.state = &#39;installed&#39;)&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT s.id, min(m.name), array_agg(d.module)</span>
+<span class="s2">                  FROM ir_act_server AS s</span>
+<span class="s2">             LEFT JOIN ir_model_data AS d</span>
+<span class="s2">                    ON (d.res_id = s.id AND d.model = &#39;ir.actions.server&#39;)</span>
+<span class="s2">             LEFT JOIN ir_module_module AS m</span>
+<span class="s2">                    ON m.name = d.module</span>
+<span class="s2">                 WHERE s.state = &#39;code&#39; AND (m.name IS null </span><span class="si">{}</span><span class="s2">)</span>
+<span class="s2">              GROUP BY s.id</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imported_module_sa</span><span class="p">)</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span>
+                <span class="n">data</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;odoo/studio&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;ir.actions.server/</span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parse_py</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">code</span><span class="p">),</span>
+                <span class="s1">&#39;__cloc_exclude__&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="n">imported_module_field</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;&#39;odoo/studio&#39;&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;imported&#39;</span><span class="p">):</span>
+            <span class="n">imported_module_field</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;min(m.name)&quot;</span><span class="p">,</span> <span class="s2">&quot;AND m.imported = TRUE AND m.state = &#39;installed&#39;&quot;</span><span class="p">)</span>
+        <span class="c1"># We always want to count manual compute field unless they are generated by studio</span>
+        <span class="c1"># the module should be odoo/studio unless it comes from an imported module install</span>
+        <span class="c1"># because manual field get an external id from the original module of the model</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT f.id, f.name, </span><span class="si">{}</span><span class="s2">, array_agg(d.module)</span>
+<span class="s2">                  FROM ir_model_fields AS f</span>
+<span class="s2">             LEFT JOIN ir_model_data AS d ON (d.res_id = f.id AND d.model = &#39;ir.model.fields&#39;)</span>
+<span class="s2">             LEFT JOIN ir_module_module AS m ON m.name = d.module </span><span class="si">{}</span>
+<span class="s2">                 WHERE f.compute IS NOT null AND f.state = &#39;manual&#39;</span>
+<span class="s2">              GROUP BY f.id, f.name</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">imported_module_field</span><span class="p">)</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="c1"># Do not count field generated by studio</span>
+        <span class="n">all_data</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_data</span> <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="s2">&quot;studio_customization&quot;</span> <span class="ow">in</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;x_studio&#39;</span><span class="p">))}</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span>
+                <span class="n">data</span><span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;odoo/studio&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;ir.model.fields/</span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parse_py</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">compute</span><span class="p">),</span>
+                <span class="s1">&#39;__cloc_exclude__&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;imported&#39;</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Count qweb view only from imported module and not studio</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT view.id, min(mod.name), array_agg(data.module)</span>
+<span class="s2">              FROM ir_ui_view view</span>
+<span class="s2">        INNER JOIN ir_model_data data ON view.id = data.res_id AND data.model = &#39;ir.ui.view&#39;</span>
+<span class="s2">         LEFT JOIN ir_module_module mod ON mod.name = data.module AND mod.imported = True</span>
+<span class="s2">             WHERE view.type = &#39;qweb&#39; AND data.module != &#39;studio_customization&#39;</span>
+<span class="s2">          GROUP BY view.id</span>
+<span class="s2">            HAVING count(mod.name) &gt; 0</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="n">custom_views</span> <span class="o">=</span> <span class="p">{</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
+        <span class="k">for</span> <span class="n">view</span> <span class="ow">in</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">custom_views</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">module_name</span> <span class="o">=</span> <span class="n">custom_views</span><span class="p">[</span><span class="n">view</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span>
+                <span class="n">module_name</span><span class="p">,</span>
+                <span class="s2">&quot;/</span><span class="si">%s</span><span class="s2">/views/</span><span class="si">%s</span><span class="s2">.xml&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">view</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parse_xml</span><span class="p">(</span><span class="n">view</span><span class="o">.</span><span class="n">arch_base</span><span class="p">),</span>
+                <span class="s1">&#39;__cloc_exclude__&#39;</span> <span class="ow">in</span> <span class="n">custom_views</span><span class="p">[</span><span class="n">view</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Count js, xml, css/scss file from imported module</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT attach.id, min(mod.name), array_agg(data.module)</span>
+<span class="s2">              FROM ir_attachment attach</span>
+<span class="s2">        INNER JOIN ir_model_data data ON attach.id = data.res_id AND data.model = &#39;ir.attachment&#39;</span>
+<span class="s2">         LEFT JOIN ir_module_module mod ON mod.name = data.module AND mod.imported = True</span>
+<span class="s2">             WHERE attach.name ~ &#39;.*\.(js|xml|css|scss)$&#39;</span>
+<span class="s2">          GROUP BY attach.id</span>
+<span class="s2">            HAVING count(mod.name) &gt; 0</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="n">uploaded_file</span> <span class="o">=</span> <span class="p">{</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
+        <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">uploaded_file</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">module_name</span> <span class="o">=</span> <span class="n">uploaded_file</span><span class="p">[</span><span class="n">attach</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">url</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">ext</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">VALID_EXTENSION</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_FILE_SIZE</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">attach</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Max file size exceeded&quot;</span><span class="p">))</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Decode using latin1 to avoid error that may raise by decoding with utf8</span>
+            <span class="c1"># The chars not correctly decoded in latin1 have no impact on how many lines will be counted</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;latin1&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">book</span><span class="p">(</span>
+                <span class="n">module_name</span><span class="p">,</span>
+                <span class="n">attach</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span>
+                <span class="s1">&#39;__cloc_exclude__&#39;</span> <span class="ow">in</span> <span class="n">uploaded_file</span><span class="p">[</span><span class="n">attach</span><span class="o">.</span><span class="n">id</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.count_env">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.count_env">[docs]</a>
+    <span class="k">def</span> <span class="nf">count_env</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">count_modules</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="n">env</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Cloc.count_database">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.count_database">[docs]</a>
+    <span class="k">def</span> <span class="nf">count_database</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">database</span><span class="p">):</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">])</span>
+        <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">uid</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">count_env</span><span class="p">(</span><span class="n">env</span><span class="p">)</span></div>
+
+
+    <span class="c1">#------------------------------------------------------</span>
+    <span class="c1"># Report</span>
+    <span class="c1">#------------------------------------------------------</span>
+    <span class="c1"># pylint: disable=W0141</span>
+<div class="viewcode-block" id="Cloc.report">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.cloc.Cloc.report">[docs]</a>
+    <span class="k">def</span> <span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># Prepare format</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">width</span><span class="p">:</span>
+            <span class="n">width</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_width</span><span class="p">,</span> <span class="n">shutil</span><span class="o">.</span><span class="n">get_terminal_size</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">24</span><span class="p">)</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="p">(</span><span class="n">width</span> <span class="o">+</span> <span class="mi">24</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="s1">&#39;{k:</span><span class="si">%d</span><span class="s1">}</span><span class="si">{lines:&gt;8}{other:&gt;8}{code:&gt;8}</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">width</span><span class="p">,)</span>
+
+        <span class="c1"># Render</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s2">&quot;Odoo cloc&quot;</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="s2">&quot;Line&quot;</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="s2">&quot;Other&quot;</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="s2">&quot;Code&quot;</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="n">hr</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">+=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="n">m</span><span class="p">],</span> <span class="n">other</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">total</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">[</span><span class="n">m</span><span class="p">],</span> <span class="n">code</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">[</span><span class="n">m</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">m</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                    <span class="n">code</span><span class="p">,</span> <span class="n">total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+                    <span class="n">s</span> <span class="o">+=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s1">&#39;    &#39;</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="n">total</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="n">total</span> <span class="o">-</span> <span class="n">code</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="n">hr</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">total</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="n">total</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="n">total</span> <span class="o">-</span> <span class="n">code</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="n">code</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span> <span class="ow">and</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="n">ex</span> <span class="o">=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s2">&quot;Excluded&quot;</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="s2">&quot;Line&quot;</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="s2">&quot;Other&quot;</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="s2">&quot;Code&quot;</span><span class="p">)</span>
+            <span class="n">ex</span> <span class="o">+=</span> <span class="n">hr</span>
+            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="p">[</span><span class="n">m</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                    <span class="n">code</span><span class="p">,</span> <span class="n">total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">excluded</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+                    <span class="n">ex</span> <span class="o">+=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s1">&#39;    &#39;</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="n">total</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="n">total</span> <span class="o">-</span> <span class="n">code</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="n">code</span><span class="p">)</span>
+            <span class="n">ex</span> <span class="o">+=</span> <span class="n">hr</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+            <span class="n">e</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Errors</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">):</span>
+                <span class="n">e</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">m</span><span class="p">]):</span>
+                    <span class="n">e</span> <span class="o">+=</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="s1">&#39;    &#39;</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">other</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

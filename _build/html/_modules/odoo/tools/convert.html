@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.convert &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.convert</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.convert</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;convert_file&#39;</span><span class="p">,</span> <span class="s1">&#39;convert_sql_import&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;convert_csv_import&#39;</span><span class="p">,</span> <span class="s1">&#39;convert_xml_import&#39;</span>
+<span class="p">]</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os.path</span>
+<span class="kn">import</span> <span class="nn">pprint</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">dateutil.relativedelta</span> <span class="kn">import</span> <span class="n">relativedelta</span>
+
+<span class="kn">import</span> <span class="nn">pytz</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span><span class="p">,</span> <span class="n">builder</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">jingtrang</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">jingtrang</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">pycompat</span>
+<span class="kn">from</span> <span class="nn">.config</span> <span class="kn">import</span> <span class="n">config</span>
+<span class="kn">from</span> <span class="nn">.misc</span> <span class="kn">import</span> <span class="n">file_open</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">SKIPPED_ELEMENT_TYPES</span>
+<span class="kn">from</span> <span class="nn">.translate</span> <span class="kn">import</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">api</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">ValidationError</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">.safe_eval</span> <span class="kn">import</span> <span class="n">safe_eval</span> <span class="k">as</span> <span class="n">s_eval</span><span class="p">,</span> <span class="n">pytz</span><span class="p">,</span> <span class="n">time</span>
+<span class="n">safe_eval</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="p">{}:</span> <span class="n">s_eval</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">nocopy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">ParseError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="o">...</span>
+
+<span class="k">class</span> <span class="nc">RecordDictWrapper</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to pass a record as locals in eval:</span>
+<span class="sd">    records do not strictly behave like dict, so we force them to.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">record</span> <span class="o">=</span> <span class="n">record</span>
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="o">.</span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">model_str</span><span class="p">,</span> <span class="n">idref</span><span class="p">):</span>
+    <span class="n">idref2</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">idref</span><span class="p">,</span>
+                  <span class="n">Command</span><span class="o">=</span><span class="n">odoo</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">Command</span><span class="p">,</span>
+                  <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+                  <span class="n">DateTime</span><span class="o">=</span><span class="n">datetime</span><span class="p">,</span>
+                  <span class="n">datetime</span><span class="o">=</span><span class="n">datetime</span><span class="p">,</span>
+                  <span class="n">timedelta</span><span class="o">=</span><span class="n">timedelta</span><span class="p">,</span>
+                  <span class="n">relativedelta</span><span class="o">=</span><span class="n">relativedelta</span><span class="p">,</span>
+                  <span class="n">version</span><span class="o">=</span><span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">major_version</span><span class="p">,</span>
+                  <span class="n">ref</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">,</span>
+                  <span class="n">pytz</span><span class="o">=</span><span class="n">pytz</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">model_str</span><span class="p">:</span>
+        <span class="n">idref2</span><span class="p">[</span><span class="s1">&#39;obj&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">model_str</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span>
+    <span class="k">return</span> <span class="n">idref2</span>
+
+<span class="k">def</span> <span class="nf">_fix_multiple_roots</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Surround the children of the ``node`` element of an XML field with a</span>
+<span class="sd">    single root &quot;data&quot; element, to prevent having a document with multiple</span>
+<span class="sd">    roots once parsed separately.</span>
+
+<span class="sd">    XML nodes should have one root only, but we&#39;d like to support</span>
+<span class="sd">    direct multiple roots in our partial documents (like inherited view architectures).</span>
+<span class="sd">    As a convention we&#39;ll surround multiple root with a container &quot;data&quot; element, to be</span>
+<span class="sd">    ignored later when parsing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">real_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">node</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">SKIPPED_ELEMENT_TYPES</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">real_nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">data_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="p">:</span>
+            <span class="n">data_node</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data_node</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">tag</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;field&#39;</span><span class="p">,</span><span class="s1">&#39;value&#39;</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span><span class="s1">&#39;char&#39;</span><span class="p">)</span>
+        <span class="n">f_model</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;search&#39;</span><span class="p">):</span>
+            <span class="n">f_search</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;search&quot;</span><span class="p">)</span>
+            <span class="n">f_use</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use&quot;</span><span class="p">,</span><span class="s1">&#39;id&#39;</span><span class="p">)</span>
+            <span class="n">f_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+            <span class="n">idref2</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="n">f_search</span><span class="p">:</span>
+                <span class="n">idref2</span> <span class="o">=</span> <span class="n">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">f_model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">)</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">f_search</span><span class="p">,</span> <span class="n">idref2</span><span class="p">)</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">f_model</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">q</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span>
+            <span class="k">if</span> <span class="n">f_use</span> <span class="o">!=</span> <span class="s1">&#39;id&#39;</span><span class="p">:</span>
+                <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="n">f_use</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">env</span><span class="p">[</span><span class="n">f_model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="n">f_use</span><span class="p">])]</span>
+            <span class="n">_fields</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">f_model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">f_name</span> <span class="ow">in</span> <span class="n">_fields</span><span class="p">)</span> <span class="ow">and</span> <span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ids</span>
+            <span class="n">f_val</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">):</span>
+                <span class="n">f_val</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f_val</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="n">f_val</span> <span class="o">=</span> <span class="n">f_val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">f_val</span>
+        <span class="n">a_eval</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">a_eval</span><span class="p">:</span>
+            <span class="n">idref2</span> <span class="o">=</span> <span class="n">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">f_model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">a_eval</span><span class="p">,</span> <span class="n">idref2</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.tools.convert.init&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s1">&#39;Could not eval(</span><span class="si">%s</span><span class="s1">) for </span><span class="si">%s</span><span class="s1"> in </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">a_eval</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">),</span> <span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
+                <span class="k">raise</span>
+        <span class="k">def</span> <span class="nf">_process</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+            <span class="n">matches</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="sa">br</span><span class="s1">&#39;[^%]%\((.*?)\)[ds]&#39;</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">),</span> <span class="n">s</span><span class="p">)</span>
+            <span class="n">done</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">:</span>
+                <span class="n">found</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">()[</span><span class="mi">1</span><span class="p">:]</span>
+                <span class="k">if</span> <span class="n">found</span> <span class="ow">in</span> <span class="n">done</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">done</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">found</span><span class="p">)</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+                <span class="c1"># So funny story: in Python 3, bytes(n: int) returns a</span>
+                <span class="c1"># bytestring of n nuls. In Python 2 it obviously returns the</span>
+                <span class="c1"># stringified number, which is what we&#39;re expecting here</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">[</span><span class="nb">id</span><span class="p">]))</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%%</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;%&#39;</span><span class="p">)</span> <span class="c1"># Quite weird but it&#39;s for (somewhat) backward compatibility sake</span>
+            <span class="k">return</span> <span class="n">s</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;xml&#39;</span><span class="p">:</span>
+            <span class="n">_fix_multiple_roots</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+            <span class="k">return</span> <span class="s1">&#39;&lt;?xml version=&quot;1.0&quot;?&gt;</span><span class="se">\n</span><span class="s1">&#39;</span>\
+                <span class="o">+</span><span class="n">_process</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">node</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;html&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_process</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">node</span><span class="p">))</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;file&#39;</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">file_open</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;file&#39;</span><span class="p">),</span> <span class="s1">&#39;rb&#39;</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;base64&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="c1"># after that, only text content makes sense</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;file&#39;</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">file_path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;No such file or directory: &#39;</span><span class="si">%s</span><span class="s2">&#39; in </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">))</span>
+            <span class="k">return</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;char&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">data</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;int&#39;</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="s1">&#39;None&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s1">&#39;float&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;list&#39;</span><span class="p">,</span><span class="s1">&#39;tuple&#39;</span><span class="p">):</span>
+            <span class="n">res</span><span class="o">=</span><span class="p">[]</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">iterchildren</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="s1">&#39;value&#39;</span><span class="p">):</span>
+                <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">env</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">t</span><span class="o">==</span><span class="s1">&#39;tuple&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">res</span>
+    <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;function&quot;</span><span class="p">:</span>
+        <span class="n">model_str</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">model_str</span><span class="p">]</span>
+        <span class="n">method_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+        <span class="c1"># determine arguments</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">a_eval</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">a_eval</span><span class="p">:</span>
+            <span class="n">idref2</span> <span class="o">=</span> <span class="n">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">model_str</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">)</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">safe_eval</span><span class="p">(</span><span class="n">a_eval</span><span class="p">,</span> <span class="n">idref2</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">child</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;value&#39;</span> <span class="ow">and</span> <span class="n">child</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">):</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="n">child</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">child</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">child</span><span class="p">,</span> <span class="n">env</span><span class="p">))</span>
+        <span class="c1"># merge current context with context in kwargs</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;context&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;context&#39;</span><span class="p">,</span> <span class="p">{})}</span>
+        <span class="c1"># invoke method</span>
+        <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">call_kw</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;test&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span>
+
+
+<span class="k">def</span> <span class="nf">str2bool</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;0&#39;</span><span class="p">,</span> <span class="s1">&#39;false&#39;</span><span class="p">,</span> <span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">nodeattr2bool</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">default</span>
+    <span class="n">val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">val</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">default</span>
+    <span class="k">return</span> <span class="n">str2bool</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">xml_import</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">get_env</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">eval_context</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">uid</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;uid&#39;</span><span class="p">)</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;context&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">uid</span> <span class="ow">or</span> <span class="n">context</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span>
+                <span class="n">user</span><span class="o">=</span><span class="n">uid</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">uid</span><span class="p">),</span>
+                <span class="n">context</span><span class="o">=</span><span class="n">context</span> <span class="ow">and</span> <span class="p">{</span>
+                    <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">safe_eval</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="p">{</span>
+                        <span class="s1">&#39;ref&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">,</span>
+                        <span class="o">**</span><span class="p">(</span><span class="n">eval_context</span> <span class="ow">or</span> <span class="p">{})</span>
+                    <span class="p">}),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span>
+
+    <span class="k">def</span> <span class="nf">make_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xml_id</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">xml_id</span> <span class="ow">or</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">xml_id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">xml_id</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">xml_id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_test_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xml_id</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">xml_id</span><span class="p">:</span>
+            <span class="n">module</span><span class="p">,</span> <span class="nb">id</span> <span class="o">=</span> <span class="n">xml_id</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">id</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;The ID reference &quot;</span><span class="si">%s</span><span class="s2">&quot; must contain</span>
+<span class="s2">maximum one dot. They are used to refer to other modules ID, in the</span>
+<span class="s2">form: module.record_id&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">xml_id</span><span class="p">,)</span>
+            <span class="k">if</span> <span class="n">module</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">:</span>
+                <span class="n">modcnt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search_count</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">module</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">)])</span>
+                <span class="k">assert</span> <span class="n">modcnt</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;The ID &quot;</span><span class="si">%s</span><span class="s2">&quot; refers to an uninstalled module&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">xml_id</span><span class="p">,)</span>
+
+    <span class="k">def</span> <span class="nf">_tag_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rec</span><span class="p">):</span>
+        <span class="n">d_model</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">)</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">d_model</span><span class="p">]</span>
+
+        <span class="n">d_search</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;search&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">d_search</span><span class="p">:</span>
+            <span class="n">idref</span> <span class="o">=</span> <span class="n">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">d_model</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">records</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">safe_eval</span><span class="p">(</span><span class="n">d_search</span><span class="p">,</span> <span class="n">idref</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Skipping deletion for failed search `</span><span class="si">%r</span><span class="s1">`&#39;</span><span class="p">,</span> <span class="n">d_search</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">d_id</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">d_id</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">records</span> <span class="o">+=</span> <span class="n">records</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">d_id</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="c1"># d_id cannot be found. doesn&#39;t matter in this case</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Skipping deletion for missing XML ID `</span><span class="si">%r</span><span class="s1">`&#39;</span><span class="p">,</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">records</span><span class="p">:</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_tag_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rec</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="s1">&#39;init&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+        <span class="n">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rec</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_tag_menuitem</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rec</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">rec_id</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_test_xml_id</span><span class="p">(</span><span class="n">rec_id</span><span class="p">)</span>
+
+        <span class="c1"># The parent attribute was specified, if non-empty determine its ID, otherwise</span>
+        <span class="c1"># explicitly make a top-level menu</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sequence&#39;</span><span class="p">):</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;sequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sequence&#39;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;parent_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent</span>
+        <span class="k">elif</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;parent&#39;</span><span class="p">):</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;parent_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;parent&#39;</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;web_icon&#39;</span><span class="p">):</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;web_icon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;web_icon&#39;</span><span class="p">]</span>
+
+
+        <span class="k">if</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">):</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;action&#39;</span><span class="p">):</span>
+            <span class="n">a_action</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">a_action</span><span class="p">:</span>
+                <span class="n">a_action</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">a_action</span><span class="p">)</span>
+            <span class="n">act</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">a_action</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">,</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">act</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">act</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">act</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s1">&#39;act_window&#39;</span><span class="p">,</span> <span class="s1">&#39;wizard&#39;</span><span class="p">,</span> <span class="s1">&#39;url&#39;</span><span class="p">,</span> <span class="s1">&#39;client&#39;</span><span class="p">,</span> <span class="s1">&#39;server&#39;</span><span class="p">))</span> <span class="ow">and</span> <span class="n">act</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">act</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">):</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rec_id</span> <span class="ow">or</span> <span class="s1">&#39;?&#39;</span>
+
+
+        <span class="n">groups</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;groups&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">group</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">):</span>
+                <span class="n">group_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="n">groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">group_id</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">group</span><span class="p">:</span>
+                <span class="n">group_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+                <span class="n">groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">group_id</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">groups</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;groups_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">groups</span>
+
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;xml_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_xml_id</span><span class="p">(</span><span class="n">rec_id</span><span class="p">),</span>
+            <span class="s1">&#39;values&#39;</span><span class="p">:</span> <span class="n">values</span><span class="p">,</span>
+            <span class="s1">&#39;noupdate&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">menu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.menu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_load_records</span><span class="p">([</span><span class="n">data</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;update&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">iterchildren</span><span class="p">(</span><span class="s1">&#39;menuitem&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tag_menuitem</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">menu</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_tag_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rec</span><span class="p">,</span> <span class="n">extra_vals</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">rec_model</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">)</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+        <span class="n">rec_id</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">rec_model</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">xml_filename</span> <span class="ow">and</span> <span class="n">rec_id</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span>
+                <span class="n">install_module</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span>
+                <span class="n">install_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">xml_filename</span><span class="p">,</span>
+                <span class="n">install_xmlid</span><span class="o">=</span><span class="n">rec_id</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_test_xml_id</span><span class="p">(</span><span class="n">rec_id</span><span class="p">)</span>
+        <span class="n">xid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_xml_id</span><span class="p">(</span><span class="n">rec_id</span><span class="p">)</span>
+
+        <span class="c1"># in update mode, the record won&#39;t be updated if the data node explicitly</span>
+        <span class="c1"># opt-out using @noupdate=&quot;1&quot;. A second check will be performed in</span>
+        <span class="c1"># model._load_records() using the record&#39;s ir.model.data `noupdate` field.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="s1">&#39;init&#39;</span><span class="p">:</span>
+            <span class="c1"># check if the xml record has no id, skip</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rec_id</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+
+            <span class="n">record</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_load_xmlid</span><span class="p">(</span><span class="n">xid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">:</span>
+                <span class="c1"># if the resource already exists, don&#39;t update it but store</span>
+                <span class="c1"># its database id (can be useful)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">[</span><span class="n">rec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="s1">&#39;forcecreate&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+                <span class="c1"># if it doesn&#39;t exist and we shouldn&#39;t create it, skip it</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="c1"># else create it normally</span>
+
+        <span class="k">if</span> <span class="n">xid</span> <span class="ow">and</span> <span class="n">xid</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">:</span>
+            <span class="c1"># updating a record created by another module</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_load_xmlid</span><span class="p">(</span><span class="n">xid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">record</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="s1">&#39;forcecreate&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+                    <span class="c1"># if it doesn&#39;t exist and we shouldn&#39;t create it, skip it</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Cannot update missing record </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">xid</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">sub_records</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;./field&#39;</span><span class="p">):</span>
+            <span class="c1">#TODO: most of this code is duplicated above (in _eval_xml)...</span>
+            <span class="n">f_name</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+            <span class="n">f_ref</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ref&quot;</span><span class="p">)</span>
+            <span class="n">f_search</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;search&quot;</span><span class="p">)</span>
+            <span class="n">f_model</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">f_model</span> <span class="ow">and</span> <span class="n">f_name</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                <span class="n">f_model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">comodel_name</span>
+            <span class="n">f_use</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use&quot;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;id&#39;</span>
+            <span class="n">f_val</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">f_search</span><span class="p">:</span>
+                <span class="n">idref2</span> <span class="o">=</span> <span class="n">_get_idref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">f_model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">)</span>
+                <span class="n">q</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">f_search</span><span class="p">,</span> <span class="n">idref2</span><span class="p">)</span>
+                <span class="k">assert</span> <span class="n">f_model</span><span class="p">,</span> <span class="s1">&#39;Define an attribute model=&quot;...&quot; in your .XML file!&#39;</span>
+                <span class="c1"># browse the objects searched</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">f_model</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+                <span class="c1"># column definitions of the &quot;local&quot; object</span>
+                <span class="n">_fields</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">rec_model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span>
+                <span class="c1"># if the current field is many2many</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">f_name</span> <span class="ow">in</span> <span class="n">_fields</span><span class="p">)</span> <span class="ow">and</span> <span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2many&#39;</span><span class="p">:</span>
+                    <span class="n">f_val</span> <span class="o">=</span> <span class="p">[</span><span class="n">odoo</span><span class="o">.</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="n">f_use</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">s</span><span class="p">])]</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+                    <span class="c1"># otherwise (we are probably in a many2one field),</span>
+                    <span class="c1"># take the first element of the search</span>
+                    <span class="n">f_val</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">f_use</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">f_ref</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">f_name</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;reference&#39;</span><span class="p">:</span>
+                    <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_id_get</span><span class="p">(</span><span class="n">f_ref</span><span class="p">)</span>
+                    <span class="n">f_val</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">f_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">f_ref</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="s1">&#39;forcecreate&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">f_val</span><span class="p">:</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping creation of </span><span class="si">%r</span><span class="s2"> because </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> could not be resolved&quot;</span><span class="p">,</span> <span class="n">xid</span><span class="p">,</span> <span class="n">f_name</span><span class="p">,</span> <span class="n">f_ref</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f_val</span> <span class="o">=</span> <span class="n">_eval_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">f_name</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                    <span class="n">field_type</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span>
+                    <span class="k">if</span> <span class="n">field_type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+                        <span class="n">f_val</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">f_val</span><span class="p">)</span> <span class="k">if</span> <span class="n">f_val</span> <span class="k">else</span> <span class="kc">False</span>
+                    <span class="k">elif</span> <span class="n">field_type</span> <span class="o">==</span> <span class="s1">&#39;integer&#39;</span><span class="p">:</span>
+                        <span class="n">f_val</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">f_val</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">field_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="s1">&#39;monetary&#39;</span><span class="p">):</span>
+                        <span class="n">f_val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">f_val</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">field_type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f_val</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                        <span class="n">f_val</span> <span class="o">=</span> <span class="n">str2bool</span><span class="p">(</span><span class="n">f_val</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">field_type</span> <span class="o">==</span> <span class="s1">&#39;one2many&#39;</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">field</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;./record&#39;</span><span class="p">):</span>
+                            <span class="n">sub_records</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">child</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span><span class="o">.</span><span class="n">inverse_name</span><span class="p">))</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f_val</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                            <span class="c1"># We do not want to write on the field since we will write</span>
+                            <span class="c1"># on the childrens&#39; parents later</span>
+                            <span class="k">continue</span>
+                    <span class="k">elif</span> <span class="n">field_type</span> <span class="o">==</span> <span class="s1">&#39;html&#39;</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;xml&#39;</span><span class="p">:</span>
+                            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;HTML field </span><span class="si">%r</span><span class="s1"> is declared as `type=&quot;xml&quot;`&#39;</span><span class="p">,</span> <span class="n">f_name</span><span class="p">)</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">f_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">f_val</span>
+        <span class="k">if</span> <span class="n">extra_vals</span><span class="p">:</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extra_vals</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;sequence&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">res</span> <span class="ow">and</span> <span class="s1">&#39;sequence&#39;</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="n">sequence</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_sequence</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">sequence</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="s1">&#39;sequence&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sequence</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">xml_id</span><span class="o">=</span><span class="n">xid</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">noupdate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span><span class="p">)</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">_load_records</span><span class="p">([</span><span class="n">data</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;update&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rec_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">[</span><span class="n">rec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_partial&#39;</span><span class="p">):</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">child_rec</span><span class="p">,</span> <span class="n">inverse_name</span> <span class="ow">in</span> <span class="n">sub_records</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tag_record</span><span class="p">(</span><span class="n">child_rec</span><span class="p">,</span> <span class="n">extra_vals</span><span class="o">=</span><span class="p">{</span><span class="n">inverse_name</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">rec_model</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+
+    <span class="k">def</span> <span class="nf">_tag_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">):</span>
+        <span class="c1"># This helper transforms a &lt;template&gt; element into a &lt;record&gt; and forwards it</span>
+        <span class="n">tpl_id</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;t-name&#39;</span><span class="p">))</span>
+        <span class="n">full_tpl_id</span> <span class="o">=</span> <span class="n">tpl_id</span>
+        <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">full_tpl_id</span><span class="p">:</span>
+            <span class="n">full_tpl_id</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">tpl_id</span><span class="p">)</span>
+        <span class="c1"># set the full template name for qweb &lt;module&gt;.&lt;id&gt;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;inherit_id&#39;</span><span class="p">):</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;t-name&#39;</span><span class="p">,</span> <span class="n">full_tpl_id</span><span class="p">)</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="s1">&#39;t&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="s1">&#39;data&#39;</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;theme_&#39;</span><span class="p">):</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="s1">&#39;theme.ir.ui.view&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="s1">&#39;ir.ui.view&#39;</span>
+
+        <span class="n">record_attrs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">tpl_id</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">att</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;forcecreate&#39;</span><span class="p">,</span> <span class="s1">&#39;context&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">att</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+                <span class="n">record_attrs</span><span class="p">[</span><span class="n">att</span><span class="p">]</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">att</span><span class="p">)</span>
+
+        <span class="n">Field</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">E</span><span class="o">.</span><span class="n">field</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="n">tpl_id</span><span class="p">)</span>
+
+        <span class="n">record</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s1">&#39;record&#39;</span><span class="p">,</span> <span class="n">attrib</span><span class="o">=</span><span class="n">record_attrs</span><span class="p">)</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;name&#39;</span><span class="p">))</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">full_tpl_id</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;key&#39;</span><span class="p">))</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="s2">&quot;qweb&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;type&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">&#39;track&#39;</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;track&#39;</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;track&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">&#39;priority&#39;</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;priority&#39;</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;priority&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">&#39;inherit_id&#39;</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;inherit_id&#39;</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;inherit_id&#39;</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="s1">&#39;website_id&#39;</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;website_id&#39;</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;website_id&#39;</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="s1">&#39;key&#39;</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;key&#39;</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;key&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;True&quot;</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">):</span>
+            <span class="n">view_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id_get</span><span class="p">(</span><span class="n">tpl_id</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="s2">&quot;update&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">view_id</span><span class="p">:</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="nb">eval</span><span class="o">=</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;customize_show&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;True&quot;</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">):</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;customize_show&#39;</span><span class="p">,</span> <span class="nb">eval</span><span class="o">=</span><span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;customize_show&#39;</span><span class="p">)))</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;groups&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">groups</span><span class="p">:</span>
+            <span class="n">grp_lst</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;ref(&#39;</span><span class="si">%s</span><span class="s2">&#39;)&quot;</span> <span class="o">%</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">groups</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;groups_id&quot;</span><span class="p">,</span> <span class="nb">eval</span><span class="o">=</span><span class="s2">&quot;[Command.set([&quot;</span><span class="o">+</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">grp_lst</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;])]&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;primary&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+            <span class="c1"># Pseudo clone mode, we&#39;ll set the t-name to the full canonical xmlid</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">builder</span><span class="o">.</span><span class="n">E</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span>
+                    <span class="n">builder</span><span class="o">.</span><span class="n">E</span><span class="o">.</span><span class="n">attribute</span><span class="p">(</span><span class="n">full_tpl_id</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;t-name&#39;</span><span class="p">),</span>
+                    <span class="n">expr</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
+                    <span class="n">position</span><span class="o">=</span><span class="s2">&quot;attributes&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="s1">&#39;primary&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;mode&#39;</span><span class="p">))</span>
+        <span class="c1"># inject complete &lt;template&gt; element (after changing node name) into</span>
+        <span class="c1"># the ``arch`` field</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;arch&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;xml&quot;</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">id_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_str</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">id_str</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idref</span><span class="p">[</span><span class="n">id_str</span><span class="p">]</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_id_get</span><span class="p">(</span><span class="n">id_str</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span> <span class="ow">and</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">model_id_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_str</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">id_str</span><span class="p">:</span>
+            <span class="n">id_str</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">id_str</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_xmlid_to_res_model_res_id</span><span class="p">(</span><span class="n">id_str</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="n">raise_if_not_found</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_tag_root</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">el</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">envs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="n">el</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_noupdate</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="s1">&#39;noupdate&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noupdate</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span> <span class="k">if</span> <span class="n">nodeattr2bool</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="s1">&#39;auto_sequence&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">f</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">ParseError</span><span class="p">:</span>
+                <span class="k">raise</span>
+            <span class="k">except</span> <span class="n">ValidationError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;while parsing </span><span class="si">{file}</span><span class="s2">:</span><span class="si">{viewline}</span><span class="se">\n</span><span class="si">{err}</span><span class="se">\n\n</span><span class="s2">View error context:</span><span class="se">\n</span><span class="si">{context}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">file</span><span class="o">=</span><span class="n">rec</span><span class="o">.</span><span class="n">getroottree</span><span class="p">()</span><span class="o">.</span><span class="n">docinfo</span><span class="o">.</span><span class="n">URL</span><span class="p">,</span>
+                    <span class="n">viewline</span><span class="o">=</span><span class="n">rec</span><span class="o">.</span><span class="n">sourceline</span><span class="p">,</span>
+                    <span class="n">context</span><span class="o">=</span><span class="n">pprint</span><span class="o">.</span><span class="n">pformat</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">err</span><span class="p">,</span> <span class="s1">&#39;context&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;-no context-&#39;</span><span class="p">),</span>
+                    <span class="n">err</span><span class="o">=</span><span class="n">err</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="n">ParseError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>  <span class="c1"># Restart with &quot;--log-handler odoo.tools.convert:DEBUG&quot; for complete traceback</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ParseError</span><span class="p">(</span><span class="s1">&#39;while parsing </span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">, somewhere inside</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">rec</span><span class="o">.</span><span class="n">getroottree</span><span class="p">()</span><span class="o">.</span><span class="n">docinfo</span><span class="o">.</span><span class="n">URL</span><span class="p">,</span>
+                    <span class="n">rec</span><span class="o">.</span><span class="n">sourceline</span><span class="p">,</span>
+                    <span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+                <span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_noupdate</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">envs</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sequences</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">env</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">envs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">noupdate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_noupdate</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">next_sequence</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequences</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequences</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span> <span class="o">+</span> <span class="mi">10</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">noupdate</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">xml_filename</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">module</span> <span class="o">=</span> <span class="n">module</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">envs</span> <span class="o">=</span> <span class="p">[</span><span class="n">env</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">lang</span><span class="o">=</span><span class="kc">None</span><span class="p">))]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">idref</span> <span class="o">=</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">idref</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">idref</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_noupdate</span> <span class="o">=</span> <span class="p">[</span><span class="n">noupdate</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sequences</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xml_filename</span> <span class="o">=</span> <span class="n">xml_filename</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;record&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_record</span><span class="p">,</span>
+            <span class="s1">&#39;delete&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_delete</span><span class="p">,</span>
+            <span class="s1">&#39;function&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_function</span><span class="p">,</span>
+            <span class="s1">&#39;menuitem&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_menuitem</span><span class="p">,</span>
+            <span class="s1">&#39;template&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_template</span><span class="p">,</span>
+
+            <span class="o">**</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DATA_ROOTS</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag_root</span><span class="p">)</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">de</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">de</span><span class="o">.</span><span class="n">tag</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">DATA_ROOTS</span><span class="p">,</span> <span class="s2">&quot;Root xml tag must be &lt;openerp&gt;, &lt;odoo&gt; or &lt;data&gt;.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tag_root</span><span class="p">(</span><span class="n">de</span><span class="p">)</span>
+    <span class="n">DATA_ROOTS</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;odoo&#39;</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">,</span> <span class="s1">&#39;openerp&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="convert_file">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.convert.convert_file">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_file</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="n">noupdate</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pathname</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">pathname</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pathname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+    <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="k">with</span> <span class="n">file_open</span><span class="p">(</span><span class="n">pathname</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.csv&#39;</span><span class="p">:</span>
+            <span class="n">convert_csv_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">pathname</span><span class="p">,</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">noupdate</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.sql&#39;</span><span class="p">:</span>
+            <span class="n">convert_sql_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">fp</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.xml&#39;</span><span class="p">:</span>
+            <span class="n">convert_xml_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">noupdate</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s1">&#39;.js&#39;</span><span class="p">:</span>
+            <span class="k">pass</span> <span class="c1"># .js files are valid but ignored here.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t load unknown file type </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="convert_sql_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.convert.convert_sql_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_sql_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">fp</span><span class="p">):</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">())</span> <span class="c1"># pylint: disable=sql-injection</span></div>
+
+
+<div class="viewcode-block" id="convert_csv_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.convert.convert_csv_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_csv_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">fname</span><span class="p">,</span> <span class="n">csvcontent</span><span class="p">,</span> <span class="n">idref</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;init&#39;</span><span class="p">,</span>
+        <span class="n">noupdate</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Import csv file :</span>
+<span class="sd">        quote: &quot;</span>
+<span class="sd">        delimiter: ,</span>
+<span class="sd">        encoding: utf-8&#39;&#39;&#39;</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">env</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">lang</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
+    <span class="n">filename</span><span class="p">,</span> <span class="n">_ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">csv_reader</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">csvcontent</span><span class="p">),</span> <span class="n">quotechar</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">reader</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;init&#39;</span> <span class="ow">or</span> <span class="s1">&#39;id&#39;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Import specification does not contain &#39;id&#39; and we are in init mode, Cannot continue.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># filter out empty lines (any([]) == False) and lines containing only empty cells</span>
+    <span class="n">datas</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">reader</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;mode&#39;</span><span class="p">:</span> <span class="n">mode</span><span class="p">,</span>
+        <span class="s1">&#39;module&#39;</span><span class="p">:</span> <span class="n">module</span><span class="p">,</span>
+        <span class="s1">&#39;install_module&#39;</span><span class="p">:</span> <span class="n">module</span><span class="p">,</span>
+        <span class="s1">&#39;install_filename&#39;</span><span class="p">:</span> <span class="n">fname</span><span class="p">,</span>
+        <span class="s1">&#39;noupdate&#39;</span><span class="p">:</span> <span class="n">noupdate</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">datas</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;error&#39;</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;messages&#39;</span><span class="p">]):</span>
+        <span class="c1"># Report failed import and abort module install</span>
+        <span class="n">warning_msg</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;messages&#39;</span><span class="p">])</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Module loading </span><span class="si">%s</span><span class="s1"> failed: file </span><span class="si">%s</span><span class="s1"> could not be processed:</span><span class="se">\n</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">fname</span><span class="p">,</span> <span class="n">warning_msg</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="convert_xml_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.convert.convert_xml_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_xml_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">xmlfile</span><span class="p">,</span> <span class="n">idref</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="n">noupdate</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">doc</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">xmlfile</span><span class="p">)</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;root_path&#39;</span><span class="p">],</span> <span class="s1">&#39;import_xml.rng&#39;</span><span class="p">)</span>
+    <span class="n">relaxng</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">RelaxNG</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">schema</span><span class="p">))</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">relaxng</span><span class="o">.</span><span class="n">assert_</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;The XML file &#39;</span><span class="si">%s</span><span class="s2">&#39; does not fit the required schema!&quot;</span><span class="p">,</span> <span class="n">xmlfile</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">jingtrang</span><span class="p">:</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;pyjing&#39;</span><span class="p">,</span> <span class="n">schema</span><span class="p">,</span> <span class="n">xmlfile</span><span class="o">.</span><span class="n">name</span><span class="p">],</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">relaxng</span><span class="o">.</span><span class="n">error_log</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Install &#39;jingtrang&#39; for more precise and useful validation messages.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">xmlfile</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">xml_filename</span> <span class="o">=</span> <span class="n">xmlfile</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">xml_filename</span> <span class="o">=</span> <span class="n">xmlfile</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">obj</span> <span class="o">=</span> <span class="n">xml_import</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">idref</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">noupdate</span><span class="o">=</span><span class="n">noupdate</span><span class="p">,</span> <span class="n">xml_filename</span><span class="o">=</span><span class="n">xml_filename</span><span class="p">)</span>
+    <span class="n">obj</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">getroot</span><span class="p">())</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

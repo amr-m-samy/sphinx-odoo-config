@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.graph &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.graph</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.graph</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot; Modules dependency graph. &quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.tools</span> <span class="k">as</span> <span class="nn">tools</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="nd">@functools</span><span class="o">.</span><span class="n">lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_ignored_modules</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;studio_customization&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">tools</span><span class="o">.</span><span class="n">sql</span><span class="o">.</span><span class="n">column_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="s1">&#39;ir_module_module&#39;</span><span class="p">,</span> <span class="s1">&#39;imported&#39;</span><span class="p">):</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT name FROM ir_module_module WHERE imported&#39;</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="p">[</span><span class="n">m</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="Graph">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Graph">[docs]</a>
+<span class="k">class</span> <span class="nc">Graph</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Modules dependency graph.</span>
+
+<span class="sd">    The graph is a mapping from module name to Nodes.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Graph.add_node">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Graph.add_node">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="n">max_depth</span><span class="p">,</span> <span class="n">father</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">]:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="ow">or</span> <span class="n">Node</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># lazy creation, do not use default value for get()</span>
+            <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">depth</span> <span class="o">&gt;=</span> <span class="n">max_depth</span><span class="p">:</span>
+                <span class="n">father</span> <span class="o">=</span> <span class="n">n</span>
+                <span class="n">max_depth</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">depth</span>
+        <span class="k">if</span> <span class="n">father</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">father</span><span class="o">.</span><span class="n">add_child</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Node</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Graph.update_from_db">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Graph.update_from_db">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_from_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="c1"># update the graph with values from the database (if exist)</span>
+        <span class="c1">## First, we set the default values for each package in graph</span>
+        <span class="n">additional_data</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;uninstalled&#39;</span><span class="p">,</span> <span class="s1">&#39;dbdemo&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;installed_version&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">keys</span><span class="p">()}</span>
+        <span class="c1">## Then we get the values from the database</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT name, id, state, demo AS dbdemo, latest_version AS installed_version&#39;</span>
+                   <span class="s1">&#39;  FROM ir_module_module&#39;</span>
+                   <span class="s1">&#39; WHERE name IN </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">additional_data</span><span class="p">),)</span>
+                   <span class="p">)</span>
+
+        <span class="c1">## and we update the default values with values from the database</span>
+        <span class="n">additional_data</span><span class="o">.</span><span class="n">update</span><span class="p">((</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">dictfetchall</span><span class="p">())</span>
+
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">additional_data</span><span class="p">[</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Graph.add_module">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Graph.add_module">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_modules</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="p">[</span><span class="n">module</span><span class="p">],</span> <span class="n">force</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Graph.add_modules">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Graph.add_modules">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_modules</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">module_list</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">force</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">packages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">len_graph</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">module_list</span><span class="p">:</span>
+            <span class="n">info</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">get_manifest</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">info</span> <span class="ow">and</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;installable&#39;</span><span class="p">]:</span>
+                <span class="n">packages</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">module</span><span class="p">,</span> <span class="n">info</span><span class="p">))</span> <span class="c1"># TODO directly a dict, like in get_modules_with_version</span>
+            <span class="k">elif</span> <span class="n">module</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ignored_modules</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%s</span><span class="s1">: not installable, skipped&#39;</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+
+        <span class="n">dependencies</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">p</span><span class="p">,</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">])</span>
+        <span class="n">current</span><span class="p">,</span> <span class="n">later</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">]),</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">while</span> <span class="n">packages</span> <span class="ow">and</span> <span class="n">current</span> <span class="o">&gt;</span> <span class="n">later</span><span class="p">:</span>
+            <span class="n">package</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">deps</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">]</span>
+
+            <span class="c1"># if all dependencies of &#39;package&#39; are already in the graph, add &#39;package&#39; in the graph</span>
+            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">dep</span> <span class="ow">in</span> <span class="bp">self</span> <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">deps</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">current</span><span class="p">:</span>
+                    <span class="n">packages</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="n">later</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+                <span class="n">current</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">package</span><span class="p">)</span>
+                <span class="n">node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">package</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="ow">or</span> <span class="s1">&#39;all&#39;</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="ow">or</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">force</span><span class="p">:</span>
+                        <span class="nb">setattr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">later</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package</span><span class="p">)</span>
+                <span class="n">packages</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">package</span><span class="p">,</span> <span class="n">info</span><span class="p">))</span>
+            <span class="n">packages</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_from_db</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">later</span><span class="p">:</span>
+            <span class="n">unmet_deps</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">[</span><span class="n">package</span><span class="p">]</span> <span class="k">if</span> <span class="n">p</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%s</span><span class="s1">: Unmet dependencies: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">package</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unmet_deps</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-</span> <span class="n">len_graph</span></div>
+
+
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">done</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="k">while</span> <span class="n">done</span><span class="p">:</span>
+            <span class="n">level_modules</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">depth</span><span class="o">==</span><span class="n">level</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">level_modules</span><span class="p">:</span>
+                <span class="n">done</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">module</span>
+            <span class="n">level</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="bp">self</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">depth</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Node">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Node">[docs]</a>
+<span class="k">class</span> <span class="nc">Node</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; One module in the modules dependency graph.</span>
+
+<span class="sd">    Node acts as a per-module singleton. A node is constructed via</span>
+<span class="sd">    Graph.add_module() or Graph.add_modules(). Some of its fields are from</span>
+<span class="sd">    ir_module_module (set by Graph.update_from_db()).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">graph</span><span class="p">:</span>
+            <span class="n">inst</span> <span class="o">=</span> <span class="n">graph</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">inst</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+            <span class="n">graph</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">inst</span>
+        <span class="k">return</span> <span class="n">inst</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="n">info</span> <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;info&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;children&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;depth&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">depth</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span>
+
+<div class="viewcode-block" id="Node.add_child">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Node.add_child">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="n">node</span> <span class="o">=</span> <span class="n">Node</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">depth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">node</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">node</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Node</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">):</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;depth&#39;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">,</span>
+            <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pprint</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_pprint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">`-&gt; </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;   &#39;</span> <span class="o">*</span> <span class="n">depth</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">_pprint</span><span class="p">(</span><span class="n">depth</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">s</span>
+
+<div class="viewcode-block" id="Node.should_have_demo">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.graph.Node.should_have_demo">[docs]</a>
+    <span class="k">def</span> <span class="nf">should_have_demo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dbdemo</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">!=</span> <span class="s1">&#39;installed&#39;</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">dbdemo</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parents</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">parents</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">depth</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span>
+            <span class="k">if</span> <span class="bp">self</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.view_validation &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.view_validation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.view_validation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; View validation code (using assertions, not the RNG schema). &quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">odoo.osv.expression</span> <span class="kn">import</span> <span class="n">DOMAIN_OPERATORS</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="n">_validators</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+<span class="n">_relaxng_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="n">READONLY</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\breadonly\b&quot;</span><span class="p">)</span>
+
+<span class="c1"># predefined symbols for evaluating attributes (invisible, readonly...)</span>
+<span class="n">IGNORED_IN_EXPRESSION</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;True&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">,</span> <span class="s1">&#39;None&#39;</span><span class="p">,</span>    <span class="c1"># those are identifiers in Python 2.7</span>
+    <span class="s1">&#39;self&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;uid&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;context&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;context_today&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;allowed_company_ids&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;current_company_id&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;time&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;datetime&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;relativedelta&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;current_date&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;today&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;now&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;abs&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;len&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;bool&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;float&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;str&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;unicode&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;set&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="get_domain_value_names">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.get_domain_value_names">[docs]</a>
+<span class="k">def</span> <span class="nf">get_domain_value_names</span><span class="p">(</span><span class="n">domain</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return all field name used by this domain</span>
+<span class="sd">    eg: [</span>
+<span class="sd">            (&#39;id&#39;, &#39;in&#39;, [1, 2, 3]),</span>
+<span class="sd">            (&#39;field_a&#39;, &#39;in&#39;, parent.truc),</span>
+<span class="sd">            (&#39;field_b&#39;, &#39;in&#39;, context.get(&#39;b&#39;)),</span>
+<span class="sd">            (1, &#39;=&#39;, 1),</span>
+<span class="sd">            bool(context.get(&#39;c&#39;)),</span>
+<span class="sd">        ]</span>
+<span class="sd">        returns {&#39;id&#39;, &#39;field_a&#39;, &#39;field_b&#39;}, {&#39;parent&#39;, &#39;parent.truc&#39;, &#39;context&#39;}</span>
+
+<span class="sd">    :param domain: list(tuple) or str</span>
+<span class="sd">    :return: set(str), set(str)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">contextual_values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">field_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">leaf</span> <span class="ow">in</span> <span class="n">domain</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">leaf</span> <span class="ow">in</span> <span class="n">DOMAIN_OPERATORS</span> <span class="ow">or</span> <span class="n">leaf</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                    <span class="c1"># &quot;&amp;&quot;, &quot;|&quot;, &quot;!&quot;, True, False</span>
+                    <span class="k">continue</span>
+                <span class="n">left</span><span class="p">,</span> <span class="n">_operator</span><span class="p">,</span> <span class="n">_right</span> <span class="o">=</span> <span class="n">leaf</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">field_names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">left</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">left</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="c1"># deprecate: True leaf and False leaf</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">extract_from_domain</span><span class="p">(</span><span class="n">ast_domain</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_domain</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">IfExp</span><span class="p">):</span>
+                    <span class="c1"># [] if condition else []</span>
+                    <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+                    <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">orelse</span><span class="p">)</span>
+                    <span class="k">return</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_domain</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BoolOp</span><span class="p">):</span>
+                    <span class="c1"># condition and []</span>
+                    <span class="c1"># this formating don&#39;t check returned domain syntax</span>
+                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">ast_domain</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">IfExp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BoolOp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BinOp</span><span class="p">)):</span>
+                            <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+                    <span class="k">return</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_domain</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BinOp</span><span class="p">):</span>
+                    <span class="c1"># [] + []</span>
+                    <span class="c1"># this formating don&#39;t check returned domain syntax</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">IfExp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BoolOp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BinOp</span><span class="p">)):</span>
+                        <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">left</span><span class="p">))</span>
+
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">IfExp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BoolOp</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BinOp</span><span class="p">)):</span>
+                        <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">right</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">ast_domain</span><span class="o">.</span><span class="n">right</span><span class="p">))</span>
+                    <span class="k">return</span>
+                <span class="k">for</span> <span class="n">ast_item</span> <span class="ow">in</span> <span class="n">ast_domain</span><span class="o">.</span><span class="n">elts</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_item</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">):</span>
+                        <span class="c1"># &quot;&amp;&quot;, &quot;|&quot;, &quot;!&quot;, True, False</span>
+                        <span class="k">if</span> <span class="n">ast_item</span><span class="o">.</span><span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DOMAIN_OPERATORS</span> <span class="ow">and</span> <span class="n">ast_item</span><span class="o">.</span><span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+                    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_item</span><span class="p">,</span> <span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)):</span>
+                        <span class="n">left</span><span class="p">,</span> <span class="n">_operator</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">ast_item</span><span class="o">.</span><span class="n">elts</span>
+                        <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">right</span><span class="p">))</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                            <span class="n">field_names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">left</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+                        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="n">left</span><span class="o">.</span><span class="n">value</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+                            <span class="c1"># deprecate: True leaf (1, &#39;=&#39;, 1) and False leaf (0, &#39;=&#39;, 1)</span>
+                            <span class="k">pass</span>
+                        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="n">right</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="c1"># deprecate: True/False leaf (py expression, &#39;=&#39;, 1)</span>
+                            <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">left</span><span class="p">))</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">item_ast</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">expr</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">body</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Name</span><span class="p">):</span>
+                <span class="c1"># domain=&quot;other_field_domain&quot;</span>
+                <span class="n">contextual_values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">extract_from_domain</span><span class="p">(</span><span class="n">item_ast</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Wrong domain formatting.&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+
+    <span class="n">value_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">contextual_values</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;parent&#39;</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">root</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">IGNORED_IN_EXPRESSION</span><span class="p">:</span>
+            <span class="n">value_names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span> <span class="k">if</span> <span class="n">root</span> <span class="o">==</span> <span class="s1">&#39;parent&#39;</span> <span class="k">else</span> <span class="n">root</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">field_names</span><span class="p">,</span> <span class="n">value_names</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return all contextual value this ast</span>
+
+<span class="sd">    eg: ast from &#39;&#39;&#39;(</span>
+<span class="sd">            id in [1, 2, 3]</span>
+<span class="sd">            and field_a in parent.truc</span>
+<span class="sd">            and field_b in context.get(&#39;b&#39;)</span>
+<span class="sd">            or (</span>
+<span class="sd">                True</span>
+<span class="sd">                and bool(context.get(&#39;c&#39;))</span>
+<span class="sd">            )</span>
+<span class="sd">        )</span>
+<span class="sd">        returns {&#39;parent&#39;, &#39;parent.truc&#39;, &#39;context&#39;, &#39;bool&#39;}</span>
+
+<span class="sd">    :param item_ast: ast</span>
+<span class="sd">    :return: set(str)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="p">(</span><span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">elts</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">item_ast</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Attribute</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">values</span><span class="p">))</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">item_ast</span><span class="o">.</span><span class="n">attr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+            <span class="k">return</span> <span class="n">values</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Index</span><span class="p">):</span> <span class="c1"># deprecated python ast class for Subscript key</span>
+        <span class="k">return</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Subscript</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">slice</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Compare</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sub_ast</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">comparators</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">sub_ast</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BinOp</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">right</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">BoolOp</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">ast_value</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">ast_value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">UnaryOp</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">operand</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Call</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ast_arg</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">ast_arg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">IfExp</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="o">.</span><span class="n">orelse</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item_ast</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Dict</span><span class="p">):</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">keys</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">item_ast</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">|=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Undefined item </span><span class="si">{</span><span class="n">item_ast</span><span class="si">!r}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="get_expression_field_names">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.get_expression_field_names">[docs]</a>
+<span class="k">def</span> <span class="nf">get_expression_field_names</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return all field name used by this expression</span>
+
+<span class="sd">    eg: expression = &#39;&#39;&#39;(</span>
+<span class="sd">            id in [1, 2, 3]</span>
+<span class="sd">            and field_a in parent.truc.id</span>
+<span class="sd">            and field_b in context.get(&#39;b&#39;)</span>
+<span class="sd">            or (True and bool(context.get(&#39;c&#39;)))</span>
+<span class="sd">        )</span>
+<span class="sd">        returns {&#39;parent&#39;, &#39;parent.truc&#39;, &#39;parent.truc.id&#39;, &#39;context&#39;, &#39;context.get&#39;}</span>
+
+<span class="sd">    :param expression: str</span>
+<span class="sd">    :param ignored: set contains the value name to ignore.</span>
+<span class="sd">                    Add &#39;.&#39; to ignore attributes (eg: {&#39;parent.&#39;} will</span>
+<span class="sd">                    ignore &#39;parent.truc&#39; and &#39;parent.truc.id&#39;)</span>
+<span class="sd">    :return: set(str)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">item_ast</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">body</span>
+    <span class="n">contextual_values</span> <span class="o">=</span> <span class="n">_get_expression_contextual_values</span><span class="p">(</span><span class="n">item_ast</span><span class="p">)</span>
+
+    <span class="n">value_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">contextual_values</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;parent&#39;</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">root</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">IGNORED_IN_EXPRESSION</span><span class="p">:</span>
+            <span class="n">value_names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span> <span class="k">if</span> <span class="n">root</span> <span class="o">==</span> <span class="s1">&#39;parent&#39;</span> <span class="k">else</span> <span class="n">root</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value_names</span></div>
+
+
+
+<div class="viewcode-block" id="get_dict_asts">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.get_dict_asts">[docs]</a>
+<span class="k">def</span> <span class="nf">get_dict_asts</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Check that the given string or AST node represents a dict expression</span>
+<span class="sd">    where all keys are string literals, and return it as a dict mapping string</span>
+<span class="sd">    keys to the AST of values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">body</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-dict expression&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">((</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">))</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">expr</span><span class="o">.</span><span class="n">keys</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-string literal dict key&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">key</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">val</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">keys</span><span class="p">,</span> <span class="n">expr</span><span class="o">.</span><span class="n">values</span><span class="p">)}</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_check</span><span class="p">(</span><span class="n">condition</span><span class="p">,</span> <span class="n">explanation</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">condition</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Expression is not a valid domain: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">explanation</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="valid_view">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.valid_view">[docs]</a>
+<span class="k">def</span> <span class="nf">valid_view</span><span class="p">(</span><span class="n">arch</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">pred</span> <span class="ow">in</span> <span class="n">_validators</span><span class="p">[</span><span class="n">arch</span><span class="o">.</span><span class="n">tag</span><span class="p">]:</span>
+        <span class="n">check</span> <span class="o">=</span> <span class="n">pred</span><span class="p">(</span><span class="n">arch</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">check</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Invalid XML: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">pred</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="validate">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.validate">[docs]</a>
+<span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="o">*</span><span class="n">view_types</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Registers a view-validation function for the specific view types</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">arch</span> <span class="ow">in</span> <span class="n">view_types</span><span class="p">:</span>
+            <span class="n">_validators</span><span class="p">[</span><span class="n">arch</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">fn</span>
+    <span class="k">return</span> <span class="n">decorator</span></div>
+
+
+
+<div class="viewcode-block" id="relaxng">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.relaxng">[docs]</a>
+<span class="k">def</span> <span class="nf">relaxng</span><span class="p">(</span><span class="n">view_type</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a validator for the given view type, or None. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">view_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_relaxng_cache</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tools</span><span class="o">.</span><span class="n">file_open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="s1">&#39;rng&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">_view.rng&#39;</span> <span class="o">%</span> <span class="n">view_type</span><span class="p">))</span> <span class="k">as</span> <span class="n">frng</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">relaxng_doc</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">frng</span><span class="p">)</span>
+                <span class="n">_relaxng_cache</span><span class="p">[</span><span class="n">view_type</span><span class="p">]</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">RelaxNG</span><span class="p">(</span><span class="n">relaxng_doc</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;Failed to load RelaxNG XML schema for views validation&#39;</span><span class="p">)</span>
+                <span class="n">_relaxng_cache</span><span class="p">[</span><span class="n">view_type</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">_relaxng_cache</span><span class="p">[</span><span class="n">view_type</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="schema_valid">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.view_validation.schema_valid">[docs]</a>
+<span class="nd">@validate</span><span class="p">(</span><span class="s1">&#39;calendar&#39;</span><span class="p">,</span> <span class="s1">&#39;graph&#39;</span><span class="p">,</span> <span class="s1">&#39;pivot&#39;</span><span class="p">,</span> <span class="s1">&#39;search&#39;</span><span class="p">,</span> <span class="s1">&#39;tree&#39;</span><span class="p">,</span> <span class="s1">&#39;activity&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">schema_valid</span><span class="p">(</span><span class="n">arch</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Get RNG validator and validate RNG file.&quot;&quot;&quot;</span>
+    <span class="n">validator</span> <span class="o">=</span> <span class="n">relaxng</span><span class="p">(</span><span class="n">arch</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">validator</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">validator</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">arch</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">validator</span><span class="o">.</span><span class="n">error_log</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">error</span><span class="p">))</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

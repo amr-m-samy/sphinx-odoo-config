@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.cli.server &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.cli.server</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.cli.server</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">OpenERP - Server</span>
+<span class="sd">OpenERP is an ERP+CRM program for small and medium businesses.</span>
+
+<span class="sd">The whole source code is distributed under the terms of the</span>
+<span class="sd">GNU Public Licence.</span>
+
+<span class="sd">(c) 2003-TODAY, Fabien Pinckaers - OpenERP SA</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">atexit</span>
+<span class="kn">import</span> <span class="nn">csv</span> <span class="c1"># pylint: disable=deprecated-module</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">ProgrammingError</span><span class="p">,</span> <span class="n">errorcodes</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">Command</span>
+
+<span class="n">__author__</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">author</span>
+<span class="n">__version__</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">version</span>
+
+<span class="c1"># Also use the `odoo` logger for the main script.</span>
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo&#39;</span><span class="p">)</span>
+
+<span class="n">re</span><span class="o">.</span><span class="n">_MAXCACHE</span> <span class="o">=</span> <span class="mi">4096</span>  <span class="c1"># default is 512, a little too small for odoo</span>
+
+<div class="viewcode-block" id="check_root_user">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.check_root_user">[docs]</a>
+<span class="k">def</span> <span class="nf">check_root_user</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Warn if the process&#39;s user is &#39;root&#39; (on POSIX system).&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">getpass</span>
+        <span class="k">if</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getuser</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;root&#39;</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;Running as user &#39;root&#39; is a security risk.</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="check_postgres_user">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.check_postgres_user">[docs]</a>
+<span class="k">def</span> <span class="nf">check_postgres_user</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Exit if the configured database user is &#39;postgres&#39;.</span>
+
+<span class="sd">    This function assumes the configuration has been initialized.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_user&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PGUSER&#39;</span><span class="p">))</span> <span class="o">==</span> <span class="s1">&#39;postgres&#39;</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;Using the database user &#39;postgres&#39; is a security risk, aborting.&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="report_configuration">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.report_configuration">[docs]</a>
+<span class="k">def</span> <span class="nf">report_configuration</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Log the server version and some configuration values.</span>
+
+<span class="sd">    This function assumes the configuration has been initialized.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Odoo version </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">__version__</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">rcfile</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using configuration file at &quot;</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">rcfile</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;addons paths: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">__path__</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;upgrade_path&#39;</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;upgrade path: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;upgrade_path&#39;</span><span class="p">])</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_host&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PGHOST&#39;</span><span class="p">,</span> <span class="s1">&#39;default&#39;</span><span class="p">)</span>
+    <span class="n">port</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_port&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PGPORT&#39;</span><span class="p">,</span> <span class="s1">&#39;default&#39;</span><span class="p">)</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_user&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PGUSER&#39;</span><span class="p">,</span> <span class="s1">&#39;default&#39;</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;database: </span><span class="si">%s</span><span class="s1">@</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="rm_pid_file">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.rm_pid_file">[docs]</a>
+<span class="k">def</span> <span class="nf">rm_pid_file</span><span class="p">(</span><span class="n">main_pid</span><span class="p">):</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">main_pid</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="setup_pid_file">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.setup_pid_file">[docs]</a>
+<span class="k">def</span> <span class="nf">setup_pid_file</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create a file with the process id written in it.</span>
+
+<span class="sd">    This function assumes the configuration has been initialized.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">evented</span> <span class="ow">and</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">]:</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">],</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">pid</span><span class="p">))</span>
+        <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">rm_pid_file</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="export_translation">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.export_translation">[docs]</a>
+<span class="k">def</span> <span class="nf">export_translation</span><span class="p">():</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="n">dbname</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;language&quot;</span><span class="p">]:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;language </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;language&quot;</span><span class="p">],)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;new language&quot;</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;writing translation file for </span><span class="si">%s</span><span class="s1"> to </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_out&quot;</span><span class="p">])</span>
+
+    <span class="n">fileformat</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_out&quot;</span><span class="p">])[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="c1"># .pot is the same fileformat as .po</span>
+    <span class="k">if</span> <span class="n">fileformat</span> <span class="o">==</span> <span class="s2">&quot;pot&quot;</span><span class="p">:</span>
+        <span class="n">fileformat</span> <span class="o">=</span> <span class="s2">&quot;po&quot;</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_out&quot;</span><span class="p">],</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">buf</span><span class="p">:</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">dbname</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">trans_export</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;language&quot;</span><span class="p">],</span>
+                <span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_modules&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">],</span> <span class="n">buf</span><span class="p">,</span> <span class="n">fileformat</span><span class="p">,</span> <span class="n">cr</span><span class="p">)</span>
+
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;translation file written successfully&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="import_translation">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.import_translation">[docs]</a>
+<span class="k">def</span> <span class="nf">import_translation</span><span class="p">():</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+    <span class="n">overwrite</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;overwrite_existing_translations&quot;</span><span class="p">]</span>
+    <span class="n">dbname</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]</span>
+
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">dbname</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="n">translation_importer</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">translate</span><span class="o">.</span><span class="n">TranslationImporter</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+        <span class="n">translation_importer</span><span class="o">.</span><span class="n">load_file</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_in&quot;</span><span class="p">],</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;language&quot;</span><span class="p">])</span>
+        <span class="n">translation_importer</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.main">[docs]</a>
+<span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="n">check_root_user</span><span class="p">()</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">parse_config</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">check_postgres_user</span><span class="p">()</span>
+    <span class="n">report_configuration</span><span class="p">()</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span>
+
+    <span class="c1"># the default limit for CSV fields in the module is 128KiB, which is not</span>
+    <span class="c1"># quite sufficient to import images to store in attachment. 500MiB is a</span>
+    <span class="c1"># bit overkill, but better safe than sorry I guess</span>
+    <span class="n">csv</span><span class="o">.</span><span class="n">field_size_limit</span><span class="p">(</span><span class="mi">500</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+
+    <span class="n">preload</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]:</span>
+        <span class="n">preload</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">db_name</span> <span class="ow">in</span> <span class="n">preload</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">_create_empty_database</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+                <span class="n">config</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">][</span><span class="s1">&#39;base&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">except</span> <span class="n">ProgrammingError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">err</span><span class="o">.</span><span class="n">pgcode</span> <span class="o">==</span> <span class="n">errorcodes</span><span class="o">.</span><span class="n">INSUFFICIENT_PRIVILEGE</span><span class="p">:</span>
+                    <span class="c1"># We use an INFO loglevel on purpose in order to avoid</span>
+                    <span class="c1"># reporting unnecessary warnings on build environment</span>
+                    <span class="c1"># using restricted database access.</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Could not determine if database </span><span class="si">%s</span><span class="s2"> exists, &quot;</span>
+                                 <span class="s2">&quot;skipping auto-creation: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">err</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">err</span>
+            <span class="k">except</span> <span class="n">odoo</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">DatabaseExists</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_out&quot;</span><span class="p">]:</span>
+        <span class="n">export_translation</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;translate_in&quot;</span><span class="p">]:</span>
+        <span class="n">import_translation</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># This needs to be done now to ensure the use of the multiprocessing</span>
+    <span class="c1"># signaling mechanism for registries loaded with -d</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;workers&#39;</span><span class="p">]:</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">multi_process</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">stop</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;stop_after_init&quot;</span><span class="p">]</span>
+
+    <span class="n">setup_pid_file</span><span class="p">()</span>
+    <span class="n">rc</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">preload</span><span class="o">=</span><span class="n">preload</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="n">stop</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">rc</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Server">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.Server">[docs]</a>
+<span class="k">class</span> <span class="nc">Server</span><span class="p">(</span><span class="n">Command</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Start the odoo server (default command)&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="Server.run">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.server.Server.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">prog</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">main</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_qweb_fields &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_qweb_fields</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_qweb_fields</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">binascii</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">time</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">BytesIO</span>
+
+<span class="kn">import</span> <span class="nn">babel</span>
+<span class="kn">import</span> <span class="nn">babel.dates</span>
+<span class="kn">from</span> <span class="nn">markupsafe</span> <span class="kn">import</span> <span class="n">Markup</span><span class="p">,</span> <span class="n">escape</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span><span class="p">,</span> <span class="n">html</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_lt</span><span class="p">,</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">posix_to_ldml</span><span class="p">,</span> <span class="n">float_utils</span><span class="p">,</span> <span class="n">format_date</span><span class="p">,</span> <span class="n">format_duration</span><span class="p">,</span> <span class="n">pycompat</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.mail</span> <span class="kn">import</span> <span class="n">safe_attrs</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">get_lang</span><span class="p">,</span> <span class="n">babel_locale_parse</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.mimetypes</span> <span class="kn">import</span> <span class="n">guess_mimetype</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="nl2br">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.nl2br">[docs]</a>
+<span class="k">def</span> <span class="nf">nl2br</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Converts newlines to HTML linebreaks in ``string``. returns</span>
+<span class="sd">    the unicode result</span>
+
+<span class="sd">    :param str string:</span>
+<span class="sd">    :rtype: unicode</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">string</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;br&gt;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="nl2br_enclose">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.nl2br_enclose">[docs]</a>
+<span class="k">def</span> <span class="nf">nl2br_enclose</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">enclosure_tag</span><span class="o">=</span><span class="s1">&#39;div&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Like nl2br, but returns enclosed Markup allowing to better manipulate</span>
+<span class="sd">    trusted and untrusted content. New lines added by use are trusted, other</span>
+<span class="sd">    content is escaped. &quot;&quot;&quot;</span>
+    <span class="n">converted</span> <span class="o">=</span> <span class="n">nl2br</span><span class="p">(</span><span class="n">escape</span><span class="p">(</span><span class="n">string</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&lt;</span><span class="si">{</span><span class="n">enclosure_tag</span><span class="si">}</span><span class="s1">&gt;</span><span class="si">{</span><span class="n">converted</span><span class="si">}</span><span class="s1">&lt;/</span><span class="si">{</span><span class="n">enclosure_tag</span><span class="si">}</span><span class="s1">&gt;&#39;</span><span class="p">)</span></div>
+
+
+<span class="c1">#--------------------------------------------------------------------</span>
+<span class="c1"># QWeb Fields converters</span>
+<span class="c1">#--------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="FieldConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">FieldConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Used to convert a t-field specification into an output HTML field.</span>
+
+<span class="sd">    :meth:`~.to_html` is the entry point of this conversion from QWeb, it:</span>
+
+<span class="sd">    * converts the record value to html using :meth:`~.record_to_html`</span>
+<span class="sd">    * generates the metadata attributes (``data-oe-``) to set on the root</span>
+<span class="sd">      result node</span>
+<span class="sd">    * generates the root result node itself through :meth:`~.render_element`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field&#39;</span>
+
+<div class="viewcode-block" id="FieldConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Get the available option informations.</span>
+
+<span class="sd">            Returns a dict of dict with:</span>
+<span class="sd">            * key equal to the option key.</span>
+<span class="sd">            * dict: type, params, name, description, default_value</span>
+<span class="sd">            * type:</span>
+<span class="sd">                &#39;string&#39;</span>
+<span class="sd">                &#39;integer&#39;</span>
+<span class="sd">                &#39;float&#39;</span>
+<span class="sd">                &#39;model&#39; (e.g. &#39;res.partner&#39;)</span>
+<span class="sd">                &#39;array&#39;</span>
+<span class="sd">                &#39;selection&#39; (e.g. [key1, key2...])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="FieldConverter.attributes">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter.attributes">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; attributes(record, field_name, field, options, values)</span>
+
+<span class="sd">        Generates the metadata attributes (prefixed by ``data-oe-``) for the</span>
+<span class="sd">        root node of the field conversion.</span>
+
+<span class="sd">        The default attributes are:</span>
+
+<span class="sd">        * ``model``, the name of the record&#39;s model</span>
+<span class="sd">        * ``id`` the id of the record to which the field belongs</span>
+<span class="sd">        * ``type`` the logical field type (widget, may not match the field&#39;s</span>
+<span class="sd">          ``type``, may not be any Field subclass name)</span>
+<span class="sd">        * ``translate``, a boolean flag (``0`` or ``1``) denoting whether the</span>
+<span class="sd">          field is translatable</span>
+<span class="sd">        * ``readonly``, has this attribute if the field is readonly</span>
+<span class="sd">        * ``expression``, the original expression</span>
+
+<span class="sd">        :returns: dict (attribute name, attribute value).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;inherit_branding&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;translate&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">data</span>
+
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-model&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_name</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-expression&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">readonly</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">[</span><span class="s1">&#39;data-oe-readonly&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="FieldConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; value_to_html(value, field, options=None)</span>
+
+<span class="sd">        Converts a single value to its HTML version/output</span>
+<span class="sd">        :rtype: unicode</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">escape</span><span class="p">(</span><span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">value</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="FieldConverter.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; record_to_html(record, field_name, options)</span>
+
+<span class="sd">        Converts the specified field of the ``record`` to HTML</span>
+
+<span class="sd">        :rtype: unicode</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">record</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">)[</span><span class="n">field_name</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">False</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_to_html</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FieldConverter.user_lang">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FieldConverter.user_lang">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">user_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; user_lang()</span>
+
+<span class="sd">        Fetches the res.lang record corresponding to the language code stored</span>
+<span class="sd">        in the user&#39;s context.</span>
+
+<span class="sd">        :returns: Model[res.lang]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">get_lang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IntegerConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.IntegerConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegerConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.integer&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Integer&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="IntegerConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.IntegerConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IntegerConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">format_decimalized_number</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Decimalized number&#39;</span><span class="p">)),</span>
+            <span class="n">precision_digits</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Precision Digits&#39;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="IntegerConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.IntegerConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;format_decimalized_number&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">tools</span><span class="o">.</span><span class="n">format_decimalized_number</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;precision_digits&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">grouping</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;-</span><span class="se">\N{ZERO WIDTH NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FloatConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">FloatConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.float&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Float&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="FloatConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">FloatConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">precision</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Rounding precision&#39;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="FloatConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;decimal_precision&#39;</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;decimal.precision&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">precision_get</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;decimal_precision&#39;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;precision&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">precision</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%f</span><span class="s1">&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">float_utils</span><span class="o">.</span><span class="n">float_round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">precision_digits</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="s1">&#39;%.</span><span class="si">{precision}</span><span class="s1">f&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+
+        <span class="n">formatted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fmt</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">grouping</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;-</span><span class="se">\N{ZERO WIDTH NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="c1"># %f does not strip trailing zeroes. %g does but its precision causes</span>
+        <span class="c1"># it to switch to scientific notation starting at a million *and* to</span>
+        <span class="c1"># strip decimals. So use %f and if no precision was specified manually</span>
+        <span class="c1"># strip trailing 0.</span>
+        <span class="k">if</span> <span class="n">precision</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">formatted</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?:(0|\d+?)0+)$&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\1&#39;</span><span class="p">,</span> <span class="n">formatted</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">formatted</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FloatConverter.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatConverter.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;precision&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span> <span class="ow">and</span> <span class="s1">&#39;decimal_precision&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">precision</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span><span class="o">.</span><span class="n">get_digits</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">env</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">precision</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">FloatConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">record_to_html</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DateConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">DateConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.date&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Date&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="DateConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">DateConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="nb">format</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;string&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date format&#39;</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="DateConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">date_format</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;format&#39;</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DateTimeConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateTimeConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">DateTimeConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.datetime&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Datetime&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="DateTimeConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateTimeConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">DateTimeConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="nb">format</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;string&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Pattern to format&#39;</span><span class="p">)),</span>
+            <span class="n">tz_name</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;char&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Optional timezone name&#39;</span><span class="p">)),</span>
+            <span class="n">time_only</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Display only the time&#39;</span><span class="p">)),</span>
+            <span class="n">hide_seconds</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Hide seconds&#39;</span><span class="p">)),</span>
+            <span class="n">date_only</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Display only the date&#39;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="DateTimeConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DateTimeConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="n">lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span>
+        <span class="n">locale</span> <span class="o">=</span> <span class="n">babel_locale_parse</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">format_func</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_datetime</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tz_name&#39;</span><span class="p">):</span>
+            <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">tz</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;tz_name&#39;</span><span class="p">])</span>
+            <span class="n">tzinfo</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">get_timezone</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;tz_name&#39;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tzinfo</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">value</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">context_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;format&#39;</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">pattern</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;format&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;time_only&#39;</span><span class="p">):</span>
+                <span class="n">strftime_pattern</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">time_format</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;date_only&#39;</span><span class="p">):</span>
+                <span class="n">strftime_pattern</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">date_format</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">strftime_pattern</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">date_format</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span><span class="p">))</span>
+
+            <span class="n">pattern</span> <span class="o">=</span> <span class="n">posix_to_ldml</span><span class="p">(</span><span class="n">strftime_pattern</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;hide_seconds&#39;</span><span class="p">):</span>
+            <span class="n">pattern</span> <span class="o">=</span> <span class="n">pattern</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;:ss&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;:s&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;time_only&#39;</span><span class="p">):</span>
+            <span class="n">format_func</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_time</span>
+            <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">format_func</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">pattern</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">tzinfo</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;date_only&#39;</span><span class="p">):</span>
+            <span class="n">format_func</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_date</span>
+            <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">format_func</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">pattern</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">format_func</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">pattern</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">tzinfo</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TextConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.TextConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">TextConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.text&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Text&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="TextConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.TextConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Escapes the value and converts newlines to br. This is bullshit.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">nl2br</span><span class="p">(</span><span class="n">escape</span><span class="p">(</span><span class="n">value</span><span class="p">))</span> <span class="k">if</span> <span class="n">value</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SelectionConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.SelectionConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">SelectionConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.selection&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Selection&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="SelectionConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.SelectionConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">SelectionConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">selection</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Selection&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;By default the widget uses the field information&#39;</span><span class="p">),</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">selection</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;json&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Json&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;By default the widget uses the field information&#39;</span><span class="p">),</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="SelectionConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.SelectionConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">escape</span><span class="p">(</span><span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;selection&#39;</span><span class="p">][</span><span class="n">value</span><span class="p">])</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SelectionConverter.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.SelectionConverter.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;selection&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">selection</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)[</span><span class="s1">&#39;selection&#39;</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">SelectionConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">record_to_html</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ManyToOneConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ManyToOneConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">ManyToOneConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.many2one&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Many to One&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="ManyToOneConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ManyToOneConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">display_name</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">nl2br</span><span class="p">(</span><span class="n">escape</span><span class="p">(</span><span class="n">value</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ManyToManyConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ManyToManyConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">ManyToManyConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.many2many&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb field many2many&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="ManyToManyConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ManyToManyConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;display_name&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">nl2br</span><span class="p">(</span><span class="n">escape</span><span class="p">(</span><span class="n">text</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="HTMLConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.HTMLConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">HTMLConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.html&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field HTML&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="HTMLConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.HTMLConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">irQweb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span>
+        <span class="c1"># wrap value inside a body and parse it as HTML</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="s2">&quot;&lt;body&gt;</span><span class="si">%s</span><span class="s2">&lt;/body&gt;&quot;</span> <span class="o">%</span> <span class="n">value</span><span class="p">,</span> <span class="n">etree</span><span class="o">.</span><span class="n">HTMLParser</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># use pos processing for all nodes with attributes</span>
+        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">body</span><span class="o">.</span><span class="n">iter</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+                <span class="n">attrib</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">attrib</span><span class="p">)</span>
+                <span class="n">attrib</span> <span class="o">=</span> <span class="n">irQweb</span><span class="o">.</span><span class="n">_post_processing_att</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">attrib</span><span class="p">)</span>
+                <span class="n">element</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+                <span class="n">element</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">attrib</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">)[</span><span class="mi">6</span><span class="p">:</span><span class="o">-</span><span class="mi">7</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ImageConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ImageConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">ImageConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``image`` widget rendering, inserts a data:uri-using image tag in the</span>
+<span class="sd">    document. May be overridden by e.g. the website module to generate links</span>
+<span class="sd">    instead.</span>
+
+<span class="sd">    .. todo:: what happens if different output need different converters? e.g.</span>
+<span class="sd">              reports may need embedded images or FS links whereas website</span>
+<span class="sd">              needs website-aware</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.image&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Image&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_src_data_b64</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">img_b64</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">binascii</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid image content&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">img_b64</span> <span class="ow">and</span> <span class="n">guess_mimetype</span><span class="p">(</span><span class="n">img_b64</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;image/webp&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.qweb&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_converted_image_data_uri</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">img_b64</span><span class="p">))</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">verify</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-image binary fields can not be converted to HTML&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+        <span class="k">except</span><span class="p">:</span> <span class="c1"># image.verify() throws &quot;suitable exceptions&quot;, I have no idea what they are</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid image content&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="s2">&quot;data:</span><span class="si">%s</span><span class="s2">;base64,</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">MIME</span><span class="p">[</span><span class="n">image</span><span class="o">.</span><span class="n">format</span><span class="p">],</span> <span class="n">value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ImageConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ImageConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;img src=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_src_data_b64</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="ImageUrlConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ImageUrlConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">ImageUrlConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``image_url`` widget rendering, inserts an image tag in the</span>
+<span class="sd">    document.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.image_url&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Image&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.image&#39;</span>
+
+<div class="viewcode-block" id="ImageUrlConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.ImageUrlConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;img src=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">))</span></div>
+</div>
+
+
+<div class="viewcode-block" id="MonetaryConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.MonetaryConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">MonetaryConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``monetary`` converter, has a mandatory option</span>
+<span class="sd">    ``display_currency`` only if field is not of type Monetary.</span>
+<span class="sd">    Otherwise, if we are in presence of a monetary field, the field definition must</span>
+<span class="sd">    have a currency_field attribute set.</span>
+
+<span class="sd">    The currency is used for formatting *and rounding* of the float value. It</span>
+<span class="sd">    is assumed that the linked res_currency has a non-empty rounding value and</span>
+<span class="sd">    res.currency&#39;s ``round`` method is used to perform rounding.</span>
+
+<span class="sd">    .. note:: the monetary converter internally adds the qweb context to its</span>
+<span class="sd">              options mapping, so that the context is available to callees.</span>
+<span class="sd">              It&#39;s set under the ``_values`` key.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.monetary&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Monetary&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="MonetaryConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.MonetaryConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">MonetaryConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">from_currency</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="s1">&#39;res.currency&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Original currency&#39;</span><span class="p">)),</span>
+            <span class="n">display_currency</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="s1">&#39;res.currency&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Display currency&#39;</span><span class="p">),</span> <span class="n">required</span><span class="o">=</span><span class="s2">&quot;value_to_html&quot;</span><span class="p">),</span>
+            <span class="n">date</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date used for the original currency (only used for t-esc). by default use the current date.&#39;</span><span class="p">)),</span>
+            <span class="n">company_id</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Company&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Company used for the original currency (only used for t-esc). By default use the user company&#39;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="MonetaryConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.MonetaryConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">display_currency</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;display_currency&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The value send to monetary field is not a number.&quot;</span><span class="p">))</span>
+
+        <span class="c1"># lang.format mandates a sprintf-style format. These formats are non-</span>
+        <span class="c1"># minimal (they have a default fixed precision instead), and</span>
+        <span class="c1"># lang.format will not set one by default. currency.round will not</span>
+        <span class="c1"># provide one either. So we need to generate a precision value</span>
+        <span class="c1"># (integer &gt; 0) from the currency&#39;s rounding (a float generally &lt; 1.0).</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="s2">&quot;%.</span><span class="si">{0}</span><span class="s2">f&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;decimal_places&#39;</span><span class="p">,</span> <span class="n">display_currency</span><span class="o">.</span><span class="n">decimal_places</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;from_currency&#39;</span><span class="p">):</span>
+            <span class="n">date</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;date&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span>
+            <span class="n">company_id</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">company_id</span><span class="p">:</span>
+                <span class="n">company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">company_id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s1">&#39;from_currency&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_convert</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">display_currency</span><span class="p">,</span> <span class="n">company</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span>
+
+        <span class="n">lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span>
+        <span class="n">formatted_amount</span> <span class="o">=</span> <span class="n">lang</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fmt</span><span class="p">,</span> <span class="n">display_currency</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">value</span><span class="p">),</span>
+                                <span class="n">grouping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">monetary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;-</span><span class="se">\N{ZERO WIDTH NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="n">pre</span> <span class="o">=</span> <span class="n">post</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">display_currency</span><span class="o">.</span><span class="n">position</span> <span class="o">==</span> <span class="s1">&#39;before&#39;</span><span class="p">:</span>
+            <span class="n">pre</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{symbol}</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="n">display_currency</span><span class="o">.</span><span class="n">symbol</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="si">{symbol}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="n">display_currency</span><span class="o">.</span><span class="n">symbol</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;label_price&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">lang</span><span class="o">.</span><span class="n">decimal_point</span> <span class="ow">in</span> <span class="n">formatted_amount</span><span class="p">:</span>
+            <span class="n">sep</span> <span class="o">=</span> <span class="n">lang</span><span class="o">.</span><span class="n">decimal_point</span>
+            <span class="n">integer_part</span><span class="p">,</span> <span class="n">decimal_part</span> <span class="o">=</span> <span class="n">formatted_amount</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span>
+            <span class="n">integer_part</span> <span class="o">+=</span> <span class="n">sep</span>
+            <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{pre}</span><span class="s1">&lt;span class=&quot;oe_currency_value&quot;&gt;</span><span class="si">{0}</span><span class="s1">&lt;/span&gt;&lt;span class=&quot;oe_currency_value&quot; style=&quot;font-size:0.5em&quot;&gt;</span><span class="si">{1}</span><span class="s1">&lt;/span&gt;</span><span class="si">{post}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">integer_part</span><span class="p">,</span> <span class="n">decimal_part</span><span class="p">,</span> <span class="n">pre</span><span class="o">=</span><span class="n">pre</span><span class="p">,</span> <span class="n">post</span><span class="o">=</span><span class="n">post</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{pre}</span><span class="s1">&lt;span class=&quot;oe_currency_value&quot;&gt;</span><span class="si">{0}</span><span class="s1">&lt;/span&gt;</span><span class="si">{post}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">formatted_amount</span><span class="p">,</span> <span class="n">pre</span><span class="o">=</span><span class="n">pre</span><span class="p">,</span> <span class="n">post</span><span class="o">=</span><span class="n">post</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MonetaryConverter.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.MonetaryConverter.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+        <span class="c1">#currency should be specified by monetary field</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;display_currency&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;monetary&#39;</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">get_currency_field</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="n">options</span><span class="p">[</span><span class="s1">&#39;display_currency&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">get_currency_field</span><span class="p">(</span><span class="n">record</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;display_currency&#39;</span><span class="p">):</span>
+            <span class="c1"># search on the model if they are a res.currency field to set as default</span>
+            <span class="n">fields</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="n">currency_fields</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">fields</span> <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span> <span class="ow">and</span> <span class="n">v</span><span class="o">.</span><span class="n">comodel_name</span> <span class="o">==</span> <span class="s1">&#39;res.currency&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">currency_fields</span><span class="p">:</span>
+                <span class="n">options</span><span class="p">[</span><span class="s1">&#39;display_currency&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="n">currency_fields</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="s1">&#39;date&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">options</span><span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;date&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;company_id&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">options</span><span class="p">[</span><span class="s1">&#39;company_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">MonetaryConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">record_to_html</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="n">TIMEDELTA_UNITS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span><span class="s1">&#39;year&#39;</span><span class="p">,</span>   <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;year&#39;</span><span class="p">),</span>   <span class="mi">3600</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">365</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;month&#39;</span><span class="p">,</span>  <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;month&#39;</span><span class="p">),</span>  <span class="mi">3600</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">30</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;week&#39;</span><span class="p">,</span>   <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;week&#39;</span><span class="p">),</span>   <span class="mi">3600</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">7</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;day&#39;</span><span class="p">,</span>    <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;day&#39;</span><span class="p">),</span>    <span class="mi">3600</span> <span class="o">*</span> <span class="mi">24</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;hour&#39;</span><span class="p">,</span>   <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;hour&#39;</span><span class="p">),</span>   <span class="mi">3600</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;minute&#39;</span><span class="p">,</span> <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;minute&#39;</span><span class="p">),</span> <span class="mi">60</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;second&#39;</span><span class="p">,</span> <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;second&#39;</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="FloatTimeConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatTimeConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">FloatTimeConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``float_time`` converter, to display integral or fractional values as</span>
+<span class="sd">    human-readable time spans (e.g. 1.5 as &quot;01:30&quot;).</span>
+
+<span class="sd">    Can be used on any numerical field.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.float_time&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Float Time&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="FloatTimeConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.FloatTimeConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">format_duration</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TimeConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.TimeConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">TimeConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``time`` converter, to display integer or fractional value as</span>
+<span class="sd">    human-readable time (e.g. 1.5 as &quot;1:30 AM&quot;). The unit of this value</span>
+<span class="sd">    is in hours.</span>
+
+<span class="sd">    Can be used on any numerical field between: 0 &lt;= value &lt; 24</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.time&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;QWeb Field Time&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="TimeConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.TimeConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The value (</span><span class="si">%s</span><span class="s2">) passed should be positive&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+        <span class="n">hours</span><span class="p">,</span> <span class="n">minutes</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">*</span> <span class="mi">60</span><span class="p">),</span> <span class="mi">60</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">hours</span> <span class="o">&gt;</span> <span class="mi">23</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The hour must be between 0 and 23&quot;</span><span class="p">))</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">time</span><span class="p">(</span><span class="n">hour</span><span class="o">=</span><span class="n">hours</span><span class="p">,</span> <span class="n">minute</span><span class="o">=</span><span class="n">minutes</span><span class="p">)</span>
+
+        <span class="n">locale</span> <span class="o">=</span> <span class="n">babel_locale_parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;format&#39;</span><span class="p">,</span> <span class="s1">&#39;short&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">pattern</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DurationConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DurationConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">DurationConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``duration`` converter, to display integral or fractional values as</span>
+<span class="sd">    human-readable time spans (e.g. 1.5 as &quot;1 hour 30 minutes&quot;).</span>
+
+<span class="sd">    Can be used on any numerical field.</span>
+
+<span class="sd">    Has an option ``unit`` which can be one of ``second``, ``minute``,</span>
+<span class="sd">    ``hour``, ``day``, ``week`` or ``year``, used to interpret the numerical</span>
+<span class="sd">    field value before converting it. By default use ``second``.</span>
+
+<span class="sd">    Has an option ``round``. By default use ``second``.</span>
+
+<span class="sd">    Has an option ``digital`` to display 01:00 instead of 1 hour</span>
+
+<span class="sd">    Sub-second values will be ignored.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.duration&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Duration&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="DurationConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DurationConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">DurationConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">unit</span> <span class="o">=</span> <span class="p">[(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">label</span><span class="p">))</span> <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">ratio</span> <span class="ow">in</span> <span class="n">TIMEDELTA_UNITS</span><span class="p">]</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">digital</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;boolean&quot;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Digital formatting&#39;</span><span class="p">)),</span>
+            <span class="n">unit</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;selection&quot;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">unit</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date unit&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date unit used for comparison and formatting&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="s1">&#39;second&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="nb">round</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;selection&quot;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">unit</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Rounding unit&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Date unit used for the rounding. The value must be smaller than &#39;hour&#39; if you use the digital formatting.&quot;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="s1">&#39;second&#39;</span><span class="p">),</span>
+            <span class="nb">format</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;selection&quot;</span><span class="p">,</span>
+                <span class="n">params</span><span class="o">=</span><span class="p">[</span>
+                    <span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Long&#39;</span><span class="p">)),</span>
+                    <span class="p">(</span><span class="s1">&#39;short&#39;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Short&#39;</span><span class="p">)),</span>
+                    <span class="p">(</span><span class="s1">&#39;narrow&#39;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Narrow&#39;</span><span class="p">))],</span>
+                <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Format&#39;</span><span class="p">),</span>
+                <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Formatting: long, short, narrow (not used for digital)&quot;</span><span class="p">),</span>
+                <span class="n">default_value</span><span class="o">=</span><span class="s1">&#39;long&#39;</span>
+            <span class="p">),</span>
+            <span class="n">add_direction</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;boolean&quot;</span><span class="p">,</span>
+                <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Add direction&quot;</span><span class="p">),</span>
+                <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Add directional information (not used for digital)&quot;</span><span class="p">)</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="DurationConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.DurationConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">units</span> <span class="o">=</span> <span class="p">{</span><span class="n">unit</span><span class="p">:</span> <span class="n">duration</span> <span class="k">for</span> <span class="n">unit</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">duration</span> <span class="ow">in</span> <span class="n">TIMEDELTA_UNITS</span><span class="p">}</span>
+
+        <span class="n">locale</span> <span class="o">=</span> <span class="n">babel_locale_parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="n">units</span><span class="p">[</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;unit&#39;</span><span class="p">,</span> <span class="s1">&#39;second&#39;</span><span class="p">)]</span>
+        <span class="n">round_to</span> <span class="o">=</span> <span class="n">units</span><span class="p">[</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;round&#39;</span><span class="p">,</span> <span class="s1">&#39;second&#39;</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;digital&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">round_to</span> <span class="o">&gt;</span> <span class="mi">3600</span><span class="p">:</span>
+            <span class="n">round_to</span> <span class="o">=</span> <span class="mi">3600</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">value</span> <span class="o">*</span> <span class="n">factor</span><span class="p">)</span> <span class="o">/</span> <span class="n">round_to</span><span class="p">)</span> <span class="o">*</span> <span class="n">round_to</span>
+
+        <span class="n">sections</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">sign</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="o">-</span><span class="n">r</span>
+            <span class="n">sign</span> <span class="o">=</span> <span class="s1">&#39;-&#39;</span>
+
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;digital&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">unit</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">secs_per_unit</span> <span class="ow">in</span> <span class="n">TIMEDELTA_UNITS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">secs_per_unit</span> <span class="o">&gt;</span> <span class="mi">3600</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">v</span><span class="p">,</span> <span class="n">r</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">secs_per_unit</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span> <span class="ow">and</span> <span class="p">(</span><span class="n">secs_per_unit</span> <span class="o">&gt;</span> <span class="n">factor</span> <span class="ow">or</span> <span class="n">secs_per_unit</span> <span class="o">&lt;</span> <span class="n">round_to</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">sections</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;</span><span class="si">%02.0f</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">v</span><span class="p">)))</span>
+            <span class="k">return</span> <span class="n">sign</span> <span class="o">+</span> <span class="sa">u</span><span class="s1">&#39;:&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sections</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">unit</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">secs_per_unit</span> <span class="ow">in</span> <span class="n">TIMEDELTA_UNITS</span><span class="p">:</span>
+            <span class="n">v</span><span class="p">,</span> <span class="n">r</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">secs_per_unit</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">section</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_timedelta</span><span class="p">(</span>
+                    <span class="n">v</span><span class="o">*</span><span class="n">secs_per_unit</span><span class="p">,</span>
+                    <span class="n">granularity</span><span class="o">=</span><span class="n">round_to</span><span class="p">,</span>
+                    <span class="n">add_direction</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;add_direction&#39;</span><span class="p">),</span>
+                    <span class="nb">format</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;format&#39;</span><span class="p">,</span> <span class="s1">&#39;long&#39;</span><span class="p">),</span>
+                    <span class="n">threshold</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="c1"># in case of wrong implementation of babel, try to fallback on en_US locale.</span>
+                <span class="c1"># https://github.com/python-babel/babel/pull/827/files</span>
+                <span class="c1"># Some bugs already fixed in 2.10 but ubuntu22 is 2.8</span>
+                <span class="n">localeUS</span> <span class="o">=</span> <span class="n">babel_locale_parse</span><span class="p">(</span><span class="s1">&#39;en_US&#39;</span><span class="p">)</span>
+                <span class="n">section</span> <span class="o">=</span> <span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_timedelta</span><span class="p">(</span>
+                    <span class="n">v</span><span class="o">*</span><span class="n">secs_per_unit</span><span class="p">,</span>
+                    <span class="n">granularity</span><span class="o">=</span><span class="n">round_to</span><span class="p">,</span>
+                    <span class="n">add_direction</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;add_direction&#39;</span><span class="p">),</span>
+                    <span class="nb">format</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;format&#39;</span><span class="p">,</span> <span class="s1">&#39;long&#39;</span><span class="p">),</span>
+                    <span class="n">threshold</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">locale</span><span class="o">=</span><span class="n">localeUS</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">section</span><span class="p">:</span>
+                <span class="n">sections</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">section</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sign</span><span class="p">:</span>
+            <span class="n">sections</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">sign</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">u</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sections</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RelativeDatetimeConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.RelativeDatetimeConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">RelativeDatetimeConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.relative&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Relative&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="RelativeDatetimeConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.RelativeDatetimeConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">RelativeDatetimeConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">now</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Reference date&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Date to compare with the field value, by default use the current date.&#39;</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="RelativeDatetimeConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.RelativeDatetimeConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">locale</span> <span class="o">=</span> <span class="n">babel_locale_parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_lang</span><span class="p">()</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="c1"># value should be a naive datetime in UTC. So is fields.Datetime.now()</span>
+        <span class="n">reference</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;now&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">babel</span><span class="o">.</span><span class="n">dates</span><span class="o">.</span><span class="n">format_timedelta</span><span class="p">(</span><span class="n">value</span> <span class="o">-</span> <span class="n">reference</span><span class="p">,</span> <span class="n">add_direction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">locale</span><span class="o">=</span><span class="n">locale</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="RelativeDatetimeConverter.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.RelativeDatetimeConverter.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;now&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">now</span><span class="o">=</span><span class="n">record</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span><span class="o">.</span><span class="n">now</span><span class="p">())</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">RelativeDatetimeConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">record_to_html</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="BarcodeConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.BarcodeConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">BarcodeConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; ``barcode`` widget rendering, inserts a data:uri-using image tag in the</span>
+<span class="sd">    document. May be overridden by e.g. the website module to generate links</span>
+<span class="sd">    instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.barcode&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Barcode&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field&#39;</span>
+
+<div class="viewcode-block" id="BarcodeConverter.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.BarcodeConverter.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">BarcodeConverter</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">symbology</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;string&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Barcode symbology&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Barcode type, eg: UPCA, EAN13, Code128&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="s1">&#39;Code128&#39;</span><span class="p">),</span>
+            <span class="n">width</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Width&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="mi">600</span><span class="p">),</span>
+            <span class="n">height</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Height&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+            <span class="n">humanreadable</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Human Readable&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+            <span class="n">quiet</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Quiet&#39;</span><span class="p">,</span> <span class="n">default_value</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">mask</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;string&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Mask&#39;</span><span class="p">,</span> <span class="n">default_value</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="BarcodeConverter.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.BarcodeConverter.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">barcode_symbology</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;symbology&#39;</span><span class="p">,</span> <span class="s1">&#39;Code128&#39;</span><span class="p">)</span>
+        <span class="n">barcode</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">barcode</span><span class="p">(</span>
+            <span class="n">barcode_symbology</span><span class="p">,</span>
+            <span class="n">value</span><span class="p">,</span>
+            <span class="o">**</span><span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;width&#39;</span><span class="p">,</span> <span class="s1">&#39;height&#39;</span><span class="p">,</span> <span class="s1">&#39;humanreadable&#39;</span><span class="p">,</span> <span class="s1">&#39;quiet&#39;</span><span class="p">,</span> <span class="s1">&#39;mask&#39;</span><span class="p">]})</span>
+
+        <span class="n">img_element</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s1">&#39;img&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;img_&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span> <span class="ow">in</span> <span class="n">safe_attrs</span><span class="p">:</span>
+                <span class="n">img_element</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">4</span><span class="p">:],</span> <span class="n">v</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">img_element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;alt&#39;</span><span class="p">):</span>
+            <span class="n">img_element</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;alt&#39;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Barcode </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+        <span class="n">img_element</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;src&#39;</span><span class="p">,</span> <span class="s1">&#39;data:image/png;base64,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">barcode</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">Markup</span><span class="p">(</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">img_element</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Contact">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.Contact">[docs]</a>
+<span class="k">class</span> <span class="nc">Contact</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.contact&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field Contact&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.many2one&#39;</span>
+
+<div class="viewcode-block" id="Contact.get_available_options">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.Contact.get_available_options">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Contact</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">get_available_options</span><span class="p">()</span>
+        <span class="n">contact_fields</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Name&#39;</span><span class="p">),</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;address&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Address&#39;</span><span class="p">),</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;phone&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Phone&#39;</span><span class="p">),</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;mobile&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Mobile&#39;</span><span class="p">),</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Email&#39;</span><span class="p">),</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;field_name&#39;</span><span class="p">:</span> <span class="s1">&#39;vat&#39;</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;VAT&#39;</span><span class="p">)},</span>
+        <span class="p">]</span>
+        <span class="n">separator_params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span>
+            <span class="n">selection</span><span class="o">=</span><span class="p">[[</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Space&quot;</span><span class="p">)],</span> <span class="p">[</span><span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Comma&quot;</span><span class="p">)],</span> <span class="p">[</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Dash&quot;</span><span class="p">)],</span> <span class="p">[</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Vertical bar&quot;</span><span class="p">)],</span> <span class="p">[</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Slash&quot;</span><span class="p">)]],</span>
+            <span class="n">placeholder</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Linebreak&#39;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">fields</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;array&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">contact_fields</span><span class="p">),</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Displayed fields&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;List of contact fields to display in the widget&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;field_name&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">contact_fields</span> <span class="k">if</span> <span class="n">param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">)]),</span>
+            <span class="n">separator</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">separator_params</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Address separator&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Separator use to split the address from the display_name.&#39;</span><span class="p">),</span> <span class="n">default_value</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="n">no_marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Hide badges&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Don&#39;t display the font awesome marker&quot;</span><span class="p">)),</span>
+            <span class="n">no_tag_br</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Use comma&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Use comma instead of the &lt;br&gt; tag to display the address&quot;</span><span class="p">)),</span>
+            <span class="n">phone_icons</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Display phone icons&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Display the phone icons even if no_marker is True&quot;</span><span class="p">)),</span>
+            <span class="n">country_image</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Display country image&#39;</span><span class="p">),</span> <span class="n">description</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Display the country image if the field is present on the record&quot;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span></div>
+
+
+<div class="viewcode-block" id="Contact.value_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.Contact.value_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">value_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;null_text&#39;</span><span class="p">):</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s1">&#39;options&#39;</span><span class="p">:</span> <span class="n">options</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">template_options</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;template_options&#39;</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="s1">&#39;base.no_contact&#39;</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="o">**</span><span class="n">template_options</span><span class="p">)</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="n">opf</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;fields&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;address&quot;</span><span class="p">,</span> <span class="s2">&quot;phone&quot;</span><span class="p">,</span> <span class="s2">&quot;mobile&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">]</span>
+        <span class="n">sep</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;separator&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sep</span><span class="p">:</span>
+            <span class="n">opsep</span> <span class="o">=</span> <span class="n">escape</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;no_tag_br&#39;</span><span class="p">):</span>
+            <span class="c1"># escaped joiners will auto-escape joined params</span>
+            <span class="n">opsep</span> <span class="o">=</span> <span class="n">escape</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">opsep</span> <span class="o">=</span> <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;br/&gt;&#39;</span><span class="p">)</span>
+
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_address</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">display_name</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">display_name</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="c1"># Avoid having something like:</span>
+        <span class="c1"># display_name = &#39;Foo\n  \n&#39; -&gt; This is a res.partner with a name and no address</span>
+        <span class="c1"># That would return markup(&#39;&lt;br/&gt;&#39;) as address. But there is no address set.</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">elem</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">display_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]):</span>
+            <span class="n">address</span> <span class="o">=</span> <span class="n">opsep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">display_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">address</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">display_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s1">&#39;address&#39;</span><span class="p">:</span> <span class="n">address</span><span class="p">,</span>
+            <span class="s1">&#39;phone&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">phone</span><span class="p">,</span>
+            <span class="s1">&#39;mobile&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">mobile</span><span class="p">,</span>
+            <span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">city</span><span class="p">,</span>
+            <span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">display_name</span><span class="p">,</span>
+            <span class="s1">&#39;website&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">website</span><span class="p">,</span>
+            <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">email</span><span class="p">,</span>
+            <span class="s1">&#39;vat&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">vat</span><span class="p">,</span>
+            <span class="s1">&#39;vat_label&#39;</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">vat_label</span> <span class="ow">or</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;VAT&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;fields&#39;</span><span class="p">:</span> <span class="n">opf</span><span class="p">,</span>
+            <span class="s1">&#39;object&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span>
+            <span class="s1">&#39;options&#39;</span><span class="p">:</span> <span class="n">options</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="s1">&#39;base.contact&#39;</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">minimal_qcontext</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QwebView">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.QwebView">[docs]</a>
+<span class="k">class</span> <span class="nc">QwebView</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.qweb&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Qweb Field qweb&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.qweb.field.many2one&#39;</span>
+
+<div class="viewcode-block" id="QwebView.record_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_qweb_fields.QwebView.record_to_html">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">record_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="n">view</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">view</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="n">view</span><span class="o">.</span><span class="n">_name</span> <span class="o">!=</span> <span class="s2">&quot;ir.ui.view&quot;</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2"> must be a &#39;ir.ui.view&#39;, got </span><span class="si">%r</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">record</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">view</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">view</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;values&#39;</span><span class="p">,</span> <span class="p">{}))</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_asset &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_asset</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_asset</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
+<span class="kn">from</span> <span class="nn">werkzeug</span> <span class="kn">import</span> <span class="n">urls</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">import</span> <span class="nn">odoo.modules.module</span>  <span class="c1"># get_manifest, don&#39;t from-import it</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">misc</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.constants</span> <span class="kn">import</span> <span class="n">ASSET_EXTENSIONS</span><span class="p">,</span> <span class="n">EXTERNAL_ASSET</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">DEFAULT_SEQUENCE</span> <span class="o">=</span> <span class="mi">16</span>
+
+<span class="c1"># Directives are stored in variables for ease of use and syntax checks.</span>
+<span class="n">APPEND_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;append&#39;</span>
+<span class="n">PREPEND_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;prepend&#39;</span>
+<span class="n">AFTER_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;after&#39;</span>
+<span class="n">BEFORE_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;before&#39;</span>
+<span class="n">REMOVE_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;remove&#39;</span>
+<span class="n">REPLACE_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;replace&#39;</span>
+<span class="n">INCLUDE_DIRECTIVE</span> <span class="o">=</span> <span class="s1">&#39;include&#39;</span>
+<span class="c1"># Those are the directives used with a &#39;target&#39; argument/field.</span>
+<span class="n">DIRECTIVES_WITH_TARGET</span> <span class="o">=</span> <span class="p">[</span><span class="n">AFTER_DIRECTIVE</span><span class="p">,</span> <span class="n">BEFORE_DIRECTIVE</span><span class="p">,</span> <span class="n">REPLACE_DIRECTIVE</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="fs2web">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.fs2web">[docs]</a>
+<span class="k">def</span> <span class="nf">fs2web</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a file system path to a web path&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span> <span class="o">==</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">path</span>
+    <span class="k">return</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="can_aggregate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.can_aggregate">[docs]</a>
+<span class="k">def</span> <span class="nf">can_aggregate</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="n">parsed</span> <span class="o">=</span> <span class="n">urls</span><span class="o">.</span><span class="n">url_parse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="k">return</span> <span class="ow">not</span> <span class="n">parsed</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">url</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/web/content&#39;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="is_wildcard_glob">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.is_wildcard_glob">[docs]</a>
+<span class="k">def</span> <span class="nf">is_wildcard_glob</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determine whether a path is a wildcarded glob eg: &quot;/web/file[14].*&quot;</span>
+<span class="sd">    or a genuine single file path &quot;/web/myfile.scss&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="s1">&#39;*&#39;</span> <span class="ow">in</span> <span class="n">path</span> <span class="ow">or</span> <span class="s1">&#39;[&#39;</span> <span class="ow">in</span> <span class="n">path</span> <span class="ow">or</span> <span class="s1">&#39;]&#39;</span> <span class="ow">in</span> <span class="n">path</span> <span class="ow">or</span> <span class="s1">&#39;?&#39;</span> <span class="ow">in</span> <span class="n">path</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_glob_static_file</span><span class="p">(</span><span class="n">pattern</span><span class="p">):</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">((</span><span class="n">file</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">file</span><span class="p">))</span> <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files</span> <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">ASSET_EXTENSIONS</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="IrAsset">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.IrAsset">[docs]</a>
+<span class="k">class</span> <span class="nc">IrAsset</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This model contributes to two things:</span>
+
+<span class="sd">        1. It provides a function returning a list of all file paths declared</span>
+<span class="sd">        in a given list of addons (see _get_addon_paths);</span>
+
+<span class="sd">        2. It allows to create &#39;ir.asset&#39; records to add additional directives</span>
+<span class="sd">        to certain bundles.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.asset&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Asset&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;sequence, id&#39;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="IrAsset.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.IrAsset.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrAsset.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.IrAsset.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrAsset.unlink">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.IrAsset.unlink">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">bundle</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Bundle name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">directive</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Directive&#39;</span><span class="p">,</span> <span class="n">selection</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="n">APPEND_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Append&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">PREPEND_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Prepend&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">AFTER_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;After&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">BEFORE_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Before&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">REMOVE_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Remove&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">REPLACE_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Replace&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">INCLUDE_DIRECTIVE</span><span class="p">,</span> <span class="s1">&#39;Include&#39;</span><span class="p">)],</span> <span class="n">default</span><span class="o">=</span><span class="n">APPEND_DIRECTIVE</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Path (or glob pattern)&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Target&#39;</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sequence</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s2">&quot;Sequence&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_SEQUENCE</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_asset_params</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This method can be overriden to add param _get_asset_paths call.</span>
+<span class="sd">        Those params will be part of the orm cache key</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">_get_asset_bundle_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">unique</span><span class="p">,</span> <span class="n">assets_params</span><span class="p">,</span> <span class="n">ignore_params</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;/web/assets/</span><span class="si">{</span><span class="n">unique</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s1">&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_parse_bundle_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bundle_name</span><span class="p">,</span> <span class="n">debug_assets</span><span class="p">):</span>
+        <span class="n">bundle_name</span><span class="p">,</span> <span class="n">asset_type</span> <span class="o">=</span> <span class="n">bundle_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">rtl</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">debug_assets</span><span class="p">:</span>
+            <span class="n">bundle_name</span><span class="p">,</span> <span class="n">min_</span> <span class="o">=</span> <span class="n">bundle_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">min_</span> <span class="o">!=</span> <span class="s1">&#39;min&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;min&#39; expected in extension in non debug mode&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">asset_type</span> <span class="o">==</span> <span class="s1">&#39;css&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">bundle_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.rtl&#39;</span><span class="p">):</span>
+                <span class="n">bundle_name</span> <span class="o">=</span> <span class="n">bundle_name</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+                <span class="n">rtl</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="n">asset_type</span> <span class="o">!=</span> <span class="s1">&#39;js&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Only js and css assets bundle are supported for now&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bundle_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">bundle_name</span><span class="si">}</span><span class="s1"> is not a valid bundle name, should have two parts&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">bundle_name</span><span class="p">,</span> <span class="n">rtl</span><span class="p">,</span> <span class="n">asset_type</span>
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">conditional</span><span class="p">(</span>
+        <span class="s1">&#39;xml&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dev_mode&#39;</span><span class="p">],</span>
+        <span class="n">tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;bundle&#39;</span><span class="p">,</span> <span class="s1">&#39;tuple(sorted(assets_params.items()))&#39;</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="s1">&#39;assets&#39;</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_get_asset_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">assets_params</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetches all asset file paths from a given list of addons matching a</span>
+<span class="sd">        certain bundle. The returned list is composed of tuples containing the</span>
+<span class="sd">        file path [1], the first addon calling it [0] and the bundle name.</span>
+<span class="sd">        Asset loading is performed as follows:</span>
+
+<span class="sd">        1. All &#39;ir.asset&#39; records matching the given bundle and with a sequence</span>
+<span class="sd">        strictly less than 16 are applied.</span>
+
+<span class="sd">        3. The manifests of the given addons are checked for assets declaration</span>
+<span class="sd">        for the given bundle. If any, they are read sequentially and their</span>
+<span class="sd">        operations are applied to the current list.</span>
+
+<span class="sd">        4. After all manifests have been parsed, the remaining &#39;ir.asset&#39;</span>
+<span class="sd">        records matching the bundle are also applied to the current list.</span>
+
+<span class="sd">        :param bundle: name of the bundle from which to fetch the file paths</span>
+<span class="sd">        :param assets_params: parameters needed by overrides, mainly website_id</span>
+<span class="sd">            see _get_asset_params</span>
+<span class="sd">        :returns: the list of tuples (path, addon, bundle)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">installed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_installed_addons_list</span><span class="p">()</span>
+        <span class="n">addons</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_active_addons_list</span><span class="p">(</span><span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+
+        <span class="n">asset_paths</span> <span class="o">=</span> <span class="n">AssetPaths</span><span class="p">()</span>
+
+        <span class="n">addons</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_topological_sort</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">addons</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_asset_paths</span><span class="p">(</span><span class="n">bundle</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="p">[],</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">asset_paths</span><span class="o">.</span><span class="n">list</span>
+
+    <span class="k">def</span> <span class="nf">_fill_asset_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span><span class="p">,</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fills the given AssetPaths instance by applying the operations found in</span>
+<span class="sd">        the matching bundle of the given addons manifests.</span>
+<span class="sd">        See `_get_asset_paths` for more information.</span>
+
+<span class="sd">        :param bundle: name of the bundle from which to fetch the file paths</span>
+<span class="sd">        :param addons: list of addon names as strings</span>
+<span class="sd">        :param css: boolean: whether or not to include style files</span>
+<span class="sd">        :param js: boolean: whether or not to include script files</span>
+<span class="sd">        :param xml: boolean: whether or not to include template files</span>
+<span class="sd">        :param asset_paths: the AssetPath object to fill</span>
+<span class="sd">        :param seen: a list of bundles already checked to avoid circularity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">bundle</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Circular assets bundle declaration: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="s2">&quot; &gt; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">seen</span> <span class="o">+</span> <span class="p">[</span><span class="n">bundle</span><span class="p">]))</span>
+
+        <span class="c1"># this index is used for prepending: files are inserted at the beginning</span>
+        <span class="c1"># of the CURRENT bundle.</span>
+        <span class="n">bundle_start_index</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">asset_paths</span><span class="o">.</span><span class="n">list</span><span class="p">)</span>
+
+        <span class="n">assets</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_related_assets</span><span class="p">([(</span><span class="s1">&#39;bundle&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)],</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span>
+        <span class="c1"># 1. Process the first sequence of &#39;ir.asset&#39; records</span>
+        <span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">assets</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">sequence</span> <span class="o">&lt;</span> <span class="n">DEFAULT_SEQUENCE</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_process_path</span><span class="p">(</span><span class="n">bundle</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">directive</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span><span class="p">,</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="n">bundle_start_index</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+
+        <span class="c1"># 2. Process all addons&#39; manifests.</span>
+        <span class="k">for</span> <span class="n">addon</span> <span class="ow">in</span> <span class="n">addons</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">command</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">_get_manifest_cached</span><span class="p">(</span><span class="n">addon</span><span class="p">)[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">bundle</span><span class="p">,</span> <span class="p">()):</span>
+                <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_command</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_process_path</span><span class="p">(</span><span class="n">bundle</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span><span class="p">,</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="n">bundle_start_index</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+
+        <span class="c1"># 3. Process the rest of &#39;ir.asset&#39; records</span>
+        <span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">assets</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">sequence</span> <span class="o">&gt;=</span> <span class="n">DEFAULT_SEQUENCE</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_process_path</span><span class="p">(</span><span class="n">bundle</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">directive</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">asset</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span><span class="p">,</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="n">bundle_start_index</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_process_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span><span class="p">,</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="n">bundle_start_index</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This sub function is meant to take a directive and a set of</span>
+<span class="sd">        arguments and apply them to the current asset_paths list</span>
+<span class="sd">        accordingly.</span>
+
+<span class="sd">        It is nested inside `_get_asset_paths` since we need the current</span>
+<span class="sd">        list of addons, extensions and asset_paths.</span>
+
+<span class="sd">        :param directive: string</span>
+<span class="sd">        :param target: string or None or False</span>
+<span class="sd">        :param path_def: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">INCLUDE_DIRECTIVE</span><span class="p">:</span>
+            <span class="c1"># recursively call this function for each INCLUDE_DIRECTIVE directive.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fill_asset_paths</span><span class="p">(</span><span class="n">path_def</span><span class="p">,</span> <span class="n">asset_paths</span><span class="p">,</span> <span class="n">seen</span> <span class="o">+</span> <span class="p">[</span><span class="n">bundle</span><span class="p">],</span> <span class="n">addons</span><span class="p">,</span> <span class="n">installed</span><span class="p">,</span> <span class="o">**</span><span class="n">assets_params</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">can_aggregate</span><span class="p">(</span><span class="n">path_def</span><span class="p">):</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_paths</span><span class="p">(</span><span class="n">path_def</span><span class="p">,</span> <span class="n">installed</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="p">[(</span><span class="n">path_def</span><span class="p">,</span> <span class="n">EXTERNAL_ASSET</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span>  <span class="c1"># external urls</span>
+
+        <span class="c1"># retrieve target index when it applies</span>
+        <span class="k">if</span> <span class="n">directive</span> <span class="ow">in</span> <span class="n">DIRECTIVES_WITH_TARGET</span><span class="p">:</span>
+            <span class="n">target_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_paths</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">installed</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">target_paths</span> <span class="ow">and</span> <span class="n">target</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ASSET_EXTENSIONS</span><span class="p">:</span>
+                <span class="c1"># nothing to do: the extension of the target is wrong</span>
+                <span class="k">return</span>
+            <span class="k">if</span> <span class="n">target_paths</span><span class="p">:</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="n">target_paths</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">target_index</span> <span class="o">=</span> <span class="n">asset_paths</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">APPEND_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">PREPEND_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">bundle_start_index</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">AFTER_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">target_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">BEFORE_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">target_index</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">REMOVE_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">directive</span> <span class="o">==</span> <span class="n">REPLACE_DIRECTIVE</span><span class="p">:</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">target_index</span><span class="p">)</span>
+            <span class="n">asset_paths</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">target_paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># this should never happen</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unexpected directive&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_related_assets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">domain</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a set of assets matching the domain, regardless of their</span>
+<span class="sd">        active state. This method can be overridden to filter the results.</span>
+<span class="sd">        :param domain: search domain</span>
+<span class="sd">        :returns: ir.asset recordset</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># active_test is needed to disable some assets through filter_duplicate for website</span>
+        <span class="c1"># they will be filtered on active afterward</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;sequence, id&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_related_bundle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_path_def</span><span class="p">,</span> <span class="n">root_bundle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the first bundle directly defining a glob matching the target</span>
+<span class="sd">        path. This is useful when generating an &#39;ir.asset&#39; record to override</span>
+<span class="sd">        a specific asset and target the right bundle, i.e. the first one</span>
+<span class="sd">        defining the target path.</span>
+
+<span class="sd">        :param target_path_def: string: path to match.</span>
+<span class="sd">        :root_bundle: string: bundle from which to initiate the search.</span>
+<span class="sd">        :returns: the first matching bundle or None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">installed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_installed_addons_list</span><span class="p">()</span>
+        <span class="n">target_path</span><span class="p">,</span> <span class="n">_full_path</span><span class="p">,</span> <span class="n">_modified</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_paths</span><span class="p">(</span><span class="n">target_path_def</span><span class="p">,</span> <span class="n">installed</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">assets_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_asset_params</span><span class="p">()</span>
+        <span class="n">asset_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_asset_paths</span><span class="p">(</span><span class="n">root_bundle</span><span class="p">,</span> <span class="n">assets_params</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_full_path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">_modified</span> <span class="ow">in</span> <span class="n">asset_paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="o">==</span> <span class="n">target_path</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">bundle</span>
+
+        <span class="k">return</span> <span class="n">root_bundle</span>
+
+    <span class="k">def</span> <span class="nf">_get_active_addons_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Can be overridden to filter the returned list of active modules.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_installed_addons_list</span><span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;addons_tuple&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_topological_sort</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">addons_tuple</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of sorted modules name accord to the spec in ir.module.module</span>
+<span class="sd">        that is, application desc, sequence, name then topologically sorted&quot;&quot;&quot;</span>
+        <span class="n">IrModule</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+
+        <span class="k">def</span> <span class="nf">mapper</span><span class="p">(</span><span class="n">addon</span><span class="p">):</span>
+            <span class="n">manif</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">_get_manifest_cached</span><span class="p">(</span><span class="n">addon</span><span class="p">)</span>
+            <span class="n">from_terp</span> <span class="o">=</span> <span class="n">IrModule</span><span class="o">.</span><span class="n">get_values_from_terp</span><span class="p">(</span><span class="n">manif</span><span class="p">)</span>
+            <span class="n">from_terp</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">addon</span>
+            <span class="n">from_terp</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">manif</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;depends&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">from_terp</span>
+
+        <span class="n">manifs</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">addons_tuple</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">sort_key</span><span class="p">(</span><span class="n">manif</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span><span class="ow">not</span> <span class="n">manif</span><span class="p">[</span><span class="s1">&#39;application&#39;</span><span class="p">],</span> <span class="nb">int</span><span class="p">(</span><span class="n">manif</span><span class="p">[</span><span class="s1">&#39;sequence&#39;</span><span class="p">]),</span> <span class="n">manif</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+
+        <span class="n">manifs</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">manifs</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">sort_key</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">misc</span><span class="o">.</span><span class="n">topological_sort</span><span class="p">({</span><span class="n">manif</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">manif</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">manif</span> <span class="ow">in</span> <span class="n">manifs</span><span class="p">})</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">_get_installed_addons_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the list of all installed addons.</span>
+<span class="sd">        :returns: string[]: list of module names</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Main source: the current registry list</span>
+        <span class="c1"># Second source of modules: server wide modules</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">_init_modules</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">server_wide_modules</span> <span class="ow">or</span> <span class="p">[])</span>
+
+    <span class="k">def</span> <span class="nf">_get_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_def</span><span class="p">,</span> <span class="n">installed</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a list of tuple (path, full_path, modified) matching a given glob (path_def).</span>
+<span class="sd">        The glob can only occur in the static direcory of an installed addon.</span>
+
+<span class="sd">        If the path_def matches a (list of) file, the result will contain the full_path</span>
+<span class="sd">        and the modified time.</span>
+<span class="sd">        Ex: (&#39;/base/static/file.js&#39;, &#39;/home/user/source/odoo/odoo/addons/base/static/file.js&#39;, 643636800)</span>
+
+<span class="sd">        If the path_def looks like a non aggregable path (http://, /web/assets), only return the path</span>
+<span class="sd">        Ex: (&#39;http://example.com/lib.js&#39;, None, -1)</span>
+<span class="sd">        The timestamp -1 is given to be thruthy while carrying no information.</span>
+
+<span class="sd">        If the path_def is not a wildward, but may still be a valid addons path, return a False path</span>
+<span class="sd">        with No timetamp</span>
+<span class="sd">        Ex: (&#39;/_custom/web.asset_frontend&#39;, False, None)</span>
+
+<span class="sd">        :param path_def: the definition (glob) of file paths to match</span>
+<span class="sd">        :param installed: the list of installed addons</span>
+<span class="sd">        :param extensions: a list of extensions that found files must match</span>
+<span class="sd">        :returns: a list of tuple: (path, full_path, modified)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">path_def</span> <span class="o">=</span> <span class="n">fs2web</span><span class="p">(</span><span class="n">path_def</span><span class="p">)</span>  <span class="c1"># we expect to have all path definition unix style or url style, this is a safety</span>
+        <span class="n">path_parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">path_def</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">part</span><span class="p">]</span>
+        <span class="n">addon</span> <span class="o">=</span> <span class="n">path_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">addon_manifest</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">_get_manifest_cached</span><span class="p">(</span><span class="n">addon</span><span class="p">)</span>
+
+        <span class="n">safe_path</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">addon_manifest</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">addon</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">installed</span><span class="p">:</span>
+                <span class="c1"># Assert that the path is in the installed addons</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unallowed to fetch files from addon </span><span class="si">{</span><span class="n">addon</span><span class="si">}</span><span class="s2"> for file </span><span class="si">{</span><span class="n">path_def</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">addons_path</span> <span class="o">=</span> <span class="n">addon_manifest</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span>
+            <span class="n">full_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">addons_path</span><span class="p">,</span> <span class="o">*</span><span class="n">path_parts</span><span class="p">]))</span>
+            <span class="c1"># forbid escape from the current addon</span>
+            <span class="c1"># &quot;/mymodule/../myothermodule&quot; is forbidden</span>
+            <span class="n">static_prefix</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">addons_path</span><span class="p">,</span> <span class="n">addon</span><span class="p">,</span> <span class="s1">&#39;static&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">full_path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">static_prefix</span><span class="p">):</span>
+                <span class="n">paths_with_timestamps</span> <span class="o">=</span> <span class="n">_glob_static_file</span><span class="p">(</span><span class="n">full_path</span><span class="p">)</span>
+                <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">(</span><span class="n">fs2web</span><span class="p">(</span><span class="n">absolute_path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">addons_path</span><span class="p">):]),</span> <span class="n">absolute_path</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">absolute_path</span><span class="p">,</span> <span class="n">timestamp</span> <span class="ow">in</span> <span class="n">paths_with_timestamps</span>
+                <span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">safe_path</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">safe_path</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">paths</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">can_aggregate</span><span class="p">(</span><span class="n">path_def</span><span class="p">):</span>  <span class="c1"># http:// or /web/content</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="p">[(</span><span class="n">path_def</span><span class="p">,</span> <span class="n">EXTERNAL_ASSET</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">paths</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_wildcard_glob</span><span class="p">(</span><span class="n">path_def</span><span class="p">):</span>  <span class="c1"># an attachment url most likely</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="p">[(</span><span class="n">path_def</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;IrAsset: the path &quot;</span><span class="si">{</span><span class="n">path_def</span><span class="si">}</span><span class="s1">&quot; did not resolve to anything.&#39;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">safe_path</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot; It may be due to security reasons.&quot;</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="c1"># Paths are filtered on the extensions (if any).</span>
+        <span class="k">return</span> <span class="n">paths</span>
+
+    <span class="k">def</span> <span class="nf">_process_command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parses a given command to return its directive, target and path definition.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Default directive: append</span>
+            <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span> <span class="o">=</span> <span class="n">APPEND_DIRECTIVE</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">command</span>
+        <span class="k">elif</span> <span class="n">command</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">DIRECTIVES_WITH_TARGET</span><span class="p">:</span>
+            <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span> <span class="o">=</span> <span class="n">command</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">directive</span><span class="p">,</span> <span class="n">path_def</span> <span class="o">=</span> <span class="n">command</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">directive</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">path_def</span></div>
+
+
+
+<div class="viewcode-block" id="AssetPaths">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.AssetPaths">[docs]</a>
+<span class="k">class</span> <span class="nc">AssetPaths</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A list of asset paths (path, addon, bundle) with efficient operations. &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memo</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+<div class="viewcode-block" id="AssetPaths.index">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.AssetPaths.index">[docs]</a>
+    <span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the index of the given path in the current assets list.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_raise_not_found</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">asset</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">list</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">asset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">index</span></div>
+
+
+<div class="viewcode-block" id="AssetPaths.append">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.AssetPaths.append">[docs]</a>
+    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Appends the given paths to the current list.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">last_modified</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">list</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">path</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">last_modified</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AssetPaths.insert">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.AssetPaths.insert">[docs]</a>
+    <span class="k">def</span> <span class="nf">insert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inserts the given paths to the current list at the given position.&quot;&quot;&quot;</span>
+        <span class="n">to_insert</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">last_modified</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">:</span>
+                <span class="n">to_insert</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">path</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">last_modified</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">list</span><span class="p">[</span><span class="n">index</span><span class="p">:</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_insert</span></div>
+
+
+<div class="viewcode-block" id="AssetPaths.remove">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_asset.AssetPaths.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths_to_remove</span><span class="p">,</span> <span class="n">bundle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Removes the given paths from the current list.&quot;&quot;&quot;</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span><span class="n">path</span> <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_full_path</span><span class="p">,</span> <span class="n">_last_modified</span> <span class="ow">in</span> <span class="n">paths_to_remove</span> <span class="k">if</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">list</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">asset</span> <span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">list</span> <span class="k">if</span> <span class="n">asset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="o">.</span><span class="n">difference_update</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">paths_to_remove</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_raise_not_found</span><span class="p">([</span><span class="n">path</span> <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_full_path</span><span class="p">,</span> <span class="n">_last_modified</span> <span class="ow">in</span> <span class="n">paths_to_remove</span><span class="p">],</span> <span class="n">bundle</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_raise_not_found</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;File(s) </span><span class="si">%s</span><span class="s2"> not found in bundle </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">bundle</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

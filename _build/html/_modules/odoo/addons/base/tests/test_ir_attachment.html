@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_ir_attachment &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_ir_attachment</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_ir_attachment</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCaseWithUserDemo</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">image_to_base64</span>
+
+<span class="n">HASH_SPLIT</span> <span class="o">=</span> <span class="mi">2</span>      <span class="c1"># FIXME: testing implementations detail is not a good idea</span>
+
+
+<div class="viewcode-block" id="TestIrAttachment">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment">[docs]</a>
+<span class="k">class</span> <span class="nc">TestIrAttachment</span><span class="p">(</span><span class="n">TransactionCaseWithUserDemo</span><span class="p">):</span>
+<div class="viewcode-block" id="TestIrAttachment.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TestIrAttachment</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filestore</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">_filestore</span><span class="p">()</span>
+
+        <span class="c1"># Blob1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;blob1&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob1_hash</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob1_fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_hash</span><span class="p">[:</span><span class="n">HASH_SPLIT</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_hash</span>
+
+        <span class="c1"># Blob2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob2</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;blob2&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blob2_b64</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blob2</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.assertApproximately">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.assertApproximately">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertApproximately</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">expectedSize</span><span class="p">,</span> <span class="n">delta</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="c1"># we don&#39;t used bin_size in context, because on write, the cached value is the data and not</span>
+        <span class="c1"># the size, so we need on each write to invalidate cache if we really want to get the size.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">UnicodeDecodeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">/</span> <span class="mi">1024</span> <span class="c1"># kb</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertAlmostEqual</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">expectedSize</span><span class="p">,</span> <span class="n">delta</span><span class="o">=</span><span class="n">delta</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_01_store_in_db">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_01_store_in_db">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_01_store_in_db</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># force storing in database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;ir_attachment.location&#39;</span><span class="p">,</span> <span class="s1">&#39;db&#39;</span><span class="p">)</span>
+
+        <span class="c1"># &#39;ir_attachment.location&#39; is undefined test database storage</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a1&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a1</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a1</span><span class="o">.</span><span class="n">db_datas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_02_store_on_disk">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_02_store_on_disk">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_02_store_on_disk</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a2&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_fname</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_03_no_duplication">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_03_no_duplication">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_03_no_duplication</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a2&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="n">a3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a3&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a3</span><span class="o">.</span><span class="n">store_fname</span><span class="p">,</span> <span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_04_keep_file">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_04_keep_file">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_04_keep_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a2&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="n">a3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a3&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+
+        <span class="n">a2_fn</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+
+        <span class="n">a3</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">a2_fn</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_05_change_data_change_file">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_05_change_data_change_file">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_05_change_data_change_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a2&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">})</span>
+        <span class="n">a2_store_fname1</span> <span class="o">=</span> <span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span>
+        <span class="n">a2_fn</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a2_store_fname1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">a2_fn</span><span class="p">))</span>
+
+        <span class="n">a2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob2</span><span class="p">})</span>
+
+        <span class="n">a2_store_fname2</span> <span class="o">=</span> <span class="n">a2</span><span class="o">.</span><span class="n">store_fname</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">a2_store_fname1</span><span class="p">,</span> <span class="n">a2_store_fname2</span><span class="p">)</span>
+
+        <span class="n">a2_fn</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a2_store_fname2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">a2_fn</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_07_write_mimetype">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_07_write_mimetype">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_07_write_mimetype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tests the consistency of documents&#39; mimetypes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">Attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a2&#39;</span><span class="p">,</span> <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;image/png&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a2</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;image/png&#39;</span><span class="p">,</span> <span class="s2">&quot;the new mimetype should be the one given on write&quot;</span><span class="p">)</span>
+        <span class="n">a3</span> <span class="o">=</span> <span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a3&#39;</span><span class="p">,</span> <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a3</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#39;</span><span class="p">,</span> <span class="s2">&quot;should preserve office mime type&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_08_neuter_xml_mimetype">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_08_neuter_xml_mimetype">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_08_neuter_xml_mimetype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tests that potentially harmful mimetypes (XML mimetypes that can lead to XSS attacks) are converted to text</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="n">document</span> <span class="o">=</span> <span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;document&#39;</span><span class="p">,</span> <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">})</span>
+        <span class="n">document</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;text/xml&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">,</span> <span class="s2">&quot;XML mimetype should be forced to text&quot;</span><span class="p">)</span>
+        <span class="n">document</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;image/svg+xml&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">,</span> <span class="s2">&quot;SVG mimetype should be forced to text&quot;</span><span class="p">)</span>
+        <span class="n">document</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;text/html&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">,</span> <span class="s2">&quot;HTML mimetype should be forced to text&quot;</span><span class="p">)</span>
+        <span class="n">document</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;application/xhtml+xml&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">,</span> <span class="s2">&quot;XHTML mimetype should be forced to text&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_09_dont_neuter_xml_mimetype_for_admin">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_09_dont_neuter_xml_mimetype_for_admin">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_09_dont_neuter_xml_mimetype_for_admin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Admin user does not have a mime type filter</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">document</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;document&#39;</span><span class="p">,</span> <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">})</span>
+        <span class="n">document</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;text/xml&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;text/xml&#39;</span><span class="p">,</span> <span class="s2">&quot;XML mimetype should not be forced to text, for admin user&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_10_image_autoresize">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_10_image_autoresize">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_10_image_autoresize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span>
+        <span class="n">img_bin</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+        <span class="n">dir_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+        <span class="k">with</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dir_path</span><span class="p">,</span> <span class="s1">&#39;odoo.jpg&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">logo</span><span class="p">:</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;RGB&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="mi">2000</span><span class="p">),</span> <span class="s1">&#39;#4169E1&#39;</span><span class="p">)</span>
+            <span class="n">img</span><span class="o">.</span><span class="n">paste</span><span class="p">(</span><span class="n">logo</span><span class="p">)</span>
+            <span class="n">img</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">img_bin</span><span class="p">,</span> <span class="s1">&#39;JPEG&#39;</span><span class="p">)</span>
+
+        <span class="n">img_encoded</span> <span class="o">=</span> <span class="n">image_to_base64</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="s1">&#39;JPEG&#39;</span><span class="p">)</span>
+        <span class="n">img_bin</span> <span class="o">=</span> <span class="n">img_bin</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+        <span class="n">fullsize</span> <span class="o">=</span> <span class="mf">124.99</span>
+
+        <span class="c1">####################################</span>
+        <span class="c1">### test create/write on &#39;datas&#39;</span>
+        <span class="c1">####################################</span>
+        <span class="n">attach</span> <span class="o">=</span> <span class="n">Attachment</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">image_no_postprocess</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;image&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="n">img_encoded</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="n">fullsize</span><span class="p">)</span>  <span class="c1"># no resize, no compression</span>
+
+        <span class="n">attach</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">image_no_postprocess</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">img_encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="mf">12.06</span><span class="p">)</span>  <span class="c1"># default resize + default compression</span>
+
+        <span class="c1"># resize + default quality (80)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;1024x768&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">img_encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="mf">3.71</span><span class="p">)</span>
+
+        <span class="c1"># resize + quality 50</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_quality&#39;</span><span class="p">,</span> <span class="s1">&#39;50&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">img_encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="mf">3.57</span><span class="p">)</span>
+
+        <span class="c1"># no resize + no quality implicit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;0&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">img_encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="n">fullsize</span><span class="p">)</span>
+
+        <span class="c1"># Check that we only compress quality when we resize. We avoid to compress again during a new write.</span>
+        <span class="c1"># no resize + quality -&gt; should have no effect</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;10000x10000&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_quality&#39;</span><span class="p">,</span> <span class="s1">&#39;50&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">img_encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="n">fullsize</span><span class="p">)</span>
+
+        <span class="c1">####################################</span>
+        <span class="c1">### test create/write on &#39;raw&#39;</span>
+        <span class="c1">####################################</span>
+
+        <span class="c1"># reset default ~ delete</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;key&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;base.image_autoresize%&#39;</span><span class="p">)])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="n">attach</span> <span class="o">=</span> <span class="n">Attachment</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">image_no_postprocess</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;image&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">img_bin</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">fullsize</span><span class="p">)</span>  <span class="c1"># no resize, no compression</span>
+
+        <span class="n">attach</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">image_no_postprocess</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">img_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="mf">12.06</span><span class="p">)</span>  <span class="c1"># default resize + default compression</span>
+
+        <span class="c1"># resize + default quality (80)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;1024x768&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">img_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="mf">3.71</span><span class="p">)</span>
+
+        <span class="c1"># resize + no quality</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_quality&#39;</span><span class="p">,</span> <span class="s1">&#39;0&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">img_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="mf">4.09</span><span class="p">)</span>
+
+        <span class="c1"># resize + quality 50</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_quality&#39;</span><span class="p">,</span> <span class="s1">&#39;50&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">img_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="mf">3.57</span><span class="p">)</span>
+
+        <span class="c1"># no resize + no quality implicit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;0&#39;</span><span class="p">)</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">img_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertApproximately</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">fullsize</span><span class="p">)</span>
+
+        <span class="c1"># no resize of gif</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;0x0&#39;</span><span class="p">)</span>
+        <span class="n">gif_bin</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;GIF89a</span><span class="se">\x01\x00\x01\x00\x00\xff\x00</span><span class="s1">,</span><span class="se">\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00</span><span class="s1">;&#39;</span>
+        <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">gif_bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">gif_bin</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_11_copy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_11_copy">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_11_copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Copying an attachment preserves the data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">document</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;document&#39;</span><span class="p">,</span> <span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob2_b64</span><span class="p">})</span>
+        <span class="n">document2</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;document (copy)&quot;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;document (copy)&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document2</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">datas</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document2</span><span class="o">.</span><span class="n">db_datas</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">db_datas</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document2</span><span class="o">.</span><span class="n">store_fname</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document2</span><span class="o">.</span><span class="n">checksum</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">checksum</span><span class="p">)</span>
+
+        <span class="n">document3</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;datas&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document3</span><span class="o">.</span><span class="n">datas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_b64</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document3</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">)</span>  <span class="c1"># no data in db but has a store_fname</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document3</span><span class="o">.</span><span class="n">db_datas</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document3</span><span class="o">.</span><span class="n">store_fname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_fname</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">document3</span><span class="o">.</span><span class="n">checksum</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blob1_hash</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_12_gc">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_12_gc">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_12_gc</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># the data needs to be unique so that no other attachment link</span>
+        <span class="c1"># the file so that the gc removes it</span>
+        <span class="n">unique_blob</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a1&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">unique_blob</span><span class="p">})</span>
+        <span class="n">store_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a1</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">store_path</span><span class="p">),</span> <span class="s1">&#39;file exists&#39;</span><span class="p">)</span>
+        <span class="n">a1</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">_gc_file_store_unsafe</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">store_path</span><span class="p">),</span> <span class="s1">&#39;file removed&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_13_rollback">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_13_rollback">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_13_rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">enter_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">leave_test_mode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">close</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># the data needs to be unique so that no other attachment link</span>
+        <span class="c1"># the file so that the gc removes it</span>
+        <span class="n">unique_blob</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a1&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">unique_blob</span><span class="p">})</span>
+        <span class="n">store_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filestore</span><span class="p">,</span> <span class="n">a1</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">store_path</span><span class="p">),</span> <span class="s1">&#39;file exists&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">_gc_file_store_unsafe</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">store_path</span><span class="p">),</span> <span class="s1">&#39;file removed&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrAttachment.test_14_invalid_mimetype_with_correct_file_extension_no_post_processing">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestIrAttachment.test_14_invalid_mimetype_with_correct_file_extension_no_post_processing">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_14_invalid_mimetype_with_correct_file_extension_no_post_processing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># test with fake svg with png mimetype</span>
+        <span class="n">unique_blob</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot;&gt;&lt;/svg&gt;&#39;</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachment</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;a1&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">unique_blob</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="s1">&#39;image/png&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a1</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">unique_blob</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">a1</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="s1">&#39;image/png&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestPermissions">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions">[docs]</a>
+<span class="k">class</span> <span class="nc">TestPermissions</span><span class="p">(</span><span class="n">TransactionCaseWithUserDemo</span><span class="p">):</span>
+<div class="viewcode-block" id="TestPermissions.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="c1"># replace self.env(uid=1) with an actual user environment so rules apply</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span>
+
+        <span class="c1"># create a record with an attachment and a rule allowing Read access</span>
+        <span class="c1"># but preventing Create, Update, or Delete</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;record1&#39;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vals</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;attach&#39;</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">_name</span><span class="p">}</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vals</span><span class="p">)</span>
+
+        <span class="c1"># prevent create, write and unlink accesses on record</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rule</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.rule&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;remove access to record </span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_id</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">_name</span><span class="p">),</span>
+            <span class="s1">&#39;domain_force&#39;</span><span class="p">:</span> <span class="s2">&quot;[(&#39;id&#39;, &#39;!=&#39;, </span><span class="si">%s</span><span class="s2">)]&quot;</span> <span class="o">%</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;perm_read&#39;</span><span class="p">:</span> <span class="kc">False</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestPermissions.test_read_permission">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions.test_read_permission">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_read_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;If the record can&#39;t be read, the attachment can&#39;t be read either</span>
+<span class="sd">        If the attachment is public, the attachment can be read even if the record can&#39;t be read</span>
+<span class="sd">        If the attachment has no res_model/res_id, it can be read by its author and admins only</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check that the information can be read out of the box</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">datas</span>
+        <span class="c1"># prevent read access on record</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rule</span><span class="o">.</span><span class="n">perm_read</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">datas</span>
+
+        <span class="c1"># Make the attachment public</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">public</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="c1"># Check the information can be read again</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">datas</span>
+        <span class="c1"># Remove the public access</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">public</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># Check the record can no longer be accessed</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">datas</span>
+
+        <span class="c1"># Create an attachment as user without res_model/res_id</span>
+        <span class="n">attachment_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="c1"># Check the user can access his own attachment</span>
+        <span class="n">attachment_user</span><span class="o">.</span><span class="n">datas</span>
+        <span class="c1"># Create an attachment as superuser without res_model/res_id</span>
+        <span class="n">attachment_admin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+        <span class="c1"># Check the record cannot be accessed by a regular user</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">attachment_admin</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">datas</span>
+        <span class="c1"># Check the record can be accessed by an admin (other than superuser)</span>
+        <span class="n">admin_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">)</span>
+        <span class="c1"># Safety assert that base.user_admin is not the superuser, otherwise the test is useless</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">admin_user</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="n">attachment_admin</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">admin_user</span><span class="p">)</span><span class="o">.</span><span class="n">datas</span></div>
+
+
+<div class="viewcode-block" id="TestPermissions.test_with_write_permissions">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions.test_with_write_permissions">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_with_write_permissions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;With write permissions to the linked record, attachment can be</span>
+<span class="sd">        created, updated, or deleted (or copied).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># enable write permission on linked record</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rule</span><span class="o">.</span><span class="n">perm_write</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vals</span><span class="p">)</span>
+        <span class="n">attachment</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">attachment</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="sa">b</span><span class="s1">&#39;test&#39;</span><span class="p">})</span>
+        <span class="n">attachment</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestPermissions.test_basic_modifications">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions.test_basic_modifications">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_basic_modifications</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Lacking write access to the linked record means create, update, and</span>
+<span class="sd">        delete on the attachment are forbidden</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="sa">b</span><span class="s1">&#39;yay&#39;</span><span class="p">})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestPermissions.test_cross_record_copies">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_attachment.TestPermissions.test_cross_record_copies">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cross_record_copies</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copying attachments between records (in the same model or not) adds</span>
+<span class="sd">        wrinkles as the ACLs may diverge a lot more</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># create an other unwritable record in a different model</span>
+        <span class="n">unwritable</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.apikeys.description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Unwritable&#39;</span><span class="p">})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">unwritable</span><span class="o">.</span><span class="n">write</span><span class="p">({})</span>  <span class="c1"># checks unwritability</span>
+        <span class="c1"># create a writable record in the same model</span>
+        <span class="n">writable</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Attachments</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;yes&#39;</span><span class="p">})</span>
+        <span class="n">writable</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;canwrite&#39;</span>  <span class="c1"># checks for writeability</span>
+
+        <span class="c1"># can copy from a record with read permissions to one with write permissions</span>
+        <span class="n">copied</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="n">writable</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">writable</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="c1"># can copy to self given write permission</span>
+        <span class="n">copied</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c1"># can not copy back to record without write permission</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">copied</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals</span><span class="p">[</span><span class="s1">&#39;res_id&#39;</span><span class="p">]})</span>
+
+        <span class="c1"># can not copy to a record without write permission</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="n">unwritable</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">unwritable</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="c1"># even from a record with write permissions</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">AccessError</span><span class="p">):</span>
+            <span class="n">copied</span><span class="o">.</span><span class="n">copy</span><span class="p">({</span><span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="n">unwritable</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">unwritable</span><span class="o">.</span><span class="n">id</span><span class="p">})</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

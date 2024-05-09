@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_res_users &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_res_users</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_res_users</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">SimpleNamespace</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.models.res_users</span> <span class="kn">import</span> <span class="n">is_selection_groups</span><span class="p">,</span> <span class="n">get_selection_groups</span><span class="p">,</span> <span class="n">name_selection_groups</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">Form</span><span class="p">,</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">new_test_user</span><span class="p">,</span> <span class="n">tagged</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+
+
+<div class="viewcode-block" id="TestUsers">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers">[docs]</a>
+<span class="k">class</span> <span class="nc">TestUsers</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestUsers.test_name_search">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_name_search">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_name_search</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check name_search on user. &quot;&quot;&quot;</span>
+        <span class="n">User</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span>
+
+        <span class="n">test_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Flad the Impaler&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;vlad&#39;</span><span class="p">})</span>
+        <span class="n">like_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Wlad the Impaler&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;vladi&#39;</span><span class="p">})</span>
+        <span class="n">other_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Nothing similar&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;nothing similar&#39;</span><span class="p">})</span>
+        <span class="n">all_users</span> <span class="o">=</span> <span class="n">test_user</span> <span class="o">|</span> <span class="n">like_user</span> <span class="o">|</span> <span class="n">other_user</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;vlad&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">test_user</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;vlad&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;not ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">all_users</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">all_users</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;not ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">User</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;lad&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">test_user</span> <span class="o">|</span> <span class="n">like_user</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;lad&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;not ilike&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">res</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">all_users</span><span class="p">,</span> <span class="n">other_user</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsers.test_user_partner">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_user_partner">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_partner</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check that the user partner is well created &quot;&quot;&quot;</span>
+
+        <span class="n">User</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span>
+        <span class="n">Partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+        <span class="n">Company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span>
+
+        <span class="n">company_1</span> <span class="o">=</span> <span class="n">Company</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;company_1&#39;</span><span class="p">})</span>
+        <span class="n">company_2</span> <span class="o">=</span> <span class="n">Company</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;company_2&#39;</span><span class="p">})</span>
+
+        <span class="n">partner</span> <span class="o">=</span> <span class="n">Partner</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Bob Partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_2</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="c1"># case 1 : the user has no partner</span>
+        <span class="n">test_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;John Smith&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;jsmith&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;company_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">company_1</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_1</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span>
+            <span class="n">test_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">company_id</span><span class="p">,</span>
+            <span class="s2">&quot;The partner_id linked to a user should be created without any company_id&quot;</span><span class="p">)</span>
+
+        <span class="c1"># case 2 : the user has a partner</span>
+        <span class="n">test_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Bob Smith&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;bsmith&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;company_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">company_1</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">test_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">company_id</span><span class="p">,</span>
+            <span class="n">company_1</span><span class="p">,</span>
+            <span class="s2">&quot;If the partner_id of a user has already a company, it is replaced by the user company&quot;</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TestUsers.test_change_user_company">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_change_user_company">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_change_user_company</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check the partner company update when the user company is changed &quot;&quot;&quot;</span>
+
+        <span class="n">User</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span>
+        <span class="n">Company</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span>
+
+        <span class="n">test_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;John Smith&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;jsmith&#39;</span><span class="p">})</span>
+        <span class="n">company_1</span> <span class="o">=</span> <span class="n">Company</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;company_1&#39;</span><span class="p">})</span>
+        <span class="n">company_2</span> <span class="o">=</span> <span class="n">Company</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;company_2&#39;</span><span class="p">})</span>
+
+        <span class="n">test_user</span><span class="o">.</span><span class="n">company_ids</span> <span class="o">+=</span> <span class="n">company_1</span>
+        <span class="n">test_user</span><span class="o">.</span><span class="n">company_ids</span> <span class="o">+=</span> <span class="n">company_2</span>
+
+        <span class="c1"># 1: the partner has no company_id, no modification</span>
+        <span class="n">test_user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_1</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span>
+            <span class="n">test_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">company_id</span><span class="p">,</span>
+            <span class="s2">&quot;On user company change, if its partner_id has no company_id,&quot;</span>
+            <span class="s2">&quot;the company_id of the partner_id shall NOT be updated&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 2: the partner has a company_id different from the new one, update it</span>
+        <span class="n">test_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_1</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="n">test_user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_2</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">test_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">company_id</span><span class="p">,</span>
+            <span class="n">company_2</span><span class="p">,</span>
+            <span class="s2">&quot;On user company change, if its partner_id has already a company_id,&quot;</span>
+            <span class="s2">&quot;the company_id of the partner_id shall be updated&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsers.test_deactivate_portal_users_access">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_deactivate_portal_users_access">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_deactivate_portal_users_access</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Test that only a portal users can deactivate his account.&quot;&quot;&quot;</span>
+        <span class="n">user_internal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Internal&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;user_internal&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;password&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+        <span class="p">})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Internal users should not be able to deactivate their account&#39;</span><span class="p">):</span>
+            <span class="n">user_internal</span><span class="o">.</span><span class="n">_deactivate_portal_user</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestUsers.test_deactivate_portal_users_archive_and_remove">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_deactivate_portal_users_archive_and_remove">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.addons.base.models.res_users_deletion&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_deactivate_portal_users_archive_and_remove</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Test that if the account can not be removed, it&#39;s archived instead</span>
+<span class="sd">        and sensitive information are removed.</span>
+
+<span class="sd">        In this test, the deletion of &quot;portal_user&quot; will succeed,</span>
+<span class="sd">        but the deletion of &quot;portal_user_2&quot; will fail.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">User</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span>
+        <span class="n">portal_user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Portal&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;portal_user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;password&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+        <span class="p">})</span>
+        <span class="n">portal_partner</span> <span class="o">=</span> <span class="n">portal_user</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="n">portal_user_2</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Portal&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;portal_user_2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;password&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+        <span class="p">})</span>
+        <span class="n">portal_partner_2</span> <span class="o">=</span> <span class="n">portal_user_2</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="p">(</span><span class="n">portal_user</span> <span class="o">|</span> <span class="n">portal_user_2</span><span class="p">)</span><span class="o">.</span><span class="n">_deactivate_portal_user</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">portal_user</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">portal_user</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="s1">&#39;Should have archived the user 1&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">portal_user</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Portal&#39;</span><span class="p">,</span> <span class="s1">&#39;Should have kept the user name&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">portal_user</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;Portal&#39;</span><span class="p">,</span> <span class="s1">&#39;Should have kept the partner name&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">portal_user</span><span class="o">.</span><span class="n">login</span><span class="p">,</span> <span class="s1">&#39;portal_user&#39;</span><span class="p">,</span> <span class="s1">&#39;Should have removed the user login&#39;</span><span class="p">)</span>
+
+        <span class="n">asked_deletion_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.deletion&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">portal_user</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+        <span class="n">asked_deletion_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.deletion&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">portal_user_2</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">asked_deletion_1</span><span class="p">,</span> <span class="s1">&#39;Should have added the user 1 in the deletion queue&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">asked_deletion_2</span><span class="p">,</span> <span class="s1">&#39;Should have added the user 2 in the deletion queue&#39;</span><span class="p">)</span>
+
+        <span class="c1"># The deletion will fail for &quot;portal_user_2&quot;,</span>
+        <span class="c1"># because of the absence of &quot;ondelete=cascade&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Cron&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="n">portal_user_2</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.model_res_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users.deletion&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_gc_portal_users</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">portal_user</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s1">&#39;Should have removed the user&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">portal_partner</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s1">&#39;Should have removed the partner&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">asked_deletion_1</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;done&#39;</span><span class="p">,</span> <span class="s1">&#39;Should have marked the deletion as done&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">portal_user_2</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s1">&#39;Should have kept the user&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">portal_partner_2</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s1">&#39;Should have kept the partner&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">asked_deletion_2</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="s1">&#39;fail&#39;</span><span class="p">,</span> <span class="s1">&#39;Should have marked the deletion as failed&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsers.test_context_get_lang">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers.test_context_get_lang">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_context_get_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+            <span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">,</span> <span class="s1">&#39;es_ES&#39;</span><span class="p">,</span> <span class="s1">&#39;de_DE&#39;</span><span class="p">,</span> <span class="s1">&#39;en_US&#39;</span><span class="p">])</span>
+        <span class="p">])</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+        <span class="n">user</span> <span class="o">=</span> <span class="n">new_test_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;jackoneill&#39;</span><span class="p">)</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">lang</span> <span class="o">=</span> <span class="s1">&#39;fr_FR&#39;</span>
+
+        <span class="n">company</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">company_id</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="n">company</span><span class="o">.</span><span class="n">lang</span> <span class="o">=</span> <span class="s1">&#39;de_DE&#39;</span>
+
+        <span class="n">request</span> <span class="o">=</span> <span class="n">SimpleNamespace</span><span class="p">()</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">best_lang</span> <span class="o">=</span> <span class="s1">&#39;es_ES&#39;</span>
+        <span class="n">request_patch</span> <span class="o">=</span> <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.res_users.request&#39;</span><span class="p">,</span> <span class="n">request</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addCleanup</span><span class="p">(</span><span class="n">request_patch</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+        <span class="n">request_patch</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">context_get</span><span class="p">()[</span><span class="s1">&#39;lang&#39;</span><span class="p">],</span> <span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">lang</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">context_get</span><span class="p">()[</span><span class="s1">&#39;lang&#39;</span><span class="p">],</span> <span class="s1">&#39;es_ES&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="n">request_patch</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">context_get</span><span class="p">()[</span><span class="s1">&#39;lang&#39;</span><span class="p">],</span> <span class="s1">&#39;de_DE&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="n">company</span><span class="o">.</span><span class="n">lang</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">context_get</span><span class="p">()[</span><span class="s1">&#39;lang&#39;</span><span class="p">],</span> <span class="s1">&#39;en_US&#39;</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TestUsers2">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers2">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestUsers2</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestUsers2.test_reified_groups">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers2.test_reified_groups">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_reified_groups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; The groups handler doesn&#39;t use the &quot;real&quot; view with pseudo-fields</span>
+<span class="sd">        during installation, so it always works (because it uses the normal</span>
+<span class="sd">        groups_id field).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># use the specific views which has the pseudo-fields</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;bob&quot;</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">login</span> <span class="o">=</span> <span class="s2">&quot;bob&quot;</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">),</span> <span class="n">user</span><span class="o">.</span><span class="n">groups_id</span><span class="p">)</span>
+
+        <span class="c1"># all template user groups are copied</span>
+        <span class="n">default_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.default_user&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">default_user</span><span class="o">.</span><span class="n">groups_id</span><span class="p">,</span> <span class="n">user</span><span class="o">.</span><span class="n">groups_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsers2.test_selection_groups">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers2.test_selection_groups">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_selection_groups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># create 3 groups that should be in a selection</span>
+        <span class="n">app</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Foo&#39;</span><span class="p">})</span>
+        <span class="n">group1</span><span class="p">,</span> <span class="n">group2</span><span class="p">,</span> <span class="n">group0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;User&#39;</span><span class="p">,</span> <span class="s1">&#39;Manager&#39;</span><span class="p">,</span> <span class="s1">&#39;Visitor&#39;</span><span class="p">)</span>
+        <span class="p">])</span>
+        <span class="c1"># THIS PART IS NECESSARY TO REPRODUCE AN ISSUE: group1.id &lt; group2.id &lt; group0.id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertLess</span><span class="p">(</span><span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertLess</span><span class="p">(</span><span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="c1"># implication order is group0 &lt; group1 &lt; group2</span>
+        <span class="n">group2</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">=</span> <span class="n">group1</span>
+        <span class="n">group1</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">=</span> <span class="n">group0</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="n">group0</span> <span class="o">+</span> <span class="n">group1</span> <span class="o">+</span> <span class="n">group2</span>
+
+        <span class="c1"># determine the name of the field corresponding to groups</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+            <span class="n">name</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fields_get</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">is_selection_groups</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="ow">and</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="n">get_selection_groups</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCountEqual</span><span class="p">(</span><span class="n">get_selection_groups</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="n">groups</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+
+        <span class="c1"># create a user</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;foo&#39;</span><span class="p">})</span>
+
+        <span class="c1"># put user in group0, and check field value</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">groups_id</span> <span class="o">&amp;</span> <span class="n">groups</span><span class="p">,</span> <span class="n">group0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="n">fname</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="n">fname</span><span class="p">],</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="c1"># put user in group1, and check field value</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">groups_id</span> <span class="o">&amp;</span> <span class="n">groups</span><span class="p">,</span> <span class="n">group0</span> <span class="o">+</span> <span class="n">group1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="n">fname</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="n">fname</span><span class="p">],</span> <span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="c1"># put user in group2, and check field value</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">groups_id</span> <span class="o">&amp;</span> <span class="n">groups</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="n">fname</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="n">fname</span><span class="p">],</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">normalized_values</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">_remove_reified_groups</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">normalized_values</span><span class="p">[</span><span class="s1">&#39;groups_id&#39;</span><span class="p">]),</span> <span class="p">[(</span><span class="mi">3</span><span class="p">,</span> <span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">group0</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+
+        <span class="n">normalized_values</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">_remove_reified_groups</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">normalized_values</span><span class="p">[</span><span class="s1">&#39;groups_id&#39;</span><span class="p">]),</span> <span class="p">[(</span><span class="mi">3</span><span class="p">,</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">group1</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+
+        <span class="n">normalized_values</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">_remove_reified_groups</span><span class="p">({</span><span class="n">fname</span><span class="p">:</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">normalized_values</span><span class="p">[</span><span class="s1">&#39;groups_id&#39;</span><span class="p">],</span> <span class="p">[(</span><span class="mi">4</span><span class="p">,</span> <span class="n">group2</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span></div>
+
+
+<div class="viewcode-block" id="TestUsers2.test_read_list_with_reified_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers2.test_read_list_with_reified_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_read_list_with_reified_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check that read_group and search_read get rid of reified fields&quot;&quot;&quot;</span>
+        <span class="n">User</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span>
+        <span class="n">fnames</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">]</span>
+
+        <span class="c1"># find some reified field name</span>
+        <span class="n">reified_fname</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+            <span class="n">fname</span>
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">User</span><span class="o">.</span><span class="n">fields_get</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">fname</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39;in_group_&#39;</span><span class="p">,</span> <span class="s1">&#39;sel_groups_&#39;</span><span class="p">))</span>
+        <span class="p">)</span>
+
+        <span class="c1"># check that the reified field name has no effect in fields</span>
+        <span class="n">res_with_reified</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">read_group</span><span class="p">([],</span> <span class="n">fnames</span> <span class="o">+</span> <span class="p">[</span><span class="n">reified_fname</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;company_id&#39;</span><span class="p">])</span>
+        <span class="n">res_without_reified</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">read_group</span><span class="p">([],</span> <span class="n">fnames</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;company_id&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">res_with_reified</span><span class="p">,</span> <span class="n">res_without_reified</span><span class="p">,</span> <span class="s2">&quot;Reified fields should be ignored in read_group&quot;</span><span class="p">)</span>
+
+        <span class="c1"># check that the reified fields are not considered invalid in search_read</span>
+        <span class="c1"># and are ignored</span>
+        <span class="n">res_with_reified</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="n">fnames</span> <span class="o">+</span> <span class="p">[</span><span class="n">reified_fname</span><span class="p">])</span>
+        <span class="n">res_without_reified</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="n">fnames</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">res_with_reified</span><span class="p">,</span> <span class="n">res_without_reified</span><span class="p">,</span> <span class="s2">&quot;Reified fields should be ignored in search_read&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Verify that the read_group is raising an error if reified field is used as groupby</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+            <span class="n">User</span><span class="o">.</span><span class="n">read_group</span><span class="p">([],</span> <span class="n">fnames</span> <span class="o">+</span> <span class="p">[</span><span class="n">reified_fname</span><span class="p">],</span> <span class="p">[</span><span class="n">reified_fname</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestUsers2.test_reified_groups_on_change">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsers2.test_reified_groups_on_change">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_reified_groups_on_change</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Test that a change on a reified fields trigger the onchange of groups_id.&quot;&quot;&quot;</span>
+        <span class="n">group_public</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_public&#39;</span><span class="p">)</span>
+        <span class="n">group_portal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span>
+        <span class="n">group_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Build the reified group field name</span>
+        <span class="n">user_groups</span> <span class="o">=</span> <span class="n">group_public</span> <span class="o">|</span> <span class="n">group_portal</span> <span class="o">|</span> <span class="n">group_user</span>
+        <span class="n">user_groups_ids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">group_id</span><span class="p">)</span> <span class="k">for</span> <span class="n">group_id</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">user_groups</span><span class="o">.</span><span class="n">ids</span><span class="p">)]</span>
+        <span class="n">group_field_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;sel_groups_</span><span class="si">{</span><span class="s1">&#39;_&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">user_groups_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># &lt;group col=&quot;4&quot; invisible=&quot;sel_groups_1_9_10 != 1&quot; groups=&quot;base.group_no_one&quot; class=&quot;o_label_nowrap&quot;&gt;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug_mode</span><span class="p">():</span>
+            <span class="n">user_form</span> <span class="o">=</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">],</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span>
+        <span class="n">user_form</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;Test&quot;</span>
+        <span class="n">user_form</span><span class="o">.</span><span class="n">login</span> <span class="o">=</span> <span class="s2">&quot;Test&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">user_form</span><span class="o">.</span><span class="n">share</span><span class="p">)</span>
+
+        <span class="n">user_form</span><span class="p">[</span><span class="n">group_field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_portal</span><span class="o">.</span><span class="n">id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">user_form</span><span class="o">.</span><span class="n">share</span><span class="p">,</span> <span class="s1">&#39;The groups_id onchange should have been triggered&#39;</span><span class="p">)</span>
+
+        <span class="n">user_form</span><span class="p">[</span><span class="n">group_field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_user</span><span class="o">.</span><span class="n">id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">user_form</span><span class="o">.</span><span class="n">share</span><span class="p">,</span> <span class="s1">&#39;The groups_id onchange should have been triggered&#39;</span><span class="p">)</span>
+
+        <span class="n">user_form</span><span class="p">[</span><span class="n">group_field_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_public</span><span class="o">.</span><span class="n">id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">user_form</span><span class="o">.</span><span class="n">share</span><span class="p">,</span> <span class="s1">&#39;The groups_id onchange should have been triggered&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;res_groups&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestUsersGroupWarning</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestUsersGroupWarning.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            These are the Groups and their Hierarchy we have Used to test Group warnings.</span>
+
+<span class="sd">            Category groups hierarchy:</span>
+<span class="sd">                Sales</span>
+<span class="sd">                ├── User: All Documents</span>
+<span class="sd">                └── Administrator</span>
+<span class="sd">                Timesheets</span>
+<span class="sd">                ├── User: own timesheets only</span>
+<span class="sd">                ├── User: all timesheets</span>
+<span class="sd">                └── Administrator</span>
+<span class="sd">                Project</span>
+<span class="sd">                ├── User</span>
+<span class="sd">                └── Administrator</span>
+<span class="sd">                Field Service</span>
+<span class="sd">                ├── User</span>
+<span class="sd">                └── Administrator</span>
+
+<span class="sd">            Implied groups hierarchy:</span>
+<span class="sd">                Sales / Administrator</span>
+<span class="sd">                └── Sales / User: All Documents</span>
+
+<span class="sd">                Timesheets / Administrator</span>
+<span class="sd">                └── Timesheets / User: all timesheets</span>
+<span class="sd">                    └── Timehseets / User: own timesheets only</span>
+
+<span class="sd">                Project / Administrator</span>
+<span class="sd">                ├── Project / User</span>
+<span class="sd">                └── Timesheets / User: all timesheets</span>
+
+<span class="sd">                Field Service / Administrator</span>
+<span class="sd">                ├── Sales / Administrator</span>
+<span class="sd">                ├── Project / Administrator</span>
+<span class="sd">                └── Field Service / User</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="n">ResGroups</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span>
+        <span class="n">IrModuleCategory</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.category&#39;</span><span class="p">]</span>
+        <span class="n">categ_sales</span> <span class="o">=</span> <span class="n">IrModuleCategory</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Sales&#39;</span><span class="p">})</span>
+        <span class="n">categ_project</span> <span class="o">=</span> <span class="n">IrModuleCategory</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Project&#39;</span><span class="p">})</span>
+        <span class="n">categ_field_service</span> <span class="o">=</span> <span class="n">IrModuleCategory</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Field Service&#39;</span><span class="p">})</span>
+        <span class="n">categ_timesheets</span> <span class="o">=</span> <span class="n">IrModuleCategory</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Timesheets&#39;</span><span class="p">})</span>
+
+        <span class="c1"># Sales</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_user</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_administrator</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User: All Documents&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_sales</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Administrator&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_sales</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">sales_categ_field</span> <span class="o">=</span> <span class="n">name_selection_groups</span><span class="p">((</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_user</span> <span class="o">|</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_administrator</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_administrator</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_user</span>
+
+        <span class="c1"># Timesheets</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_own_timesheet</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User: own timesheets only&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_timesheets</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User: all timesheets&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_timesheets</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_administrator</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Administrator&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_timesheets</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">timesheets_categ_field</span> <span class="o">=</span> <span class="n">name_selection_groups</span><span class="p">((</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_own_timesheet</span> <span class="o">|</span>
+                                                            <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span> <span class="o">|</span>
+                                                            <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_administrator</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span>
+                                                           <span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_administrator</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">+=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">+=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_own_timesheet</span>
+
+        <span class="c1"># Project</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_project_user</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_project_admnistrator</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_project</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Administrator&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_project</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">project_categ_field</span> <span class="o">=</span> <span class="n">name_selection_groups</span><span class="p">((</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_project_user</span> <span class="o">|</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_project_admnistrator</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_project_admnistrator</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">=</span> <span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_project_user</span> <span class="o">|</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span><span class="p">)</span>
+
+        <span class="c1"># Field Service</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_user</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_administrator</span> <span class="o">=</span> <span class="n">ResGroups</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_field_service</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Administrator&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="n">categ_field_service</span><span class="o">.</span><span class="n">id</span><span class="p">},</span>
+        <span class="p">])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">field_service_categ_field</span> <span class="o">=</span> <span class="n">name_selection_groups</span><span class="p">((</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_user</span> <span class="o">|</span> <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_administrator</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_administrator</span><span class="o">.</span><span class="n">implied_ids</span> <span class="o">=</span> <span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_sales_administrator</span> <span class="o">|</span>
+                                                             <span class="bp">cls</span><span class="o">.</span><span class="n">group_project_admnistrator</span> <span class="o">|</span>
+                                                             <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_user</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span>
+
+        <span class="c1"># User</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">test_group_user</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Group User&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;TestGroupUser&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span> <span class="o">|</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">group_timesheets_administrator</span> <span class="o">|</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">group_field_service_administrator</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning.test_user_group_empty_group_warning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.test_user_group_empty_group_warning">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_group_empty_group_warning</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; User changes Empty Sales access from &#39;Sales: Administrator&#39;. The</span>
+<span class="sd">        warning should be there since &#39;Sales: Administrator&#39; is required when</span>
+<span class="sd">        user is having &#39;Field Service: Administrator&#39;. When user reverts the</span>
+<span class="sd">        changes, warning should disappear. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_group_user</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_user_group_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">UserForm</span><span class="p">:</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">,</span>
+                <span class="s1">&#39;Since Test Group User is a/an &quot;Field Service: Administrator&quot;, they will at least obtain the right &quot;Sales: Administrator&quot;&#39;</span>
+            <span class="p">)</span>
+
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_sales_administrator</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning.test_user_group_inheritance_warning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.test_user_group_inheritance_warning">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_group_inheritance_warning</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; User changes &#39;Sales: User&#39; from &#39;Sales: Administrator&#39;. The warning</span>
+<span class="sd">        should be there since &#39;Sales: Administrator&#39; is required when user is</span>
+<span class="sd">        having &#39;Field Service: Administrator&#39;. When user reverts the changes,</span>
+<span class="sd">        warning should disappear. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_group_user</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_user_group_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">UserForm</span><span class="p">:</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_sales_user</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">,</span>
+                <span class="s1">&#39;Since Test Group User is a/an &quot;Field Service: Administrator&quot;, they will at least obtain the right &quot;Sales: Administrator&quot;&#39;</span>
+            <span class="p">)</span>
+
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_sales_administrator</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning.test_user_group_inheritance_warning_multi">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.test_user_group_inheritance_warning_multi">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_group_inheritance_warning_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; User changes &#39;Sales: User&#39; from &#39;Sales: Administrator&#39; and</span>
+<span class="sd">        &#39;Project: User&#39; from &#39;Project: Administrator&#39;. The warning should</span>
+<span class="sd">        be there since &#39;Sales: Administrator&#39; and &#39;Project: Administrator&#39;</span>
+<span class="sd">        are required when user is havning &#39;Field Service: Administrator&#39;.</span>
+<span class="sd">        When user reverts the changes For &#39;Sales: Administrator&#39;, warning</span>
+<span class="sd">        should disappear for Sales Access.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_group_user</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_user_group_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">UserForm</span><span class="p">:</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_sales_user</span><span class="o">.</span><span class="n">id</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">project_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_project_user</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span>
+                <span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">,</span>
+                <span class="s1">&#39;Since Test Group User is a/an &quot;Field Service: Administrator&quot;, they will at least obtain the right &quot;Sales: Administrator&quot;, Project: Administrator&quot;&#39;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sales_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_sales_administrator</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">,</span>
+                <span class="s1">&#39;Since Test Group User is a/an &quot;Field Service: Administrator&quot;, they will at least obtain the right &quot;Project: Administrator&quot;&#39;</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning.test_user_group_least_possible_inheritance_warning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.test_user_group_least_possible_inheritance_warning">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_group_least_possible_inheritance_warning</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; User changes &#39;Timesheets: User: own timesheets only &#39; from</span>
+<span class="sd">        &#39;Timesheets: Administrator&#39;. The warning should be there since</span>
+<span class="sd">        &#39;Timesheets: User: all timesheets&#39; is at least required when user is</span>
+<span class="sd">        having &#39;Project: Administrator&#39;. When user reverts the changes For</span>
+<span class="sd">        &#39;Timesheets: User: all timesheets&#39;, warning should disappear.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_group_user</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_user_group_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">UserForm</span><span class="p">:</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">timesheets_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_timesheets_user_own_timesheet</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">,</span>
+                <span class="s1">&#39;Since Test Group User is a/an &quot;Project: Administrator&quot;, they will at least obtain the right &quot;Timesheets: User: all timesheets&quot;&#39;</span>
+            <span class="p">)</span>
+
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">timesheets_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_timesheets_user_all_timesheet</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUsersGroupWarning.test_user_group_parent_inheritance_no_warning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersGroupWarning.test_user_group_parent_inheritance_no_warning">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_user_group_parent_inheritance_no_warning</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; User changes &#39;Field Service: User&#39; from &#39;Field Service: Administrator&#39;.</span>
+<span class="sd">        The warning should not be there since &#39;Field Service: User&#39; is not affected</span>
+<span class="sd">        by any other groups.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">Form</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_group_user</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">show_user_group_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">view</span><span class="o">=</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">UserForm</span><span class="p">:</span>
+            <span class="n">UserForm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">field_service_categ_field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">group_field_service_user</span><span class="o">.</span><span class="n">id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">UserForm</span><span class="o">.</span><span class="n">user_group_warning</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestUsersTweaks">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersTweaks">[docs]</a>
+<span class="k">class</span> <span class="nc">TestUsersTweaks</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestUsersTweaks.test_superuser">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_res_users.TestUsersTweaks.test_superuser">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_superuser</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; The superuser is inactive and must remain as such. &quot;&quot;&quot;</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">SUPERUSER_ID</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">active</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">):</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

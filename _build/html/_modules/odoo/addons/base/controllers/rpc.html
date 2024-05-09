@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.controllers.rpc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.controllers.rpc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.controllers.rpc</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">xmlrpc.client</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">markupsafe</span> <span class="kn">import</span> <span class="n">Markup</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.http</span> <span class="kn">import</span> <span class="n">Controller</span><span class="p">,</span> <span class="n">route</span><span class="p">,</span> <span class="n">dispatch_rpc</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">Response</span>
+<span class="kn">from</span> <span class="nn">odoo.fields</span> <span class="kn">import</span> <span class="n">Date</span><span class="p">,</span> <span class="n">Datetime</span><span class="p">,</span> <span class="n">Command</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">lazy</span><span class="p">,</span> <span class="n">ustr</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">frozendict</span>
+
+<span class="c1"># ==========================================================</span>
+<span class="c1"># XML-RPC helpers</span>
+<span class="c1"># ==========================================================</span>
+
+<span class="c1"># XML-RPC fault codes. Some care must be taken when changing these: the</span>
+<span class="c1"># constants are also defined client-side and must remain in sync.</span>
+<span class="c1"># User code must use the exceptions defined in ``odoo.exceptions`` (not</span>
+<span class="c1"># create directly ``xmlrpc.client.Fault`` objects).</span>
+<span class="n">RPC_FAULT_CODE_CLIENT_ERROR</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># indistinguishable from app. error.</span>
+<span class="n">RPC_FAULT_CODE_APPLICATION_ERROR</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">RPC_FAULT_CODE_WARNING</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">RPC_FAULT_CODE_ACCESS_DENIED</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">RPC_FAULT_CODE_ACCESS_ERROR</span> <span class="o">=</span> <span class="mi">4</span>
+
+<span class="c1"># 0 to 31, excluding tab, newline, and carriage return</span>
+<span class="n">CONTROL_CHARACTERS</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">32</span><span class="p">))</span> <span class="o">-</span> <span class="p">{</span><span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">13</span><span class="p">})</span>
+
+
+<div class="viewcode-block" id="xmlrpc_handle_exception_int">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.xmlrpc_handle_exception_int">[docs]</a>
+<span class="k">def</span> <span class="nf">xmlrpc_handle_exception_int</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RedirectWarning</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">RPC_FAULT_CODE_WARNING</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessError</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">RPC_FAULT_CODE_ACCESS_ERROR</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">RPC_FAULT_CODE_ACCESS_DENIED</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">UserError</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">RPC_FAULT_CODE_WARNING</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="n">formatted_info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exception</span><span class="p">(</span><span class="o">*</span><span class="n">info</span><span class="p">))</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">RPC_FAULT_CODE_APPLICATION_ERROR</span><span class="p">,</span> <span class="n">formatted_info</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">fault</span><span class="p">,</span> <span class="n">allow_none</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="xmlrpc_handle_exception_string">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.xmlrpc_handle_exception_string">[docs]</a>
+<span class="k">def</span> <span class="nf">xmlrpc_handle_exception_string</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RedirectWarning</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="s1">&#39;warning -- Warning</span><span class="se">\n\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">MissingError</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="s1">&#39;warning -- MissingError</span><span class="se">\n\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessError</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="s1">&#39;warning -- AccessError</span><span class="se">\n\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="s1">&#39;AccessDenied&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">UserError</span><span class="p">):</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="s1">&#39;warning -- UserError</span><span class="se">\n\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="c1">#InternalError</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="n">formatted_info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exception</span><span class="p">(</span><span class="o">*</span><span class="n">info</span><span class="p">))</span>
+        <span class="n">fault</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Fault</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">exception_to_unicode</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="n">formatted_info</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">fault</span><span class="p">,</span> <span class="n">allow_none</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="OdooMarshaller">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller">[docs]</a>
+<span class="k">class</span> <span class="nc">OdooMarshaller</span><span class="p">(</span><span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Marshaller</span><span class="p">):</span>
+    <span class="n">dispatch</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Marshaller</span><span class="o">.</span><span class="n">dispatch</span><span class="p">)</span>
+
+<div class="viewcode-block" id="OdooMarshaller.dump_frozen_dict">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_frozen_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_frozen_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_struct</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+    <span class="c1"># By default, in xmlrpc, bytes are converted to xmlrpc.client.Binary object.</span>
+    <span class="c1"># Historically, odoo is sending binary as base64 string.</span>
+    <span class="c1"># In python 3, base64.b64{de,en}code() methods now works on bytes.</span>
+    <span class="c1"># Convert them to str to have a consistent behavior between python 2 and python 3.</span>
+<div class="viewcode-block" id="OdooMarshaller.dump_bytes">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_bytes">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_unicode</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OdooMarshaller.dump_datetime">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_datetime">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_datetime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="c1"># override to marshall as a string for backwards compatibility</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">Datetime</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_unicode</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+    <span class="c1"># convert date objects to strings in iso8061 format.</span>
+<div class="viewcode-block" id="OdooMarshaller.dump_date">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_date">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_date</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_unicode</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OdooMarshaller.dump_lazy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_lazy">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_lazy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">_value</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)](</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OdooMarshaller.dump_unicode">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.OdooMarshaller.dump_unicode">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_unicode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">):</span>
+        <span class="c1"># XML 1.0 disallows control characters, remove them otherwise they break clients</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">dump_unicode</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">CONTROL_CHARACTERS</span><span class="p">),</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">frozendict</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_frozen_dict</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_bytes</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_datetime</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_date</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">lazy</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_lazy</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">dump_unicode</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">Command</span><span class="p">]</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">defaultdict</span><span class="p">]</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
+    <span class="n">dispatch</span><span class="p">[</span><span class="n">Markup</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">write</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch</span><span class="p">[</span><span class="nb">str</span><span class="p">](</span><span class="bp">self</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="n">write</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># monkey-patch xmlrpc.client&#39;s marshaller</span>
+<span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">Marshaller</span> <span class="o">=</span> <span class="n">OdooMarshaller</span>
+
+<span class="c1"># ==========================================================</span>
+<span class="c1"># RPC Controller</span>
+<span class="c1"># ==========================================================</span>
+<div class="viewcode-block" id="RPC">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.RPC">[docs]</a>
+<span class="k">class</span> <span class="nc">RPC</span><span class="p">(</span><span class="n">Controller</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle RPC connections.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_xmlrpc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Common method to handle an XML-RPC request.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">httprequest</span><span class="o">.</span><span class="n">get_data</span><span class="p">()</span>
+        <span class="n">params</span><span class="p">,</span> <span class="n">method</span> <span class="o">=</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch_rpc</span><span class="p">(</span><span class="n">service</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">xmlrpc</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">dumps</span><span class="p">((</span><span class="n">result</span><span class="p">,),</span> <span class="n">methodresponse</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">allow_none</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RPC.xmlrpc_1">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.RPC.xmlrpc_1">[docs]</a>
+    <span class="nd">@route</span><span class="p">(</span><span class="s2">&quot;/xmlrpc/&lt;service&gt;&quot;</span><span class="p">,</span> <span class="n">auth</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;POST&quot;</span><span class="p">],</span> <span class="n">csrf</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">save_session</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">xmlrpc_1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;XML-RPC service that returns faultCode as strings.</span>
+
+<span class="sd">        This entrypoint is historical and non-compliant, but kept for</span>
+<span class="sd">        backwards-compatibility.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xmlrpc</span><span class="p">(</span><span class="n">service</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">xmlrpc_handle_exception_string</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Response</span><span class="p">(</span><span class="n">response</span><span class="o">=</span><span class="n">response</span><span class="p">,</span> <span class="n">mimetype</span><span class="o">=</span><span class="s1">&#39;text/xml&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RPC.xmlrpc_2">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.RPC.xmlrpc_2">[docs]</a>
+    <span class="nd">@route</span><span class="p">(</span><span class="s2">&quot;/xmlrpc/2/&lt;service&gt;&quot;</span><span class="p">,</span> <span class="n">auth</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;POST&quot;</span><span class="p">],</span> <span class="n">csrf</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">save_session</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">xmlrpc_2</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;XML-RPC service that returns faultCode as int.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xmlrpc</span><span class="p">(</span><span class="n">service</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">xmlrpc_handle_exception_int</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Response</span><span class="p">(</span><span class="n">response</span><span class="o">=</span><span class="n">response</span><span class="p">,</span> <span class="n">mimetype</span><span class="o">=</span><span class="s1">&#39;text/xml&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RPC.jsonrpc">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.controllers.html#odoo.addons.base.controllers.rpc.RPC.jsonrpc">[docs]</a>
+    <span class="nd">@route</span><span class="p">(</span><span class="s1">&#39;/jsonrpc&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;json&#39;</span><span class="p">,</span> <span class="n">auth</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">,</span> <span class="n">save_session</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">jsonrpc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Method used by client APIs to contact OpenERP. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">dispatch_rpc</span><span class="p">(</span><span class="n">service</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

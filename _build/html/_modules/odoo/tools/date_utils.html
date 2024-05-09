@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.date_utils &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.date_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.date_utils</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">calendar</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">time</span>
+<span class="kn">import</span> <span class="nn">pytz</span>
+<span class="kn">from</span> <span class="nn">dateutil.relativedelta</span> <span class="kn">import</span> <span class="n">relativedelta</span>
+
+<span class="kn">from</span> <span class="nn">.func</span> <span class="kn">import</span> <span class="n">lazy</span>
+<span class="kn">from</span> <span class="nn">odoo.loglevels</span> <span class="kn">import</span> <span class="n">ustr</span>
+
+
+<div class="viewcode-block" id="date_type">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.date_type">[docs]</a>
+<span class="k">def</span> <span class="nf">date_type</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Return either the datetime.datetime class or datetime.date type whether `value` is a datetime or a date.</span>
+
+<span class="sd">    :param value: A datetime.datetime or datetime.date object.</span>
+<span class="sd">    :return: datetime.datetime or datetime.date</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">datetime</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span> <span class="k">else</span> <span class="n">date</span></div>
+
+
+
+<div class="viewcode-block" id="get_month">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.get_month">[docs]</a>
+<span class="k">def</span> <span class="nf">get_month</span><span class="p">(</span><span class="n">date</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Compute the month dates range on which the &#39;date&#39; parameter belongs to.</span>
+
+<span class="sd">    :param date: A datetime.datetime or datetime.date object.</span>
+<span class="sd">    :return: A tuple (date_from, date_to) having the same object type as the &#39;date&#39; parameter.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">date_from</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">date_to</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">calendar</span><span class="o">.</span><span class="n">monthrange</span><span class="p">(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">month</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">date_from</span><span class="p">,</span> <span class="n">date_to</span></div>
+
+
+
+<div class="viewcode-block" id="get_quarter_number">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.get_quarter_number">[docs]</a>
+<span class="k">def</span> <span class="nf">get_quarter_number</span><span class="p">(</span><span class="n">date</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Get the number of the quarter on which the &#39;date&#39; parameter belongs to.</span>
+
+<span class="sd">    :param date: A datetime.datetime or datetime.date object.</span>
+<span class="sd">    :return: A [1-4] integer.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">date</span><span class="o">.</span><span class="n">month</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_quarter">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.get_quarter">[docs]</a>
+<span class="k">def</span> <span class="nf">get_quarter</span><span class="p">(</span><span class="n">date</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Compute the quarter dates range on which the &#39;date&#39; parameter belongs to.</span>
+
+<span class="sd">    :param date: A datetime.datetime or datetime.date object.</span>
+<span class="sd">    :return: A tuple (date_from, date_to) having the same object type as the &#39;date&#39; parameter.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">quarter_number</span> <span class="o">=</span> <span class="n">get_quarter_number</span><span class="p">(</span><span class="n">date</span><span class="p">)</span>
+    <span class="n">month_from</span> <span class="o">=</span> <span class="p">((</span><span class="n">quarter_number</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">3</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">date_from</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">month_from</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">date_to</span> <span class="o">=</span> <span class="p">(</span><span class="n">date_from</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">months</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">date_to</span> <span class="o">=</span> <span class="n">date_to</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">day</span><span class="o">=</span><span class="n">calendar</span><span class="o">.</span><span class="n">monthrange</span><span class="p">(</span><span class="n">date_to</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date_to</span><span class="o">.</span><span class="n">month</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">date_from</span><span class="p">,</span> <span class="n">date_to</span></div>
+
+
+
+<div class="viewcode-block" id="get_fiscal_year">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.get_fiscal_year">[docs]</a>
+<span class="k">def</span> <span class="nf">get_fiscal_year</span><span class="p">(</span><span class="n">date</span><span class="p">,</span> <span class="n">day</span><span class="o">=</span><span class="mi">31</span><span class="p">,</span> <span class="n">month</span><span class="o">=</span><span class="mi">12</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Compute the fiscal year dates range on which the &#39;date&#39; parameter belongs to.</span>
+<span class="sd">    A fiscal year is the period used by governments for accounting purposes and vary between countries.</span>
+<span class="sd">    By default, calling this method with only one parameter gives the calendar year because the ending date of the</span>
+<span class="sd">    fiscal year is set to the YYYY-12-31.</span>
+<span class="sd">    :param date:    A datetime.datetime or datetime.date object.</span>
+<span class="sd">    :param day:     The day of month the fiscal year ends.</span>
+<span class="sd">    :param month:   The month of year the fiscal year ends.</span>
+<span class="sd">    :return: A tuple (date_from, date_to) having the same object type as the &#39;date&#39; parameter.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">fix_day</span><span class="p">(</span><span class="n">year</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">):</span>
+        <span class="n">max_day</span> <span class="o">=</span> <span class="n">calendar</span><span class="o">.</span><span class="n">monthrange</span><span class="p">(</span><span class="n">year</span><span class="p">,</span> <span class="n">month</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">month</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">day</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">28</span><span class="p">,</span> <span class="n">max_day</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">max_day</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">day</span><span class="p">,</span> <span class="n">max_day</span><span class="p">)</span>
+
+    <span class="n">day</span> <span class="o">=</span> <span class="n">fix_day</span><span class="p">(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">)</span>
+    <span class="n">date_to</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">date</span> <span class="o">&lt;=</span> <span class="n">date_to</span><span class="p">:</span>
+        <span class="n">date_from</span> <span class="o">=</span> <span class="n">date_to</span> <span class="o">-</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">years</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">day</span> <span class="o">=</span> <span class="n">fix_day</span><span class="p">(</span><span class="n">date_from</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date_from</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">date_from</span><span class="o">.</span><span class="n">day</span><span class="p">)</span>
+        <span class="n">date_from</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date_from</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date_from</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">)</span>
+        <span class="n">date_from</span> <span class="o">+=</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">date_from</span> <span class="o">=</span> <span class="n">date_to</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">date_to</span> <span class="o">=</span> <span class="n">date_to</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">years</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">day</span> <span class="o">=</span> <span class="n">fix_day</span><span class="p">(</span><span class="n">date_to</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date_to</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">date_to</span><span class="o">.</span><span class="n">day</span><span class="p">)</span>
+        <span class="n">date_to</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">date</span><span class="p">)(</span><span class="n">date_to</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">date_to</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">date_from</span><span class="p">,</span> <span class="n">date_to</span></div>
+
+
+
+<div class="viewcode-block" id="get_timedelta">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.get_timedelta">[docs]</a>
+<span class="k">def</span> <span class="nf">get_timedelta</span><span class="p">(</span><span class="n">qty</span><span class="p">,</span> <span class="n">granularity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper to get a `relativedelta` object for the given quantity and interval unit.</span>
+<span class="sd">        :param qty: the number of unit to apply on the timedelta to return</span>
+<span class="sd">        :param granularity: Type of period in string, can be year, quarter, month, week, day or hour.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">switch</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;hour&#39;</span><span class="p">:</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="n">qty</span><span class="p">),</span>
+        <span class="s1">&#39;day&#39;</span><span class="p">:</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">qty</span><span class="p">),</span>
+        <span class="s1">&#39;week&#39;</span><span class="p">:</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">weeks</span><span class="o">=</span><span class="n">qty</span><span class="p">),</span>
+        <span class="s1">&#39;month&#39;</span><span class="p">:</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">months</span><span class="o">=</span><span class="n">qty</span><span class="p">),</span>
+        <span class="s1">&#39;year&#39;</span><span class="p">:</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">years</span><span class="o">=</span><span class="n">qty</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">switch</span><span class="p">[</span><span class="n">granularity</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="start_of">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.start_of">[docs]</a>
+<span class="k">def</span> <span class="nf">start_of</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">granularity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get start of a time period from a date or a datetime.</span>
+
+<span class="sd">    :param value: initial date or datetime.</span>
+<span class="sd">    :param granularity: type of period in string, can be year, quarter, month, week, day or hour.</span>
+<span class="sd">    :return: a date/datetime object corresponding to the start of the specified period.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">is_datetime</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;year&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">day</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;quarter&quot;</span><span class="p">:</span>
+        <span class="c1"># Q1 = Jan 1st</span>
+        <span class="c1"># Q2 = Apr 1st</span>
+        <span class="c1"># Q3 = Jul 1st</span>
+        <span class="c1"># Q4 = Oct 1st</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">get_quarter</span><span class="p">(</span><span class="n">value</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;month&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">day</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s1">&#39;week&#39;</span><span class="p">:</span>
+        <span class="c1"># `calendar.weekday` uses ISO8601 for start of week reference, this means that</span>
+        <span class="c1"># by default MONDAY is the first day of the week and SUNDAY is the last.</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span> <span class="o">-</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">calendar</span><span class="o">.</span><span class="n">weekday</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">day</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;day&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;hour&quot;</span> <span class="ow">and</span> <span class="n">is_datetime</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">min</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">hour</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">hour</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">is_datetime</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Granularity must be year, quarter, month, week, day or hour for value </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Granularity must be year, quarter, month, week or day for value </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">min</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_datetime</span> <span class="k">else</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="end_of">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.end_of">[docs]</a>
+<span class="k">def</span> <span class="nf">end_of</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">granularity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get end of a time period from a date or a datetime.</span>
+
+<span class="sd">    :param value: initial date or datetime.</span>
+<span class="sd">    :param granularity: Type of period in string, can be year, quarter, month, week, day or hour.</span>
+<span class="sd">    :return: A date/datetime object corresponding to the start of the specified period.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">is_datetime</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;year&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">day</span><span class="o">=</span><span class="mi">31</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;quarter&quot;</span><span class="p">:</span>
+        <span class="c1"># Q1 = Mar 31st</span>
+        <span class="c1"># Q2 = Jun 30th</span>
+        <span class="c1"># Q3 = Sep 30th</span>
+        <span class="c1"># Q4 = Dec 31st</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">get_quarter</span><span class="p">(</span><span class="n">value</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;month&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">day</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">months</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">days</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s1">&#39;week&#39;</span><span class="p">:</span>
+        <span class="c1"># `calendar.weekday` uses ISO8601 for start of week reference, this means that</span>
+        <span class="c1"># by default MONDAY is the first day of the week and SUNDAY is the last.</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">6</span><span class="o">-</span><span class="n">calendar</span><span class="o">.</span><span class="n">weekday</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">day</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;day&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">elif</span> <span class="n">granularity</span> <span class="o">==</span> <span class="s2">&quot;hour&quot;</span> <span class="ow">and</span> <span class="n">is_datetime</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">max</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">hour</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">hour</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">is_datetime</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Granularity must be year, quarter, month, week, day or hour for value </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Granularity must be year, quarter, month, week or day for value </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">max</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_datetime</span> <span class="k">else</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="add">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.add">[docs]</a>
+<span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the sum of ``value`` and a :class:`relativedelta`.</span>
+
+<span class="sd">    :param value: initial date or datetime.</span>
+<span class="sd">    :param args: positional args to pass directly to :class:`relativedelta`.</span>
+<span class="sd">    :param kwargs: keyword args to pass directly to :class:`relativedelta`.</span>
+<span class="sd">    :return: the resulting date/datetime.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">value</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="subtract">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.subtract">[docs]</a>
+<span class="k">def</span> <span class="nf">subtract</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the difference between ``value`` and a :class:`relativedelta`.</span>
+
+<span class="sd">    :param value: initial date or datetime.</span>
+<span class="sd">    :param args: positional args to pass directly to :class:`relativedelta`.</span>
+<span class="sd">    :param kwargs: keyword args to pass directly to :class:`relativedelta`.</span>
+<span class="sd">    :return: the resulting date/datetime.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">value</span> <span class="o">-</span> <span class="n">relativedelta</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="json_default">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.json_default">[docs]</a>
+<span class="k">def</span> <span class="nf">json_default</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Properly serializes date and datetime objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">fields</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">date</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">lazy</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">_value</span>
+    <span class="k">return</span> <span class="n">ustr</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="date_range">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.date_utils.date_range">[docs]</a>
+<span class="k">def</span> <span class="nf">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">relativedelta</span><span class="p">(</span><span class="n">months</span><span class="o">=</span><span class="mi">1</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Date range generator with a step interval.</span>
+
+<span class="sd">    :param date | datetime start: beginning date of the range.</span>
+<span class="sd">    :param date | datetime end: ending date of the range.</span>
+<span class="sd">    :param relativedelta step: interval of the range.</span>
+<span class="sd">    :return: a range of datetime from start to end.</span>
+<span class="sd">    :rtype: Iterator[datetime]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">end</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>
+        <span class="n">are_naive</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">end</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="n">are_utc</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span> <span class="o">==</span> <span class="n">pytz</span><span class="o">.</span><span class="n">utc</span> <span class="ow">and</span> <span class="n">end</span><span class="o">.</span><span class="n">tzinfo</span> <span class="o">==</span> <span class="n">pytz</span><span class="o">.</span><span class="n">utc</span>
+
+        <span class="c1"># Cases with miscellenous timezone are more complexe because of DST.</span>
+        <span class="n">are_others</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">and</span> <span class="n">end</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">are_utc</span>
+
+        <span class="k">if</span> <span class="n">are_others</span> <span class="ow">and</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span><span class="o">.</span><span class="n">zone</span> <span class="o">!=</span> <span class="n">end</span><span class="o">.</span><span class="n">tzinfo</span><span class="o">.</span><span class="n">zone</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Timezones of start argument and end argument seem inconsistent&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">are_naive</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">are_utc</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">are_others</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Timezones of start argument and end argument mismatch&quot;</span><span class="p">)</span>
+
+        <span class="n">dt</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">end_dt</span> <span class="o">=</span> <span class="n">end</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">post_process</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span><span class="o">.</span><span class="n">localize</span> <span class="k">if</span> <span class="n">start</span><span class="o">.</span><span class="n">tzinfo</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">dt</span><span class="p">:</span> <span class="n">dt</span>
+
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">end</span><span class="p">,</span> <span class="n">date</span><span class="p">):</span>
+        <span class="n">dt</span><span class="p">,</span> <span class="n">end_dt</span> <span class="o">=</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span>
+        <span class="n">post_process</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">dt</span><span class="p">:</span> <span class="n">dt</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;start/end should be both date or both datetime type&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">start</span> <span class="o">&gt;</span> <span class="n">end</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;start &gt; end, start date must be before end&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">start</span> <span class="o">==</span> <span class="n">start</span> <span class="o">+</span> <span class="n">step</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Looks like step is null&quot;</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="n">dt</span> <span class="o">&lt;=</span> <span class="n">end_dt</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">post_process</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span>
+        <span class="n">dt</span> <span class="o">=</span> <span class="n">dt</span> <span class="o">+</span> <span class="n">step</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

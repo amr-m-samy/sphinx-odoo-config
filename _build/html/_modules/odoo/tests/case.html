@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tests.case &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tests.case</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tests.case</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Test case implementation&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">PurePath</span>
+<span class="kn">from</span> <span class="nn">unittest</span> <span class="kn">import</span> <span class="n">SkipTest</span>
+<span class="kn">from</span> <span class="nn">unittest</span> <span class="kn">import</span> <span class="n">TestCase</span> <span class="k">as</span> <span class="n">_TestCase</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="n">__unittest</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="n">_subtest_msg_sentinel</span> <span class="o">=</span> <span class="nb">object</span><span class="p">()</span>
+
+
+<span class="k">class</span> <span class="nc">_Outcome</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">success</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test</span> <span class="o">=</span> <span class="n">test</span>
+
+    <span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+    <span class="k">def</span> <span class="nf">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_case</span><span class="p">,</span> <span class="n">isTest</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="n">SkipTest</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">addSkip</span><span class="p">(</span><span class="n">test_case</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span> <span class="c1"># pylint: disable=bare-except</span>
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">exception_type</span><span class="p">,</span> <span class="n">exception</span><span class="p">,</span> <span class="n">tb</span> <span class="o">=</span> <span class="n">exc_info</span>
+                <span class="n">tb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_complete_traceback</span><span class="p">(</span><span class="n">tb</span><span class="p">)</span>
+                <span class="n">exc_info</span> <span class="o">=</span> <span class="p">(</span><span class="n">exception_type</span><span class="p">,</span> <span class="n">exception</span><span class="p">,</span> <span class="n">tb</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">_addError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">test_case</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+
+            <span class="c1"># explicitly break a reference cycle:</span>
+            <span class="c1"># exc_info -&gt; frame -&gt; exc_info</span>
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_complete_traceback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_tb</span><span class="p">):</span>
+        <span class="n">Traceback</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">initial_tb</span><span class="p">)</span>
+
+        <span class="c1"># make the set of frames in the traceback</span>
+        <span class="n">tb_frames</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">tb</span> <span class="o">=</span> <span class="n">initial_tb</span>
+        <span class="k">while</span> <span class="n">tb</span><span class="p">:</span>
+            <span class="n">tb_frames</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">tb</span><span class="o">.</span><span class="n">tb_frame</span><span class="p">)</span>
+            <span class="n">tb</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_next</span>
+        <span class="n">tb</span> <span class="o">=</span> <span class="n">initial_tb</span>
+
+        <span class="c1"># find the common frame by searching the last frame of the current_stack present in the traceback.</span>
+        <span class="n">current_frame</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()</span>
+        <span class="n">common_frame</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">while</span> <span class="n">current_frame</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">current_frame</span> <span class="ow">in</span> <span class="n">tb_frames</span><span class="p">:</span>
+                <span class="n">common_frame</span> <span class="o">=</span> <span class="n">current_frame</span>  <span class="c1"># we want to find the last frame in common</span>
+            <span class="n">current_frame</span> <span class="o">=</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">f_back</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">common_frame</span><span class="p">:</span>  <span class="c1"># not really useful but safer</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;No common frame found with current stack, displaying full stack&#39;</span><span class="p">)</span>
+            <span class="n">tb</span> <span class="o">=</span> <span class="n">initial_tb</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># remove the tb_frames until the common_frame is reached (keep the current_frame tb since the line is more accurate)</span>
+            <span class="k">while</span> <span class="n">tb</span> <span class="ow">and</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_frame</span> <span class="o">!=</span> <span class="n">common_frame</span><span class="p">:</span>
+                <span class="n">tb</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_next</span>
+
+        <span class="c1"># add all current frame elements under the common_frame to tb</span>
+        <span class="n">current_frame</span> <span class="o">=</span> <span class="n">common_frame</span><span class="o">.</span><span class="n">f_back</span>
+        <span class="k">while</span> <span class="n">current_frame</span><span class="p">:</span>
+            <span class="n">tb</span> <span class="o">=</span> <span class="n">Traceback</span><span class="p">(</span><span class="n">tb</span><span class="p">,</span> <span class="n">current_frame</span><span class="p">,</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">f_lasti</span><span class="p">,</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">f_lineno</span><span class="p">)</span>
+            <span class="n">current_frame</span> <span class="o">=</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">f_back</span>
+
+        <span class="c1"># remove traceback root part (odoo_bin, main, loading, ...), as</span>
+        <span class="c1"># everything under the testCase is not useful. Using &#39;_callTestMethod&#39;,</span>
+        <span class="c1"># &#39;_callSetUp&#39;, &#39;_callTearDown&#39;, &#39;_callCleanup&#39; instead of the test</span>
+        <span class="c1"># method since the error does not comme especially from the test method.</span>
+        <span class="k">while</span> <span class="n">tb</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_frame</span><span class="o">.</span><span class="n">f_code</span>
+            <span class="k">if</span> <span class="n">PurePath</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">co_filename</span><span class="p">)</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;case.py&#39;</span> <span class="ow">and</span> <span class="n">code</span><span class="o">.</span><span class="n">co_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;_callTestMethod&#39;</span><span class="p">,</span> <span class="s1">&#39;_callSetUp&#39;</span><span class="p">,</span> <span class="s1">&#39;_callTearDown&#39;</span><span class="p">,</span> <span class="s1">&#39;_callCleanup&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_next</span>
+            <span class="n">tb</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_next</span>
+
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;No root frame found, displaying full stacks&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">initial_tb</span>  <span class="c1"># this shouldn&#39;t be reached</span>
+
+
+<div class="viewcode-block" id="TestCase">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCase</span><span class="p">(</span><span class="n">_TestCase</span><span class="p">):</span>
+    <span class="n">_class_cleanups</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># needed, backport for versions &lt; 3.8</span>
+    <span class="n">__unittest_skip__</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">__unittest_skip_why__</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">_moduleSetUpFailed</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># pylint: disable=super-init-not-called</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">methodName</span><span class="o">=</span><span class="s1">&#39;runTest&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an instance of the class that will use the named test</span>
+<span class="sd">           method when executed. Raises a ValueError if the instance does</span>
+<span class="sd">           not have a method with the specified name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_testMethodName</span> <span class="o">=</span> <span class="n">methodName</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_outcome</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">methodName</span> <span class="o">!=</span> <span class="s1">&#39;runTest&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">methodName</span><span class="p">):</span>
+            <span class="c1"># we allow instantiation with no explicit method name</span>
+            <span class="c1"># but not an *incorrect* or missing method name</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;no such test method in </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span>
+                             <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="n">methodName</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cleanups</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subtest</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Map types to custom assertEqual functions that will compare</span>
+        <span class="c1"># instances of said type in more detail to generate a more useful</span>
+        <span class="c1"># error message.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_type_equality_funcs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">dict</span><span class="p">,</span> <span class="s1">&#39;assertDictEqual&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="s1">&#39;assertListEqual&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="s1">&#39;assertTupleEqual&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">set</span><span class="p">,</span> <span class="s1">&#39;assertSetEqual&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">,</span> <span class="s1">&#39;assertSetEqual&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addTypeEqualityFunc</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="s1">&#39;assertMultiLineEqual&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestCase.addCleanup">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.addCleanup">[docs]</a>
+    <span class="k">def</span> <span class="nf">addCleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a function, with arguments, to be called when the test is</span>
+<span class="sd">        completed. Functions added are called on a LIFO basis and are</span>
+<span class="sd">        called after tearDown on test failure or success.</span>
+
+<span class="sd">        Cleanup items are called even if setUp fails (unlike tearDown).&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cleanups</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">function</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestCase.addClassCleanup">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.addClassCleanup">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">addClassCleanup</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Same as addCleanup, except the cleanup items are called even if</span>
+<span class="sd">        setUpClass fails (unlike tearDownClass).&quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_class_cleanups</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">function</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestCase.shortDescription">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.shortDescription">[docs]</a>
+    <span class="k">def</span> <span class="nf">shortDescription</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="TestCase.subTest">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.subTest">[docs]</a>
+    <span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+    <span class="k">def</span> <span class="nf">subTest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="n">_subtest_msg_sentinel</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a context manager that will return the enclosed block</span>
+<span class="sd">        of code in a subtest identified by the optional message and</span>
+<span class="sd">        keyword parameters.  A failure in the subtest marks the test</span>
+<span class="sd">        case as failed but resumes execution at the end of the enclosed</span>
+<span class="sd">        block, allowing further test code to be executed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtest</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">params</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">parent</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">params</span><span class="p">}}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subtest</span> <span class="o">=</span> <span class="n">_SubTest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_outcome</span><span class="o">.</span><span class="n">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_subtest</span><span class="p">,</span> <span class="n">isTest</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="k">yield</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subtest</span> <span class="o">=</span> <span class="n">parent</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_addError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This method is similar to feed_errors_to_result in python&lt;=3.10</span>
+<span class="sd">        but only manage one error at a time</span>
+<span class="sd">        This is also inspired from python 3.11 _addError but still manages</span>
+<span class="sd">        subtests errors as in python 3.7-3.10 for minimal changes.</span>
+<span class="sd">        The method remains on the test to easily override it in test_test_suite</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">test</span><span class="p">,</span> <span class="n">_SubTest</span><span class="p">):</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">addSubTest</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">test_case</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">failureException</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">addFailure</span><span class="p">(</span><span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">addError</span><span class="p">(</span><span class="n">test</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_callSetUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_callTestMethod</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+        <span class="n">method</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_callTearDown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tearDown</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_callCleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TestCase.run">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">startTest</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="n">testMethod</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_testMethodName</span><span class="p">)</span>
+
+        <span class="n">skip</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">skip_why</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">skip</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">__unittest_skip__</span> <span class="ow">or</span> <span class="n">testMethod</span><span class="o">.</span><span class="n">__unittest_skip__</span>
+            <span class="n">skip_why</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">__unittest_skip_why__</span> <span class="ow">or</span> <span class="n">testMethod</span><span class="o">.</span><span class="n">__unittest_skip_why__</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>  <span class="c1"># testMethod may not have a __unittest_skip__ or __unittest_skip_why__</span>
+            <span class="k">pass</span>
+        <span class="k">if</span> <span class="n">skip</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">addSkip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">skip_why</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">stopTest</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">outcome</span> <span class="o">=</span> <span class="n">_Outcome</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_outcome</span> <span class="o">=</span> <span class="n">outcome</span>
+            <span class="k">with</span> <span class="n">outcome</span><span class="o">.</span><span class="n">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_callSetUp</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">outcome</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">outcome</span><span class="o">.</span><span class="n">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">isTest</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_callTestMethod</span><span class="p">(</span><span class="n">testMethod</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">outcome</span><span class="o">.</span><span class="n">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_callTearDown</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">doCleanups</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">outcome</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">addSuccess</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">stopTest</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+            <span class="c1"># clear the outcome, no more needed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_outcome</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="TestCase.doCleanups">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.doCleanups">[docs]</a>
+    <span class="k">def</span> <span class="nf">doCleanups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute all cleanup functions. Normally called for you after</span>
+<span class="sd">        tearDown.&quot;&quot;&quot;</span>
+
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanups</span><span class="p">:</span>
+            <span class="n">function</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanups</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_outcome</span><span class="o">.</span><span class="n">testPartExecutor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_callCleanup</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCase.doClassCleanups">
+<a class="viewcode-back" href="../../../odoo.tests.html#odoo.tests.case.TestCase.doClassCleanups">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">doClassCleanups</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute all class cleanup functions. Normally called for you after</span>
+<span class="sd">        tearDownClass.&quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">tearDown_exceptions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">while</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_class_cleanups</span><span class="p">:</span>
+            <span class="n">function</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_class_cleanups</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">tearDown_exceptions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span></div>
+</div>
+
+
+
+<span class="k">class</span> <span class="nc">_SubTest</span><span class="p">(</span><span class="n">TestCase</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_case</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message</span> <span class="o">=</span> <span class="n">message</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_case</span> <span class="o">=</span> <span class="n">test_case</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">failureException</span> <span class="o">=</span> <span class="n">test_case</span><span class="o">.</span><span class="n">failureException</span>
+
+    <span class="k">def</span> <span class="nf">runTest</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;subtests cannot be run directly&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_subDescription</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_message</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_subtest_msg_sentinel</span><span class="p">:</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">{}</span><span class="s2">]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_message</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+            <span class="n">params_desc</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">=</span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;(</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">params_desc</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;(&lt;subtest&gt;)&#39;</span>
+
+    <span class="k">def</span> <span class="nf">id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_case</span><span class="o">.</span><span class="n">id</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subDescription</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test_case</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subDescription</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

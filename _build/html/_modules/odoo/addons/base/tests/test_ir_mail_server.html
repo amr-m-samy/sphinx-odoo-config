@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_ir_mail_server &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_ir_mail_server</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_ir_mail_server</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">email.message</span>
+<span class="kn">import</span> <span class="nn">email.policy</span>
+
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">tools</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.tests</span> <span class="kn">import</span> <span class="n">test_mail_examples</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.tests.common</span> <span class="kn">import</span> <span class="n">MockSmtplibCase</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">tagged</span><span class="p">,</span> <span class="n">users</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCase</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">config</span>
+
+
+<span class="k">class</span> <span class="nc">_FakeSMTP</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;SMTP stub&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">messages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">from_filter</span> <span class="o">=</span> <span class="s1">&#39;example.com&#39;</span>
+
+    <span class="c1"># Python 3 before 3.7.4</span>
+    <span class="k">def</span> <span class="nf">sendmail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="n">message_str</span><span class="p">,</span>
+                 <span class="n">mail_options</span><span class="o">=</span><span class="p">(),</span> <span class="n">rcpt_options</span><span class="o">=</span><span class="p">()):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message_str</span><span class="p">)</span>
+
+    <span class="c1"># Python 3.7.4+</span>
+    <span class="k">def</span> <span class="nf">send_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span>
+                     <span class="n">mail_options</span><span class="o">=</span><span class="p">(),</span> <span class="n">rcpt_options</span><span class="o">=</span><span class="p">()):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">())</span>
+
+
+<div class="viewcode-block" id="EmailConfigCase">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.EmailConfigCase">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mail_server&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">EmailConfigCase</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="EmailConfigCase.test_default_email_from">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.EmailConfigCase.test_default_email_from">[docs]</a>
+    <span class="nd">@patch</span><span class="o">.</span><span class="n">dict</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;email_from&quot;</span><span class="p">:</span> <span class="s2">&quot;settings@example.com&quot;</span><span class="p">})</span>
+    <span class="k">def</span> <span class="nf">test_default_email_from</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Email from setting is respected and comes from configuration. &quot;&quot;&quot;</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.mail_server&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">build_email</span><span class="p">(</span>
+            <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;recipient@example.com&quot;</span><span class="p">,</span> <span class="s2">&quot;Subject&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;The body of an email&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">message</span><span class="p">[</span><span class="s2">&quot;From&quot;</span><span class="p">],</span> <span class="s2">&quot;settings@example.com&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestIrMailServer">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mail_server&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestIrMailServer</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">,</span> <span class="n">MockSmtplibCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestIrMailServer.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;mail.default.from_filter&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_init_mail_servers</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_assert_base_values">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_assert_base_values">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_assert_base_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_default_bounce_address</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_default_from_address</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_bpo_34424_35805">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_bpo_34424_35805">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_bpo_34424_35805</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure all email sent are bpo-34424 and bpo-35805 free&quot;&quot;&quot;</span>
+        <span class="n">fake_smtp</span> <span class="o">=</span> <span class="n">_FakeSMTP</span><span class="p">()</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">email</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">EmailMessage</span><span class="p">(</span><span class="n">policy</span><span class="o">=</span><span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">SMTP</span><span class="p">)</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&quot;Joé Doe&quot; &lt;joe@example.com&gt;&#39;</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&quot;Joé Doe&quot; &lt;joe@example.com&gt;&#39;</span>
+
+        <span class="c1"># Message-Id &amp; References fields longer than 77 chars (bpo-35805)</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Message-Id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&lt;929227342217024.1596730490.324691772460938-example-30661-some.reference@test-123.example.com&gt;&#39;</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;References&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&lt;345227342212345.1596730777.324691772483620-example-30453-other.reference@test-123.example.com&gt;&#39;</span>
+
+        <span class="n">msg_on_the_wire</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_email</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">fake_smtp</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg_on_the_wire</span><span class="p">,</span>
+            <span class="s1">&#39;From: =?utf-8?q?Jo=C3=A9?= Doe &lt;joe@example.com&gt;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+            <span class="s1">&#39;To: =?utf-8?q?Jo=C3=A9?= Doe &lt;joe@example.com&gt;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+            <span class="s1">&#39;Message-Id: &lt;929227342217024.1596730490.324691772460938-example-30661-some.reference@test-123.example.com&gt;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+            <span class="s1">&#39;References: &lt;345227342212345.1596730777.324691772483620-example-30453-other.reference@test-123.example.com&gt;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+            <span class="s1">&#39;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_content_alternative_correct_order">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_content_alternative_correct_order">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_content_alternative_correct_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        RFC-1521 7.2.3. The Multipart/alternative subtype</span>
+<span class="sd">        &gt; the alternatives appear in an order of increasing faithfulness</span>
+<span class="sd">        &gt; to the original content. In general, the best choice is the</span>
+<span class="sd">        &gt; LAST part of a type supported by the recipient system&#39;s local</span>
+<span class="sd">        &gt; environment.</span>
+
+<span class="sd">        Also, the MIME-Version header should be present in BOTH the</span>
+<span class="sd">        enveloppe AND the parts</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fake_smtp</span> <span class="o">=</span> <span class="n">_FakeSMTP</span><span class="p">()</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="s2">&quot;test@example.com&quot;</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="s1">&#39;&lt;p&gt;Hello world&lt;/p&gt;&#39;</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">)</span>
+        <span class="n">msg_on_the_wire</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_email</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">fake_smtp</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertGreater</span><span class="p">(</span><span class="n">msg_on_the_wire</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;text/html&#39;</span><span class="p">),</span> <span class="n">msg_on_the_wire</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;text/plain&#39;</span><span class="p">),</span>
+            <span class="s2">&quot;The html part should be preferred (=appear after) to the text part&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg_on_the_wire</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s1">&#39;===============&#39;</span><span class="p">),</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># +2 for the header and the footer</span>
+            <span class="s2">&quot;There should be 2 parts: one text and one html&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg_on_the_wire</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s1">&#39;MIME-Version: 1.0&#39;</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="s2">&quot;There should be 3 headers MIME-Version: one on the enveloppe, &quot;</span>
+            <span class="s2">&quot;one on the html part, one on the text part&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_content_mail_body">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_content_mail_body">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_content_mail_body</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">bodies</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;content&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;content&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;head&gt;&lt;meta content=&quot;text/html; charset=utf-8&quot; http-equiv=&quot;Content-Type&quot;&gt;&lt;/head&gt;&lt;body&gt;&lt;p&gt;content&lt;/p&gt;&lt;/body&gt;&#39;</span><span class="p">,</span>
+            <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">MISC_HTML_SOURCE</span><span class="p">,</span>
+            <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_HTML</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">expected_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;content&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;content&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;content&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;test1</span><span class="se">\n</span><span class="s2">*test2*</span><span class="se">\n</span><span class="s2">test3</span><span class="se">\n</span><span class="s2">test4</span><span class="se">\n</span><span class="s2">test5</span><span class="se">\n</span><span class="s2">test6   test7</span><span class="se">\n</span><span class="s2">test8    test9</span><span class="se">\n</span><span class="s2">test10</span><span class="se">\n</span><span class="s2">test11</span><span class="se">\n</span><span class="s2">test12</span><span class="se">\n</span><span class="s2">google [1]</span><span class="se">\n</span><span class="s2">test link [2]</span><span class="se">\n\n\n</span><span class="s2">[1] http://google.com</span><span class="se">\n</span><span class="s2">[2] javascript:alert(&#39;malicious code&#39;)&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;On 01/05/2016 10:24 AM, Raoul</span><span class="se">\n</span><span class="s1">Poilvache wrote:</span><span class="se">\n\n</span><span class="s1">* Test reply. The suite. *</span><span class="se">\n\n</span><span class="s1">--</span><span class="se">\n</span><span class="s1">Raoul Poilvache</span><span class="se">\n\n</span><span class="s1">Top cool !!!</span><span class="se">\n\n</span><span class="s1">--</span><span class="se">\n</span><span class="s1">Raoul Poilvache&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">body</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">bodies</span><span class="p">,</span> <span class="n">expected_list</span><span class="p">):</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">build_email</span><span class="p">(</span>
+                <span class="s1">&#39;john.doe@from.example.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;destinataire@to.example.com&#39;</span><span class="p">,</span>
+                <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
+                <span class="n">subject</span><span class="o">=</span><span class="s1">&#39;Subject&#39;</span><span class="p">,</span>
+                <span class="n">subtype</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">body_alternative</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">message</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_maintype</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;multipart&#39;</span><span class="p">:</span>
+                    <span class="k">continue</span>  <span class="c1"># skip container</span>
+                <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">():</span>
+                        <span class="k">continue</span>
+                    <span class="n">body_alternative</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_content</span><span class="p">())</span>
+                    <span class="c1"># remove ending new lines as it just adds noise</span>
+                    <span class="n">body_alternative</span> <span class="o">=</span> <span class="n">body_alternative</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">body_alternative</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_get_test_email_from">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_get_test_email_from">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;admin&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_get_test_email_from</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the email used to test the mail server connection. Check</span>
+<span class="sd">        from_filter parsing / default fallback value. &quot;&quot;&quot;</span>
+        <span class="n">test_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;example_2.com, example_3.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Server&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;smtp_host&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_encryption&#39;</span><span class="p">:</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="k">for</span> <span class="n">from_filter</span><span class="p">,</span> <span class="n">expected_test_email</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s1">&#39;example_2.com, example_3.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;dummy.com, full_email@example_2.com, dummy2.com&#39;</span><span class="p">,</span>
+                <span class="c1"># fallback on user&#39;s email</span>
+                <span class="s1">&#39; &#39;</span><span class="p">,</span>
+                <span class="s1">&#39;,&#39;</span><span class="p">,</span>
+                <span class="kc">False</span><span class="p">,</span>
+            <span class="p">],</span> <span class="p">[</span>
+                <span class="s1">&#39;noreply@example_2.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;full_email@example_2.com&#39;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">email</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">email</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">email</span><span class="p">,</span>
+            <span class="p">],</span>
+        <span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">from_filter</span><span class="o">=</span><span class="n">from_filter</span><span class="p">):</span>
+                <span class="n">test_server</span><span class="o">.</span><span class="n">from_filter</span> <span class="o">=</span> <span class="n">from_filter</span>
+                <span class="n">email_from</span> <span class="o">=</span> <span class="n">test_server</span><span class="o">.</span><span class="n">_get_test_email_from</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">email_from</span><span class="p">,</span> <span class="n">expected_test_email</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_match_from_filter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_match_from_filter">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_mail_server_match_from_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the from_filter field on the &quot;ir.mail_server&quot;. &quot;&quot;&quot;</span>
+        <span class="c1"># Should match</span>
+        <span class="n">tests</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.EXAMPLE.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;fake@test.mycompany.com&quot; &lt;admin@mail.example.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;fake@test.mycompany.com&quot; &lt;ADMIN@mail.example.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;fake@test.mycompany.com&quot; &lt;ADMIN@mail.example.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;test.mycompany.com, mail.example.com, test2.com&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">email</span><span class="p">,</span> <span class="n">from_filter</span> <span class="ow">in</span> <span class="n">tests</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_match_from_filter</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">))</span>
+
+        <span class="c1"># Should not match</span>
+        <span class="n">tests</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;test@mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;test.mycompany.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.éxample.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mmail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@mail.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;mmail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;admin@mail.example.com&quot; &lt;fake@test.mycompany.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;mail.example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;fake@test.mycompany.com&quot; &lt;ADMIN@mail.example.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;test.mycompany.com, wrong.mail.example.com, test3.com&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">email</span><span class="p">,</span> <span class="n">from_filter</span> <span class="ow">in</span> <span class="n">tests</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_match_from_filter</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_priorities">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_priorities">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_priorities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test if we choose the right mail server to send an email. Simulates</span>
+<span class="sd">        simple Odoo DB so we have to spoof the FROM otherwise we cannot send</span>
+<span class="sd">        any email. &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">email_from</span><span class="p">,</span> <span class="p">(</span><span class="n">expected_mail_server</span><span class="p">,</span> <span class="n">expected_email_from</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;unknown_email@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="c1"># no notification set, must be forced to spoof the FROM</span>
+                <span class="s1">&#39;&quot;Test&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">,</span>
+            <span class="p">],</span> <span class="p">[</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mail_server_user</span><span class="p">,</span> <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mail_server_domain</span><span class="p">,</span> <span class="s1">&#39;unknown_email@test.mycompany.com&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mail_server_default</span><span class="p">,</span> <span class="s1">&#39;&quot;Test&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">],</span>
+        <span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">email_from</span><span class="o">=</span><span class="n">email_from</span><span class="p">):</span>
+                <span class="n">mail_server</span><span class="p">,</span> <span class="n">mail_from</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_find_mail_server</span><span class="p">(</span><span class="n">email_from</span><span class="o">=</span><span class="n">email_from</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">mail_server</span><span class="p">,</span> <span class="n">expected_mail_server</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">mail_from</span><span class="p">,</span> <span class="n">expected_email_from</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_send_email">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_send_email">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_send_email</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test main &#39;send_email&#39; usage: check mail_server choice based on from</span>
+<span class="sd">        filters, encapsulation, spoofing. &quot;&quot;&quot;</span>
+        <span class="n">IrMailServer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">mail_from</span><span class="p">,</span> <span class="p">(</span><span class="n">expected_smtp_from</span><span class="p">,</span> <span class="n">expected_msg_from</span><span class="p">,</span> <span class="n">expected_mail_server</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Name&quot; &lt;unknown_name@test.mycompany.com&gt;&#39;</span>
+            <span class="p">],</span> <span class="p">[</span>
+                <span class="c1"># A mail server is configured for the email</span>
+                <span class="p">(</span><span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_user</span><span class="p">),</span>
+                <span class="c1"># No mail server are configured for the email address, so it will use the</span>
+                <span class="c1"># notifications email instead and encapsulate the old email</span>
+                <span class="p">(</span><span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_default</span><span class="p">),</span>
+                <span class="c1"># same situation, but the original email has no name part</span>
+                <span class="p">(</span><span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span> <span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_default</span><span class="p">),</span>
+                <span class="c1"># A mail server is configured for the entire domain name, so we can use the bounce</span>
+                <span class="c1"># email address because the mail server supports it</span>
+                <span class="p">(</span><span class="s1">&#39;unknown_name@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Name&quot; &lt;unknown_name@test.mycompany.com&gt;&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_domain</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">):</span>
+            <span class="c1"># test with and without providing an SMTP session, which should not impact test</span>
+            <span class="k">for</span> <span class="n">provide_smtp</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">]:</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">,</span> <span class="n">provide_smtp</span><span class="o">=</span><span class="n">provide_smtp</span><span class="p">):</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="n">provide_smtp</span><span class="p">:</span>
+                            <span class="n">smtp_session</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">smtp_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="n">smtp_session</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="n">connect_mocked</span><span class="o">.</span><span class="n">assert_called_once</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+                        <span class="n">smtp_from</span><span class="o">=</span><span class="n">expected_smtp_from</span><span class="p">,</span>
+                        <span class="n">message_from</span><span class="o">=</span><span class="n">expected_msg_from</span><span class="p">,</span>
+                        <span class="n">mail_server</span><span class="o">=</span><span class="n">expected_mail_server</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+        <span class="c1"># remove the notification server</span>
+        <span class="c1"># so &lt;notifications.test@test.mycompany.com&gt; will use the &lt;test.mycompany.com&gt; mail server</span>
+        <span class="c1"># The mail server configured for the notifications email has been removed</span>
+        <span class="c1"># but we can still use the mail server configured for test.mycompany.com</span>
+        <span class="c1"># and so we will be able to use the bounce address</span>
+        <span class="c1"># because we use the mail server for &quot;test.mycompany.com&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_notification</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">provide_smtp</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">]:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">provide_smtp</span><span class="p">:</span>
+                    <span class="n">smtp_session</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">smtp_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">)</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">)</span>
+                    <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="n">smtp_session</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">)</span>
+                    <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">connect_mocked</span><span class="o">.</span><span class="n">assert_called_once</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+                <span class="n">smtp_from</span><span class="o">=</span><span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span>
+                <span class="n">message_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">,</span>
+                <span class="n">from_filter</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_send_email_context_force">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_send_email_context_force">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.addons.base.models.ir_mail_server&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_send_email_context_force</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Allow to force notifications_email / bounce_address from context</span>
+<span class="sd">        to allow higher-level apps to send values until end of mail stack</span>
+<span class="sd">        without hacking too much models. &quot;&quot;&quot;</span>
+        <span class="c1"># custom notification / bounce email from context</span>
+        <span class="n">context_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;context.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;context&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">IrMailServer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.mail_server&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span>
+            <span class="n">domain_notifications_email</span><span class="o">=</span><span class="s2">&quot;notification@context.example.com&quot;</span><span class="p">,</span>
+            <span class="n">domain_bounce_address</span><span class="o">=</span><span class="s2">&quot;bounce@context.example.com&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+            <span class="n">mail_server</span><span class="p">,</span> <span class="n">smtp_from</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">_find_mail_server</span><span class="p">(</span><span class="n">email_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">mail_server</span><span class="p">,</span> <span class="n">context_server</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">smtp_from</span><span class="p">,</span> <span class="s2">&quot;notification@context.example.com&quot;</span><span class="p">)</span>
+            <span class="n">smtp_session</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">smtp_from</span><span class="o">=</span><span class="n">smtp_from</span><span class="p">)</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">)</span>
+            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="n">smtp_session</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+            <span class="n">smtp_from</span><span class="o">=</span><span class="s2">&quot;bounce@context.example.com&quot;</span><span class="p">,</span>
+            <span class="n">message_from</span><span class="o">=</span><span class="s1">&#39;&quot;Name&quot; &lt;notification@context.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="n">from_filter</span><span class="o">=</span><span class="n">context_server</span><span class="o">.</span><span class="n">from_filter</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># miss-configured database, no mail servers from filter</span>
+        <span class="c1"># match the user / notification email</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span><span class="o">.</span><span class="n">from_filter</span> <span class="o">=</span> <span class="s2">&quot;random.domain&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;specific_user@test.com&#39;</span><span class="p">)</span>
+            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">domain_notifications_email</span><span class="o">=</span><span class="s1">&#39;test@custom_domain.com&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect_mocked</span><span class="o">.</span><span class="n">assert_called_once</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+            <span class="n">smtp_from</span><span class="o">=</span><span class="s1">&#39;test@custom_domain.com&#39;</span><span class="p">,</span>
+            <span class="n">message_from</span><span class="o">=</span><span class="s1">&#39;&quot;specific_user&quot; &lt;test@custom_domain.com&gt;&#39;</span><span class="p">,</span>
+            <span class="n">from_filter</span><span class="o">=</span><span class="s1">&#39;random.domain&#39;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_send_email_IDNA">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_send_email_IDNA">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_send_email_IDNA</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that the mail from / recipient envelop are encoded using IDNA &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;test@ééééééé.com&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+            <span class="n">smtp_from</span><span class="o">=</span><span class="s1">&#39;test@xn--9caaaaaaa.com&#39;</span><span class="p">,</span>
+            <span class="n">smtp_to_list</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;dest@xn--example--i1a.com&#39;</span><span class="p">],</span>
+            <span class="n">message_from</span><span class="o">=</span><span class="s1">&#39;test@=?utf-8?b?w6nDqcOpw6nDqcOpw6k=?=.com&#39;</span><span class="p">,</span>
+            <span class="n">from_filter</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_config_bin">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_config_bin">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">,</span> <span class="s1">&#39;odoo.addons.base.models.ir_mail_server&#39;</span><span class="p">)</span>
+    <span class="nd">@patch</span><span class="o">.</span><span class="n">dict</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">,</span> <span class="p">{</span>
+        <span class="s2">&quot;from_filter&quot;</span><span class="p">:</span> <span class="s2">&quot;dummy@example.com, test.mycompany.com, dummy2@example.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;smtp_server&quot;</span><span class="p">:</span> <span class="s2">&quot;example.com&quot;</span><span class="p">,</span>
+    <span class="p">})</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_config_bin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the configuration provided in the odoo-bin arguments. This config</span>
+<span class="sd">        is used when no mail server exists. Test with and without giving a</span>
+<span class="sd">        pre-configured SMTP session, should not impact results.</span>
+
+<span class="sd">        Also check &quot;mail.default.from_filter&quot; parameter usage that should overwrite</span>
+<span class="sd">        odoo-bin argument &quot;--from-filter&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">IrMailServer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Remove all mail server so we will use the odoo-bin arguments</span>
+        <span class="n">IrMailServer</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">IrMailServer</span><span class="o">.</span><span class="n">search</span><span class="p">([]))</span>
+
+        <span class="k">for</span> <span class="n">mail_from</span><span class="p">,</span> <span class="p">(</span><span class="n">expected_smtp_from</span><span class="p">,</span> <span class="n">expected_msg_from</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="c1"># inside &quot;from_filter&quot; domain</span>
+                <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Formatted Name&quot; &lt;specific_user@test.mycompany.com&gt;&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Formatted Name&quot; &lt;specific_user@test.MYCOMPANY.com&gt;&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Formatted Name&quot; &lt;SPECIFIC_USER@test.mycompany.com&gt;&#39;</span><span class="p">,</span>
+                <span class="c1"># outside &quot;from_filter&quot; domain</span>
+                <span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;&quot;Formatted Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">,</span>
+            <span class="p">],</span> <span class="p">[</span>
+                <span class="c1"># inside &quot;from_filter&quot; domain: no rewriting</span>
+                <span class="p">(</span><span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Formatted Name&quot; &lt;specific_user@test.mycompany.com&gt;&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;specific_user@test.MYCOMPANY.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Formatted Name&quot; &lt;specific_user@test.MYCOMPANY.com&gt;&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;SPECIFIC_USER@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Formatted Name&quot; &lt;SPECIFIC_USER@test.mycompany.com&gt;&#39;</span><span class="p">),</span>
+                <span class="c1"># outside &quot;from_filter&quot; domain: spoofing, as fallback email can be found</span>
+                <span class="p">(</span><span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span> <span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;test@unknown_domain.com&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Formatted Name&quot; &lt;test@unknown_domain.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">):</span>
+            <span class="k">for</span> <span class="n">provide_smtp</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">]:</span>  <span class="c1"># providing smtp session should ont impact test</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">,</span> <span class="n">provide_smtp</span><span class="o">=</span><span class="n">provide_smtp</span><span class="p">):</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="n">provide_smtp</span><span class="p">:</span>
+                            <span class="n">smtp_session</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">smtp_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="n">smtp_session</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="n">connect_mocked</span><span class="o">.</span><span class="n">assert_called_once</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+                        <span class="n">smtp_from</span><span class="o">=</span><span class="n">expected_smtp_from</span><span class="p">,</span>
+                        <span class="n">message_from</span><span class="o">=</span><span class="n">expected_msg_from</span><span class="p">,</span>
+                        <span class="n">from_filter</span><span class="o">=</span><span class="s2">&quot;dummy@example.com, test.mycompany.com, dummy2@example.com&quot;</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+        <span class="c1"># for from_filter in ICP, overwrite the one from odoo-bin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;mail.default.from_filter&#39;</span><span class="p">,</span> <span class="s1">&#39;icp.example.com&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Use an email in the domain of the config parameter &quot;mail.default.from_filter&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="s1">&#39;specific_user@icp.example.com&#39;</span><span class="p">)</span>
+            <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+            <span class="n">smtp_from</span><span class="o">=</span><span class="s1">&#39;specific_user@icp.example.com&#39;</span><span class="p">,</span>
+            <span class="n">message_from</span><span class="o">=</span><span class="s1">&#39;specific_user@icp.example.com&#39;</span><span class="p">,</span>
+            <span class="n">from_filter</span><span class="o">=</span><span class="s1">&#39;icp.example.com&#39;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServer.test_mail_server_config_cli">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server.TestIrMailServer.test_mail_server_config_cli">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="nd">@patch</span><span class="o">.</span><span class="n">dict</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;fake.com&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_server&#39;</span><span class="p">:</span> <span class="s1">&#39;cli_example.com&#39;</span><span class="p">})</span>
+    <span class="k">def</span> <span class="nf">test_mail_server_config_cli</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test the mail server configuration when the &quot;smtp_authentication&quot; is</span>
+<span class="sd">        &quot;cli&quot;. It should take the configuration from the odoo-bin argument. The</span>
+<span class="sd">        &quot;from_filter&quot; of the mail server should overwrite the one set in the CLI</span>
+<span class="sd">        arguments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">IrMailServer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span>
+        <span class="c1"># should be ignored by the mail server</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;mail.default.from_filter&#39;</span><span class="p">,</span> <span class="s1">&#39;fake.com&#39;</span><span class="p">)</span>
+
+        <span class="n">server_other</span> <span class="o">=</span> <span class="n">IrMailServer</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Server No From Filter&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;smtp_host&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_encryption&#39;</span><span class="p">:</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="s1">&#39;cli&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;dummy@example.com, cli_example.com, dummy2@example.com&#39;</span><span class="p">,</span>
+        <span class="p">}])</span>
+
+        <span class="k">for</span> <span class="n">mail_from</span><span class="p">,</span> <span class="p">(</span><span class="n">expected_smtp_from</span><span class="p">,</span> <span class="n">expected_msg_from</span><span class="p">,</span> <span class="n">expected_mail_server</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="c1"># check that the CLI server take the configuration in the odoo-bin argument</span>
+                <span class="c1"># except the from_filter which is taken on the mail server</span>
+                <span class="s1">&#39;test@cli_example.com&#39;</span><span class="p">,</span>
+                <span class="c1"># other mail servers still work</span>
+                <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span>
+            <span class="p">],</span> <span class="p">[</span>
+                <span class="p">(</span><span class="s1">&#39;test@cli_example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;test@cli_example.com&#39;</span><span class="p">,</span> <span class="n">server_other</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mail_server_user</span><span class="p">),</span>
+            <span class="p">],</span>
+        <span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">):</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">mock_smtplib_connection</span><span class="p">():</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_email</span><span class="p">(</span><span class="n">mail_from</span><span class="o">=</span><span class="n">mail_from</span><span class="p">)</span>
+                    <span class="n">IrMailServer</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertSMTPEmailsSent</span><span class="p">(</span>
+                    <span class="n">smtp_from</span><span class="o">=</span><span class="n">expected_smtp_from</span><span class="p">,</span>
+                    <span class="n">message_from</span><span class="o">=</span><span class="n">expected_msg_from</span><span class="p">,</span>
+                    <span class="n">mail_server</span><span class="o">=</span><span class="n">expected_mail_server</span><span class="p">,</span>
+                <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

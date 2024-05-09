@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_fields &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_fields</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_fields</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">pytz</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">Command</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">ustr</span><span class="p">,</span> <span class="n">OrderedSet</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.translate</span> <span class="kn">import</span> <span class="n">code_translations</span><span class="p">,</span> <span class="n">_lt</span>
+
+<span class="n">REFERENCING_FIELDS</span> <span class="o">=</span> <span class="p">{</span><span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;.id&#39;</span><span class="p">}</span>
+<div class="viewcode-block" id="only_ref_fields">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.only_ref_fields">[docs]</a>
+<span class="k">def</span> <span class="nf">only_ref_fields</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">record</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">REFERENCING_FIELDS</span><span class="p">}</span></div>
+
+<div class="viewcode-block" id="exclude_ref_fields">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.exclude_ref_fields">[docs]</a>
+<span class="k">def</span> <span class="nf">exclude_ref_fields</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">record</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">REFERENCING_FIELDS</span><span class="p">}</span></div>
+
+
+<span class="c1"># these lazy translations promise translations for [&#39;yes&#39;, &#39;no&#39;, &#39;true&#39;, &#39;false&#39;]</span>
+<span class="n">BOOLEAN_TRANSLATIONS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;yes&#39;</span><span class="p">),</span>
+    <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;no&#39;</span><span class="p">),</span>
+    <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;true&#39;</span><span class="p">),</span>
+    <span class="n">_lt</span><span class="p">(</span><span class="s1">&#39;false&#39;</span><span class="p">)</span>
+<span class="p">)</span>
+
+<div class="viewcode-block" id="ImportWarning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.ImportWarning">[docs]</a>
+<span class="k">class</span> <span class="nc">ImportWarning</span><span class="p">(</span><span class="ne">Warning</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Used to send warnings upwards the stack during the import process &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="ConversionNotFound">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.ConversionNotFound">[docs]</a>
+<span class="k">class</span> <span class="nc">ConversionNotFound</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="IrFieldsConverter">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.IrFieldsConverter">[docs]</a>
+<span class="k">class</span> <span class="nc">IrFieldsConverter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">AbstractModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.fields.converter&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Fields Converter&#39;</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_format_import_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="n">error_params</span><span class="o">=</span><span class="p">(),</span> <span class="n">error_args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># sanitize error params for later formatting by the import system</span>
+        <span class="n">sanitize</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%%</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">p</span>
+        <span class="k">if</span> <span class="n">error_params</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_params</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">error_params</span> <span class="o">=</span> <span class="n">sanitize</span><span class="p">(</span><span class="n">error_params</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_params</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">error_params</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">sanitize</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">error_params</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_params</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">error_params</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">sanitize</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">error_params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">error_type</span><span class="p">(</span><span class="n">error_msg</span> <span class="o">%</span> <span class="n">error_params</span><span class="p">,</span> <span class="n">error_args</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_import_field_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Rebuild field path for import error attribution to the right field.</span>
+<span class="sd">        This method uses the &#39;parent_fields_hierarchy&#39; context key built during treatment of one2many fields</span>
+<span class="sd">        (_str_to_one2many). As the field to import is the last of the chain (child_id/child_id2/field_to_import),</span>
+<span class="sd">        we need to retrieve the complete hierarchy in case of error in order to assign the error to the correct</span>
+<span class="sd">        column in the import UI.</span>
+
+<span class="sd">        :param (str) field: field in which the value will be imported.</span>
+<span class="sd">        :param (str or list) value:</span>
+<span class="sd">            - str: in most of the case the value we want to import into a field is a string (or a number).</span>
+<span class="sd">            - list: when importing into a one2may field, all the records to import are regrouped into a list of dict.</span>
+<span class="sd">                E.g.: creating multiple partners: [{None: &#39;ChildA_1&#39;, &#39;type&#39;: &#39;Private address&#39;}, {None: &#39;ChildA_2&#39;, &#39;type&#39;: &#39;Private address&#39;}]</span>
+<span class="sd">                where &#39;None&#39; is the name. (because we can find a partner by his name, we don&#39;t need to specify the field.)</span>
+
+<span class="sd">        The field_path value is computed based on the last field in the chain.</span>
+<span class="sd">        for example,</span>
+<span class="sd">            - path_field for &#39;Private address&#39; at childA_1 is [&#39;partner_id&#39;, &#39;type&#39;]</span>
+<span class="sd">            - path_field for &#39;childA_1&#39; is [&#39;partner_id&#39;]</span>
+
+<span class="sd">        So, by retrieving the correct field_path for each value to import, if errors are raised for those fields,</span>
+<span class="sd">        we can the link the errors to the correct header-field couple in the import UI.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">field_path</span> <span class="o">=</span> <span class="p">[</span><span class="n">field</span><span class="p">]</span>
+        <span class="n">parent_fields_hierarchy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;parent_fields_hierarchy&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parent_fields_hierarchy</span><span class="p">:</span>
+            <span class="n">field_path</span> <span class="o">=</span> <span class="n">parent_fields_hierarchy</span> <span class="o">+</span> <span class="n">field_path</span>
+
+        <span class="n">field_path_value</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">while</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field_path_value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">field_path_value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">key</span><span class="p">:</span>
+                <span class="n">field_path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="n">field_path_value</span> <span class="o">=</span> <span class="n">field_path_value</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">field_path</span>
+
+<div class="viewcode-block" id="IrFieldsConverter.for_model">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.IrFieldsConverter.for_model">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">for_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">fromtype</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns a converter object for the model. A converter is a</span>
+<span class="sd">        callable taking a record-ish (a dictionary representing an odoo</span>
+<span class="sd">        record with values of typetag ``fromtype``) and returning a converted</span>
+<span class="sd">        records matching what :meth:`odoo.osv.orm.Model.write` expects.</span>
+
+<span class="sd">        :param model: :class:`odoo.osv.orm.Model` for the conversion base</span>
+<span class="sd">        :param fromtype:</span>
+<span class="sd">        :returns: a converter callable</span>
+<span class="sd">        :rtype: (record: dict, logger: (field, error) -&gt; None) -&gt; dict</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># make sure model is new api</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+
+        <span class="n">converters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_field</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">fromtype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+
+        <span class="k">def</span> <span class="nf">fn</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+            <span class="n">converted</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">import_file_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_file&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">record</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">REFERENCING_FIELDS</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="n">converted</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">continue</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">converted</span><span class="p">[</span><span class="n">field</span><span class="p">],</span> <span class="n">ws</span> <span class="o">=</span> <span class="n">converters</span><span class="p">[</span><span class="n">field</span><span class="p">](</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                            <span class="c1"># wrap warning string in an ImportWarning for</span>
+                            <span class="c1"># uniform handling</span>
+                            <span class="n">w</span> <span class="o">=</span> <span class="ne">ImportWarning</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+                        <span class="n">log</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">UnicodeEncodeError</span><span class="p">,</span> <span class="ne">UnicodeDecodeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">log</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">import_file_context</span><span class="p">:</span>
+                        <span class="c1"># if the error is linked to a matching error, the error is a tuple</span>
+                        <span class="c1"># E.g.:(&quot;Value X cannot be found for field Y at row 1&quot;, {</span>
+                        <span class="c1">#   &#39;more_info&#39;: {},</span>
+                        <span class="c1">#   &#39;value&#39;: &#39;X&#39;,</span>
+                        <span class="c1">#   &#39;field&#39;: &#39;Y&#39;,</span>
+                        <span class="c1">#   &#39;field_path&#39;: child_id/Y,</span>
+                        <span class="c1"># })</span>
+                        <span class="c1"># In order to link the error to the correct header-field couple in the import UI, we need to add</span>
+                        <span class="c1"># the field path to the additional error info.</span>
+                        <span class="c1"># As we raise the deepest child in error, we need to add the field path only for the deepest</span>
+                        <span class="c1"># error in the import recursion. (if field_path is given, don&#39;t overwrite it)</span>
+                        <span class="n">error_info</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">e</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="n">error_info</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">error_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;field_path&#39;</span><span class="p">):</span>  <span class="c1"># only raise the deepest child in error</span>
+                            <span class="n">error_info</span><span class="p">[</span><span class="s1">&#39;field_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_import_field_path</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                    <span class="n">log</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">converted</span>
+
+        <span class="k">return</span> <span class="n">fn</span></div>
+
+
+<div class="viewcode-block" id="IrFieldsConverter.to_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.IrFieldsConverter.to_field">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">to_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">fromtype</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Fetches a converter for the provided field object, from the</span>
+<span class="sd">        specified type.</span>
+
+<span class="sd">        A converter is simply a callable taking a value of type ``fromtype``</span>
+<span class="sd">        (or a composite of ``fromtype``, e.g. list or dict) and returning a</span>
+<span class="sd">        value acceptable for a write() on the field ``field``.</span>
+
+<span class="sd">        By default, tries to get a method on itself with a name matching the</span>
+<span class="sd">        pattern ``_$fromtype_to_$field.type`` and returns it.</span>
+
+<span class="sd">        Converter callables can either return a value and a list of warnings</span>
+<span class="sd">        to their caller or raise ``ValueError``, which will be interpreted as a</span>
+<span class="sd">        validation &amp; conversion failure.</span>
+
+<span class="sd">        ValueError can have either one or two parameters. The first parameter</span>
+<span class="sd">        is mandatory, **must** be a unicode string and will be used as the</span>
+<span class="sd">        user-visible message for the error (it should be translatable and</span>
+<span class="sd">        translated). It can contain a ``field`` named format placeholder so the</span>
+<span class="sd">        caller can inject the field&#39;s translated, user-facing name (@string).</span>
+
+<span class="sd">        The second parameter is optional and, if provided, must be a mapping.</span>
+<span class="sd">        This mapping will be merged into the error dictionary returned to the</span>
+<span class="sd">        client.</span>
+
+<span class="sd">        If a converter can perform its function but has to make assumptions</span>
+<span class="sd">        about the data, it can send a warning to the user through adding an</span>
+<span class="sd">        instance of :class:`~.ImportWarning` to the second value</span>
+<span class="sd">        it returns. The handling of a warning at the upper levels is the same</span>
+<span class="sd">        as ``ValueError`` above.</span>
+
+<span class="sd">        :param model:</span>
+<span class="sd">        :param field: field object to generate a value for</span>
+<span class="sd">        :type field: :class:`odoo.fields.Field`</span>
+<span class="sd">        :param fromtype: type to convert to something fitting for ``field``</span>
+<span class="sd">        :type fromtype: type | str</span>
+<span class="sd">        :return: a function (fromtype -&gt; field.write_type), if a converter is found</span>
+<span class="sd">        :rtype: Callable | None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fromtype</span><span class="p">,</span> <span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="nb">str</span><span class="p">))</span>
+        <span class="c1"># FIXME: return None</span>
+        <span class="n">typename</span> <span class="o">=</span> <span class="n">fromtype</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fromtype</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="k">else</span> <span class="n">fromtype</span>
+        <span class="n">converter</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_</span><span class="si">%s</span><span class="s1">_to_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">typename</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">converter</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">converter</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_str_to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="p">[]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; does not seem to be a valid JSON for field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_str_to_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Unable to import field type &#39;</span><span class="si">%s</span><span class="s2">&#39;  &quot;</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_boolean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># all translatables used for booleans</span>
+        <span class="c1"># potentially broken casefolding? What about locales?</span>
+        <span class="n">trues</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">word</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+            <span class="p">[</span><span class="sa">u</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;yes&quot;</span><span class="p">],</span> <span class="c1"># don&#39;t use potentially translated values</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_boolean_translations</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;true&quot;</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_boolean_translations</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;yes&quot;</span><span class="p">),</span>
+        <span class="p">))</span>
+        <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">trues</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="p">[]</span>
+
+        <span class="c1"># potentially broken casefolding? What about locales?</span>
+        <span class="n">falses</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">word</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+            <span class="p">[</span><span class="sa">u</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;false&quot;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;no&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_boolean_translations</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;false&quot;</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_boolean_translations</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;no&quot;</span><span class="p">),</span>
+        <span class="p">))</span>
+        <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">falses</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_skip_records&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="p">[]</span>
+
+        <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+            <span class="ne">ValueError</span><span class="p">,</span>
+            <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Unknown value &#39;</span><span class="si">%s</span><span class="s2">&#39; for boolean field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+            <span class="n">value</span><span class="p">,</span>
+            <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Use &#39;1&#39; for yes and &#39;0&#39; for no&quot;</span><span class="p">)}</span>
+        <span class="p">)]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_integer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="p">[]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">ValueError</span><span class="p">,</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; does not seem to be an integer for field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+                <span class="n">value</span>
+            <span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_float</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="p">[]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">ValueError</span><span class="p">,</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; does not seem to be a number for field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+                <span class="n">value</span>
+            <span class="p">)</span>
+
+    <span class="n">_str_to_monetary</span> <span class="o">=</span> <span class="n">_str_to_float</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span><span class="p">,</span> <span class="p">[]</span>
+
+    <span class="n">_str_to_reference</span> <span class="o">=</span> <span class="n">_str_to_char</span> <span class="o">=</span> <span class="n">_str_to_text</span> <span class="o">=</span> <span class="n">_str_to_binary</span> <span class="o">=</span> <span class="n">_str_to_html</span> <span class="o">=</span> <span class="n">_str_id</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_date</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed_value</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">parsed_value</span><span class="p">),</span> <span class="p">[]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">ValueError</span><span class="p">,</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; does not seem to be a valid date for field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+                <span class="n">value</span><span class="p">,</span>
+                <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Use the format &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;2012-12-31&quot;</span><span class="p">)}</span>
+            <span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_input_tz</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># if there&#39;s a tz in context, try to use that</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tz&#39;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">[</span><span class="s1">&#39;tz&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="n">pytz</span><span class="o">.</span><span class="n">UnknownTimeZoneError</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="c1"># if the current user has a tz set, try to use that</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span>
+        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">tz</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">tz</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">pytz</span><span class="o">.</span><span class="n">UnknownTimeZoneError</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="c1"># fallback if no tz in context or on user: UTC</span>
+        <span class="k">return</span> <span class="n">pytz</span><span class="o">.</span><span class="n">UTC</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_datetime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed_value</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">ValueError</span><span class="p">,</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; does not seem to be a valid datetime for field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+                <span class="n">value</span><span class="p">,</span>
+                <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Use the format &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="sa">u</span><span class="s2">&quot;2012-12-31 23:59:59&quot;</span><span class="p">)}</span>
+            <span class="p">)</span>
+
+        <span class="n">input_tz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_input_tz</span><span class="p">()</span><span class="c1"># Apply input tz to the parsed naive datetime</span>
+        <span class="n">dt</span> <span class="o">=</span> <span class="n">input_tz</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">parsed_value</span><span class="p">,</span> <span class="n">is_dst</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># And convert to UTC before reformatting for writing</span>
+        <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">dt</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">pytz</span><span class="o">.</span><span class="n">UTC</span><span class="p">)),</span> <span class="p">[]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_boolean_translations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">):</span>
+        <span class="c1"># Cache translations so they don&#39;t have to be reloaded from scratch on</span>
+        <span class="c1"># every row of the file</span>
+        <span class="n">tnx_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">tnx_cache</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tnx_cache</span><span class="p">[</span><span class="n">src</span><span class="p">]</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">lang</span><span class="p">,</span> <span class="n">__</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get_installed</span><span class="p">():</span>
+            <span class="n">translations</span> <span class="o">=</span> <span class="n">code_translations</span><span class="o">.</span><span class="n">get_python_translations</span><span class="p">(</span><span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="n">lang</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">translations</span><span class="p">:</span>
+                <span class="n">values</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">translations</span><span class="p">[</span><span class="n">src</span><span class="p">])</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">tnx_cache</span><span class="p">[</span><span class="n">src</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_selection_translations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">src</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">src</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="c1"># Cache translations so they don&#39;t have to be reloaded from scratch on</span>
+        <span class="c1"># every row of the file</span>
+        <span class="n">tnx_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">tnx_cache</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tnx_cache</span><span class="p">[</span><span class="n">src</span><span class="p">]</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields.selection&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT s.name</span>
+<span class="s2">            FROM ir_model_fields_selection s</span>
+<span class="s2">            JOIN ir_model_fields f ON s.field_id = f.id</span>
+<span class="s2">            WHERE f.model = </span><span class="si">%s</span><span class="s2"> AND f.name = </span><span class="si">%s</span><span class="s2"> AND s.name-&gt;&gt;&#39;en_US&#39; = </span><span class="si">%s</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">model_name</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">src</span><span class="p">])</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+            <span class="n">name</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;en_US&#39;</span><span class="p">)</span>
+            <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">tnx_cache</span><span class="p">[</span><span class="n">src</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># get untranslated values</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">env</span>
+        <span class="n">selection</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="n">env</span><span class="p">)[</span><span class="s1">&#39;selection&#39;</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">item</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">selection</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">selection</span><span class="p">):</span>
+                <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">item2</span><span class="p">,</span> <span class="n">label2</span> <span class="ow">in</span> <span class="n">field</span><span class="o">.</span><span class="n">_description_selection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">item2</span> <span class="o">==</span> <span class="n">item</span><span class="p">:</span>
+                        <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label2</span><span class="p">)</span>
+                        <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_selection_translations</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+            <span class="c1"># case insensitive comparaison of string to allow to set the value even if the given &#39;value&#39; param is not</span>
+            <span class="c1"># exactly (case sensitive) the same as one of the selection item.</span>
+            <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">item</span><span class="p">,</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_skip_records&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_set_empty_fields&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+            <span class="ne">ValueError</span><span class="p">,</span>
+            <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Value &#39;</span><span class="si">%s</span><span class="s2">&#39; not found in selection field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+            <span class="n">value</span><span class="p">,</span>
+            <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">_label</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span><span class="p">,</span> <span class="n">_label</span> <span class="ow">in</span> <span class="n">selection</span> <span class="k">if</span> <span class="n">_label</span> <span class="ow">or</span> <span class="n">item</span><span class="p">]}</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="IrFieldsConverter.db_id_for">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_fields.IrFieldsConverter.db_id_for">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">db_id_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">subfield</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Finds a database id for the reference ``value`` in the referencing</span>
+<span class="sd">        subfield ``subfield`` of the provided field of the provided model.</span>
+
+<span class="sd">        :param model: model to which the field belongs</span>
+<span class="sd">        :param field: relational field for which references are provided</span>
+<span class="sd">        :param subfield: a relational subfield allowing building of refs to</span>
+<span class="sd">                         existing records: ``None`` for a name_search,</span>
+<span class="sd">                         ``id`` for an external id and ``.id`` for a database</span>
+<span class="sd">                         id</span>
+<span class="sd">        :param value: value of the reference to match to an actual record</span>
+<span class="sd">        :return: a pair of the matched database identifier (if any), the</span>
+<span class="sd">                 translated user-readable name for the field and the list of</span>
+<span class="sd">                 warnings</span>
+<span class="sd">        :rtype: (ID|None, unicode, list)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># the function &#39;flush&#39; comes from BaseModel.load(), and forces the</span>
+        <span class="c1"># creation/update of former records (batch creation)</span>
+        <span class="n">flush</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_flush&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="o">**</span><span class="n">kw</span><span class="p">:</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="nb">id</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">error_msg</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Possible Values&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;tree,form&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;views&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;list&#39;</span><span class="p">),</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">)],</span>
+            <span class="s1">&#39;context&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;create&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+            <span class="s1">&#39;help&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;See all possible values&quot;</span><span class="p">)}</span>
+        <span class="k">if</span> <span class="n">subfield</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">action</span><span class="p">[</span><span class="s1">&#39;res_model&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span>
+        <span class="k">elif</span> <span class="n">subfield</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;.id&#39;</span><span class="p">):</span>
+            <span class="n">action</span><span class="p">[</span><span class="s1">&#39;res_model&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;ir.model.data&#39;</span>
+            <span class="n">action</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">)]</span>
+
+        <span class="n">RelatedModel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">subfield</span> <span class="o">==</span> <span class="s1">&#39;.id&#39;</span><span class="p">:</span>
+            <span class="n">field_type</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;database id&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_str_to_boolean</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">field_type</span><span class="p">,</span> <span class="n">warnings</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tentative_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                    <span class="ne">ValueError</span><span class="p">,</span>
+                    <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Invalid database id &#39;</span><span class="si">%s</span><span class="s2">&#39; for the field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">),</span>
+                    <span class="n">value</span><span class="p">,</span>
+                    <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="n">action</span><span class="p">})</span>
+            <span class="k">if</span> <span class="n">RelatedModel</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">tentative_id</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="n">tentative_id</span>
+        <span class="k">elif</span> <span class="n">subfield</span> <span class="o">==</span> <span class="s1">&#39;id&#39;</span><span class="p">:</span>
+            <span class="n">field_type</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;external id&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_str_to_boolean</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">field_type</span><span class="p">,</span> <span class="n">warnings</span>
+            <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">xmlid</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">xmlid</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;_import_current_module&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span>
+            <span class="n">flush</span><span class="p">(</span><span class="n">xml_id</span><span class="o">=</span><span class="n">xmlid</span><span class="p">)</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xmlid_to_record_id</span><span class="p">(</span><span class="n">xmlid</span><span class="p">,</span> <span class="n">RelatedModel</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">subfield</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">field_type</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">field_type</span><span class="p">,</span> <span class="n">warnings</span>
+            <span class="n">flush</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">)</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="n">RelatedModel</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ids</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="ne">ImportWarning</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+                        <span class="s2">&quot;Found multiple matches for value </span><span class="si">%r</span><span class="s2"> in field </span><span class="si">%%</span><span class="s2">(field)r (</span><span class="si">%d</span><span class="s2"> matches)&quot;</span><span class="p">,</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%%</span><span class="s1">&#39;</span><span class="p">),</span>
+                        <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">),</span>
+                    <span class="p">)))</span>
+                <span class="nb">id</span><span class="p">,</span> <span class="n">_name</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">name_create_enabled_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name_create_enabled_fields&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+                <span class="k">if</span> <span class="n">name_create_enabled_fields</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">():</span>
+                            <span class="nb">id</span><span class="p">,</span> <span class="n">_name</span> <span class="o">=</span> <span class="n">RelatedModel</span><span class="o">.</span><span class="n">name_create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">Exception</span><span class="p">,</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">IntegrityError</span><span class="p">):</span>
+                        <span class="n">error_msg</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Cannot create new &#39;</span><span class="si">%s</span><span class="s2">&#39; records from their name alone. Please create those records manually and try importing again.&quot;</span><span class="p">,</span> <span class="n">RelatedModel</span><span class="o">.</span><span class="n">_description</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">Exception</span><span class="p">,</span>
+                <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Unknown sub-field </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">subfield</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">set_empty</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">skip_record</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_file&#39;</span><span class="p">):</span>
+            <span class="n">import_set_empty_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_set_empty_fields&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="n">field_path</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;parent_fields_hierarchy&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="o">+</span> <span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">]))</span>
+            <span class="n">set_empty</span> <span class="o">=</span> <span class="n">field_path</span> <span class="ow">in</span> <span class="n">import_set_empty_fields</span>
+            <span class="n">skip_record</span> <span class="o">=</span> <span class="n">field_path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_skip_records&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="nb">id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">set_empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">skip_record</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">error_msg</span><span class="p">:</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;No matching record found for </span><span class="si">%(field_type)s</span><span class="s2"> &#39;</span><span class="si">%(value)s</span><span class="s2">&#39; in field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39; and the following error was encountered when we attempted to create one: </span><span class="si">%(error_message)s</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;No matching record found for </span><span class="si">%(field_type)s</span><span class="s2"> &#39;</span><span class="si">%(value)s</span><span class="s2">&#39; in field &#39;</span><span class="si">%%</span><span class="s2">(field)s&#39;&quot;</span><span class="p">)</span>
+
+            <span class="n">error_info_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;moreinfo&#39;</span><span class="p">:</span> <span class="n">action</span><span class="p">}</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_file&#39;</span><span class="p">):</span>
+                <span class="c1"># limit to 50 char to avoid too long error messages.</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="p">[:</span><span class="mi">50</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+                <span class="n">error_info_dict</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span> <span class="s1">&#39;field_type&#39;</span><span class="p">:</span> <span class="n">field_type</span><span class="p">})</span>
+                <span class="k">if</span> <span class="n">error_msg</span><span class="p">:</span>
+                    <span class="n">error_info_dict</span><span class="p">[</span><span class="s1">&#39;error_message&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">error_msg</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_import_error</span><span class="p">(</span>
+                <span class="ne">ValueError</span><span class="p">,</span>
+                <span class="n">message</span><span class="p">,</span>
+                <span class="p">{</span><span class="s1">&#39;field_type&#39;</span><span class="p">:</span> <span class="n">field_type</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span> <span class="s1">&#39;error_message&#39;</span><span class="p">:</span> <span class="n">error_msg</span><span class="p">},</span>
+                <span class="n">error_info_dict</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">id</span><span class="p">,</span> <span class="n">field_type</span><span class="p">,</span> <span class="n">warnings</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_xmlid_to_record_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xmlid</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the record id corresponding to the given external id,</span>
+<span class="sd">        provided that the record actually exists; otherwise return ``None``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">import_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_cache&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">import_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">xmlid</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">module</span><span class="p">,</span> <span class="n">name</span> <span class="o">=</span> <span class="n">xmlid</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT d.model, d.res_id</span>
+<span class="s2">                FROM ir_model_data d</span>
+<span class="s2">                JOIN &quot;</span><span class="si">{}</span><span class="s2">&quot; r ON d.res_id = r.id</span>
+<span class="s2">                WHERE d.module = </span><span class="si">%s</span><span class="s2"> AND d.name = </span><span class="si">%s</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">_table</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">[</span><span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">])</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">res_model</span><span class="p">,</span> <span class="n">res_id</span> <span class="o">=</span> <span class="n">import_cache</span><span class="p">[</span><span class="n">xmlid</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+            <span class="k">if</span> <span class="n">res_model</span> <span class="o">!=</span> <span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span>
+                <span class="n">MSG</span> <span class="o">=</span> <span class="s2">&quot;Invalid external ID </span><span class="si">%s</span><span class="s2">: expected model </span><span class="si">%r</span><span class="s2">, found </span><span class="si">%r</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">MSG</span> <span class="o">%</span> <span class="p">(</span><span class="n">xmlid</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">res_model</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">res_id</span>
+
+    <span class="k">def</span> <span class="nf">_referencing_subfield</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Checks the record for the subfields allowing referencing (an</span>
+<span class="sd">        existing record in an other table), errors out if it finds potential</span>
+<span class="sd">        conflicts (multiple referencing subfields) or non-referencing subfields</span>
+<span class="sd">        returns the name of the correct subfield.</span>
+
+<span class="sd">        :param record:</span>
+<span class="sd">        :return: the record subfield to use for referencing and a list of warnings</span>
+<span class="sd">        :rtype: str, list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Can import by display_name, external id or database id</span>
+        <span class="n">fieldset</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fieldset</span> <span class="o">-</span> <span class="n">REFERENCING_FIELDS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Can not create Many-To-One records indirectly, import the field separately&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fieldset</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="n">_</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Ambiguous specification for field &#39;</span><span class="si">%(field)s</span><span class="s2">&#39;, only provide one of name, external id or database id&quot;</span><span class="p">))</span>
+
+        <span class="c1"># only one field left possible, unpack</span>
+        <span class="p">[</span><span class="n">subfield</span><span class="p">]</span> <span class="o">=</span> <span class="n">fieldset</span>
+        <span class="k">return</span> <span class="n">subfield</span><span class="p">,</span> <span class="p">[]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_many2one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="c1"># Should only be one record, unpack</span>
+        <span class="p">[</span><span class="n">record</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span>
+
+        <span class="n">subfield</span><span class="p">,</span> <span class="n">w1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_referencing_subfield</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="nb">id</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">w2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_id_for</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">subfield</span><span class="p">,</span> <span class="n">record</span><span class="p">[</span><span class="n">subfield</span><span class="p">])</span>
+        <span class="k">return</span> <span class="nb">id</span><span class="p">,</span> <span class="n">w1</span> <span class="o">+</span> <span class="n">w2</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_many2one_reference</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_str_to_integer</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_many2many</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="p">[</span><span class="n">record</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="n">subfield</span><span class="p">,</span> <span class="n">warnings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_referencing_subfield</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">reference</span> <span class="ow">in</span> <span class="n">record</span><span class="p">[</span><span class="n">subfield</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="nb">id</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">ws</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_id_for</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">subfield</span><span class="p">,</span> <span class="n">reference</span><span class="p">)</span>
+            <span class="n">ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ws</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_set_empty_fields&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">([</span><span class="nb">id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">]):</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">id</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span> <span class="k">if</span> <span class="nb">id</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;import_skip_records&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">([</span><span class="nb">id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">]):</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">warnings</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;update_many2many&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">],</span> <span class="n">warnings</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ids</span><span class="p">)],</span> <span class="n">warnings</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_str_to_one2many</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">records</span><span class="p">):</span>
+        <span class="n">name_create_enabled_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name_create_enabled_fields&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span>
+        <span class="n">relative_name_create_enabled_fields</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">k</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">):]:</span> <span class="n">v</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">name_create_enabled_fields</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="n">commands</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">exclude_ref_fields</span><span class="p">(</span><span class="n">records</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="p">{}:</span>
+            <span class="c1"># only one row with only ref field, field=ref1,ref2,ref3 as in</span>
+            <span class="c1"># m2o/m2m</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="n">records</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">subfield</span><span class="p">,</span> <span class="n">ws</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_referencing_subfield</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ws</span><span class="p">)</span>
+            <span class="c1"># transform [{subfield:ref1,ref2,ref3}] into</span>
+            <span class="c1"># [{subfield:ref1},{subfield:ref2},{subfield:ref3}]</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="p">({</span><span class="n">subfield</span><span class="p">:</span><span class="n">item</span><span class="p">}</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">record</span><span class="p">[</span><span class="n">subfield</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">))</span>
+
+        <span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">exception</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exception</span><span class="p">,</span> <span class="ne">Warning</span><span class="p">):</span>
+                <span class="n">current_field_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">f</span><span class="p">]</span><span class="o">.</span><span class="n">string</span>
+                <span class="n">arg0</span> <span class="o">=</span> <span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(field)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%(field)s</span><span class="s1">/&#39;</span> <span class="o">+</span> <span class="n">current_field_name</span><span class="p">)</span>
+                <span class="n">exception</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">arg0</span><span class="p">,</span> <span class="o">*</span><span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="k">raise</span> <span class="n">exception</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">exception</span><span class="p">)</span>
+
+        <span class="c1"># Complete the field hierarchy path</span>
+        <span class="c1"># E.g. For &quot;parent/child/subchild&quot;, field hierarchy path for &quot;subchild&quot; is [&#39;parent&#39;, &#39;child&#39;]</span>
+        <span class="n">parent_fields_hierarchy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;parent_fields_hierarchy&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="o">+</span> <span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+
+        <span class="n">convert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span>
+            <span class="n">name_create_enabled_fields</span><span class="o">=</span><span class="n">relative_name_create_enabled_fields</span><span class="p">,</span>
+            <span class="n">parent_fields_hierarchy</span><span class="o">=</span><span class="n">parent_fields_hierarchy</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">for_model</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">refs</span> <span class="o">=</span> <span class="n">only_ref_fields</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="n">writable</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">exclude_ref_fields</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">log</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">refs</span><span class="p">:</span>
+                <span class="n">subfield</span><span class="p">,</span> <span class="n">w1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_referencing_subfield</span><span class="p">(</span><span class="n">refs</span><span class="p">)</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">w1</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">id</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">w2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_id_for</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">subfield</span><span class="p">,</span> <span class="n">record</span><span class="p">[</span><span class="n">subfield</span><span class="p">])</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">w2</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">subfield</span> <span class="o">!=</span> <span class="s1">&#39;id&#39;</span><span class="p">:</span>
+                        <span class="k">raise</span>
+                    <span class="n">writable</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="nb">id</span><span class="p">:</span>
+                <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="nb">id</span><span class="p">))</span>
+                <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">writable</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">writable</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">commands</span><span class="p">,</span> <span class="n">warnings</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

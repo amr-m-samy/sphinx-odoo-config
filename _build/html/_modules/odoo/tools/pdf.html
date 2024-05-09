@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.pdf &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.pdf</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.pdf</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">hashlib</span> <span class="kn">import</span> <span class="n">md5</span>
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
+<span class="kn">from</span> <span class="nn">zlib</span> <span class="kn">import</span> <span class="n">compress</span><span class="p">,</span> <span class="n">decompress</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">PdfImagePlugin</span>
+<span class="kn">from</span> <span class="nn">reportlab.lib</span> <span class="kn">import</span> <span class="n">colors</span>
+<span class="kn">from</span> <span class="nn">reportlab.lib.units</span> <span class="kn">import</span> <span class="n">cm</span>
+<span class="kn">from</span> <span class="nn">reportlab.lib.utils</span> <span class="kn">import</span> <span class="n">ImageReader</span>
+<span class="kn">from</span> <span class="nn">reportlab.pdfgen</span> <span class="kn">import</span> <span class="n">canvas</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.parse_version</span> <span class="kn">import</span> <span class="n">parse_version</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="c1"># class were renamed in PyPDF2 &gt; 2.0</span>
+    <span class="c1"># https://pypdf2.readthedocs.io/en/latest/user/migration-1-to-2.html#classes</span>
+    <span class="kn">from</span> <span class="nn">PyPDF2</span> <span class="kn">import</span> <span class="n">PdfReader</span>
+    <span class="kn">import</span> <span class="nn">PyPDF2</span>
+    <span class="c1"># monkey patch to discard unused arguments as the old arguments were not discarded in the transitional class</span>
+    <span class="c1"># https://pypdf2.readthedocs.io/en/2.0.0/_modules/PyPDF2/_reader.html#PdfReader</span>
+<div class="viewcode-block" id="PdfFileReader">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.PdfFileReader">[docs]</a>
+    <span class="k">class</span> <span class="nc">PdfFileReader</span><span class="p">(</span><span class="n">PdfReader</span><span class="p">):</span>
+        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;strict&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;strict&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># maintain the default</span>
+            <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span><span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;strict&#39;</span><span class="p">,</span> <span class="s1">&#39;stream&#39;</span><span class="p">)}</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+    <span class="n">PyPDF2</span><span class="o">.</span><span class="n">PdfFileReader</span> <span class="o">=</span> <span class="n">PdfFileReader</span>
+    <span class="kn">from</span> <span class="nn">PyPDF2</span> <span class="kn">import</span> <span class="n">PdfFileWriter</span><span class="p">,</span> <span class="n">PdfFileReader</span>
+    <span class="n">PdfFileReader</span><span class="o">.</span><span class="n">getFields</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="o">.</span><span class="n">get_fields</span>
+    <span class="n">PdfFileWriter</span><span class="o">.</span><span class="n">_addObject</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="o">.</span><span class="n">_add_object</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">PyPDF2</span> <span class="kn">import</span> <span class="n">PdfFileWriter</span><span class="p">,</span> <span class="n">PdfFileReader</span>
+
+<span class="kn">from</span> <span class="nn">PyPDF2.generic</span> <span class="kn">import</span> <span class="n">ArrayObject</span><span class="p">,</span> <span class="n">BooleanObject</span><span class="p">,</span> <span class="n">ByteStringObject</span><span class="p">,</span> <span class="n">DecodedStreamObject</span><span class="p">,</span> <span class="n">DictionaryObject</span><span class="p">,</span> <span class="n">IndirectObject</span><span class="p">,</span> <span class="n">NameObject</span><span class="p">,</span> <span class="n">NumberObject</span><span class="p">,</span> <span class="n">createStringObject</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">fontTools</span>
+    <span class="kn">from</span> <span class="nn">fontTools.ttLib</span> <span class="kn">import</span> <span class="n">TTFont</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">TTFont</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">file_open</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">DEFAULT_PDF_DATETIME_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;D:%Y%m</span><span class="si">%d</span><span class="s2">%H%M%S+00&#39;00&#39;&quot;</span>
+<span class="n">REGEX_SUBTYPE_UNFORMATED</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^\w+/[\w-]+$&#39;</span><span class="p">)</span>
+<span class="n">REGEX_SUBTYPE_FORMATED</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^/\w+#2F[\w-]+$&#39;</span><span class="p">)</span>
+
+
+<span class="c1"># Disable linter warning: this import is needed to make sure a PDF stream can be saved in Image.</span>
+<span class="n">PdfImagePlugin</span><span class="o">.</span><span class="vm">__name__</span>
+
+<span class="c1"># make sure values are unwrapped by calling the specialized __getitem__</span>
+<span class="k">def</span> <span class="nf">_unwrapping_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">default</span>
+
+
+<span class="n">DictionaryObject</span><span class="o">.</span><span class="n">get</span> <span class="o">=</span> <span class="n">_unwrapping_get</span>
+
+
+<div class="viewcode-block" id="BrandedFileWriter">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.BrandedFileWriter">[docs]</a>
+<span class="k">class</span> <span class="nc">BrandedFileWriter</span><span class="p">(</span><span class="n">PdfFileWriter</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addMetadata</span><span class="p">({</span>
+            <span class="s1">&#39;/Creator&#39;</span><span class="p">:</span> <span class="s2">&quot;Odoo&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;/Producer&#39;</span><span class="p">:</span> <span class="s2">&quot;Odoo&quot;</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+
+
+<span class="n">PdfFileWriter</span> <span class="o">=</span> <span class="n">BrandedFileWriter</span>
+
+
+<div class="viewcode-block" id="merge_pdf">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.merge_pdf">[docs]</a>
+<span class="k">def</span> <span class="nf">merge_pdf</span><span class="p">(</span><span class="n">pdf_data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Merge a collection of PDF documents in one.</span>
+<span class="sd">    Note that the attachments are not merged.</span>
+<span class="sd">    :param list pdf_data: a list of PDF datastrings</span>
+<span class="sd">    :return: a unique merged PDF datastring</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">writer</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">document</span> <span class="ow">in</span> <span class="n">pdf_data</span><span class="p">:</span>
+        <span class="n">reader</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">document</span><span class="p">),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">getNumPages</span><span class="p">()):</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">addPage</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">page</span><span class="p">))</span>
+
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">_buffer</span><span class="p">:</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">_buffer</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_buffer</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="fill_form_fields_pdf">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.fill_form_fields_pdf">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_form_fields_pdf</span><span class="p">(</span><span class="n">writer</span><span class="p">,</span> <span class="n">form_fields</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Fill in the form fields of a PDF</span>
+<span class="sd">    :param writer: a PdfFileWriter object</span>
+<span class="sd">    :param dict form_fields: a dictionary of form fields to update in the PDF</span>
+<span class="sd">    :return: a filled PDF datastring</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="c1"># This solves a known problem with PyPDF2, where with some pdf software, forms fields aren&#39;t</span>
+    <span class="c1"># correctly filled until the user click on it, see: https://github.com/py-pdf/pypdf/issues/355</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">writer</span><span class="p">,</span> <span class="s1">&#39;set_need_appearances_writer&#39;</span><span class="p">):</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">set_need_appearances_writer</span><span class="p">()</span>
+        <span class="n">is_upper_version_pypdf2</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># This method was renamed in PyPDF2 2.0</span>
+        <span class="n">is_upper_version_pypdf2</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">catalog</span> <span class="o">=</span> <span class="n">writer</span><span class="o">.</span><span class="n">_root_object</span>
+        <span class="c1"># get the AcroForm tree</span>
+        <span class="k">if</span> <span class="s2">&quot;/AcroForm&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">catalog</span><span class="p">:</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/AcroForm&quot;</span><span class="p">):</span> <span class="n">IndirectObject</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">writer</span><span class="o">.</span><span class="n">_objects</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">writer</span><span class="p">)</span>
+            <span class="p">})</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s2">&quot;/AcroForm&quot;</span><span class="p">][</span><span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/NeedAppearances&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">BooleanObject</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">nbr_pages</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">writer</span><span class="o">.</span><span class="n">pages</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_upper_version_pypdf2</span> <span class="k">else</span> <span class="n">writer</span><span class="o">.</span><span class="n">getNumPages</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">page_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">nbr_pages</span><span class="p">):</span>
+        <span class="n">page</span> <span class="o">=</span> <span class="n">writer</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">page_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_upper_version_pypdf2</span><span class="p">:</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">update_page_form_field_values</span><span class="p">(</span><span class="n">page</span><span class="p">,</span> <span class="n">form_fields</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># This is a known bug on previous version of PyPDF2, fixed in 2.11</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/Annots&#39;</span><span class="p">):</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No fields to update in this page&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">updatePageFormFieldValues</span><span class="p">(</span><span class="n">page</span><span class="p">,</span> <span class="n">form_fields</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">raw_annot</span> <span class="ow">in</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/Annots&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">annot</span> <span class="o">=</span> <span class="n">raw_annot</span><span class="o">.</span><span class="n">getObject</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">form_fields</span><span class="p">:</span>
+                <span class="c1"># Mark filled fields as readonly to avoid the blue overlay:</span>
+                <span class="k">if</span> <span class="n">annot</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/T&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">field</span><span class="p">:</span>
+                    <span class="n">annot</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Ff&quot;</span><span class="p">):</span> <span class="n">NumberObject</span><span class="p">(</span><span class="mi">1</span><span class="p">)})</span></div>
+
+
+<div class="viewcode-block" id="rotate_pdf">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.rotate_pdf">[docs]</a>
+<span class="k">def</span> <span class="nf">rotate_pdf</span><span class="p">(</span><span class="n">pdf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Rotate clockwise PDF (90°) into a new PDF.</span>
+<span class="sd">    Note that the attachments are not copied.</span>
+<span class="sd">    :param pdf: a PDF to rotate</span>
+<span class="sd">    :return: a PDF rotated</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">writer</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">pdf</span><span class="p">),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">getNumPages</span><span class="p">()):</span>
+        <span class="n">page</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">page</span><span class="p">)</span>
+        <span class="n">page</span><span class="o">.</span><span class="n">rotateClockwise</span><span class="p">(</span><span class="mi">90</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">addPage</span><span class="p">(</span><span class="n">page</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">_buffer</span><span class="p">:</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">_buffer</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_buffer</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="to_pdf_stream">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.to_pdf_stream">[docs]</a>
+<span class="k">def</span> <span class="nf">to_pdf_stream</span><span class="p">(</span><span class="n">attachment</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the byte stream of the attachment as a PDF.&quot;&quot;&quot;</span>
+    <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">mimetype</span> <span class="o">==</span> <span class="s1">&#39;application/pdf&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">stream</span>
+    <span class="k">elif</span> <span class="n">attachment</span><span class="o">.</span><span class="n">mimetype</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;image&#39;</span><span class="p">):</span>
+        <span class="n">output_stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+        <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">output_stream</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;pdf&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output_stream</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;mimetype (</span><span class="si">%s</span><span class="s2">) not recognized for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">attachment</span><span class="o">.</span><span class="n">mimetype</span><span class="p">,</span> <span class="n">attachment</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="add_banner">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.add_banner">[docs]</a>
+<span class="k">def</span> <span class="nf">add_banner</span><span class="p">(</span><span class="n">pdf_stream</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">logo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">thickness</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">cm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Add a banner on a PDF in the upper right corner, with Odoo&#39;s logo (optionally).</span>
+
+<span class="sd">    :param pdf_stream (BytesIO):    The PDF stream where the banner will be applied.</span>
+<span class="sd">    :param text (str):              The text to be displayed.</span>
+<span class="sd">    :param logo (bool):             Whether to display Odoo&#39;s logo in the banner.</span>
+<span class="sd">    :param thickness (float):       The thickness of the banner in pixels.</span>
+<span class="sd">    :return (BytesIO):              The modified PDF stream.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">old_pdf</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">pdf_stream</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overwriteWarnings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">packet</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+    <span class="n">can</span> <span class="o">=</span> <span class="n">canvas</span><span class="o">.</span><span class="n">Canvas</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+    <span class="n">odoo_logo</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">file_open</span><span class="p">(</span><span class="s1">&#39;base/static/img/main_partner-image.png&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">))</span>
+    <span class="n">odoo_color</span> <span class="o">=</span> <span class="n">colors</span><span class="o">.</span><span class="n">Color</span><span class="p">(</span><span class="mi">113</span> <span class="o">/</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">75</span> <span class="o">/</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">103</span> <span class="o">/</span> <span class="mi">255</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">old_pdf</span><span class="o">.</span><span class="n">getNumPages</span><span class="p">()):</span>
+        <span class="n">page</span> <span class="o">=</span> <span class="n">old_pdf</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">page</span><span class="o">.</span><span class="n">mediaBox</span><span class="o">.</span><span class="n">getWidth</span><span class="p">()))</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">page</span><span class="o">.</span><span class="n">mediaBox</span><span class="o">.</span><span class="n">getHeight</span><span class="p">()))</span>
+
+        <span class="n">can</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="o">-</span><span class="mi">45</span><span class="p">)</span>
+
+        <span class="c1"># Draw banner</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">can</span><span class="o">.</span><span class="n">beginPath</span><span class="p">()</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">moveTo</span><span class="p">(</span><span class="o">-</span><span class="n">width</span><span class="p">,</span> <span class="o">-</span><span class="n">thickness</span><span class="p">)</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="o">-</span><span class="n">width</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">)</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">)</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="o">-</span><span class="n">thickness</span><span class="p">)</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">setFillColor</span><span class="p">(</span><span class="n">odoo_color</span><span class="p">)</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">drawPath</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">stroke</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># Insert text (and logo) inside the banner</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">setFontSize</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">setFillColor</span><span class="p">(</span><span class="n">colors</span><span class="o">.</span><span class="n">white</span><span class="p">)</span>
+        <span class="n">can</span><span class="o">.</span><span class="n">drawRightString</span><span class="p">(</span><span class="mf">0.75</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.45</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+        <span class="n">logo</span> <span class="ow">and</span> <span class="n">can</span><span class="o">.</span><span class="n">drawImage</span><span class="p">(</span>
+            <span class="n">ImageReader</span><span class="p">(</span><span class="n">odoo_logo</span><span class="p">),</span> <span class="mf">0.25</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.05</span> <span class="o">*</span> <span class="n">thickness</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span> <span class="n">preserveAspectRatio</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">can</span><span class="o">.</span><span class="n">showPage</span><span class="p">()</span>
+
+    <span class="n">can</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="c1"># Merge the old pages with the watermark</span>
+    <span class="n">watermark_pdf</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">packet</span><span class="p">,</span> <span class="n">overwriteWarnings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">new_pdf</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">old_pdf</span><span class="o">.</span><span class="n">getNumPages</span><span class="p">()):</span>
+        <span class="n">new_page</span> <span class="o">=</span> <span class="n">old_pdf</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="c1"># Remove annotations (if any), to prevent errors in PyPDF2</span>
+        <span class="k">if</span> <span class="s1">&#39;/Annots&#39;</span> <span class="ow">in</span> <span class="n">new_page</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">new_page</span><span class="p">[</span><span class="s1">&#39;/Annots&#39;</span><span class="p">]</span>
+        <span class="n">new_page</span><span class="o">.</span><span class="n">mergePage</span><span class="p">(</span><span class="n">watermark_pdf</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">p</span><span class="p">))</span>
+        <span class="n">new_pdf</span><span class="o">.</span><span class="n">addPage</span><span class="p">(</span><span class="n">new_page</span><span class="p">)</span>
+
+    <span class="c1"># Write the new pdf into a new output stream</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+    <span class="n">new_pdf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output</span></div>
+
+
+
+<span class="c1"># by default PdfFileReader will overwrite warnings.showwarning which is what</span>
+<span class="c1"># logging.captureWarnings does, meaning it essentially reverts captureWarnings</span>
+<span class="c1"># every time it&#39;s called which is undesirable</span>
+<span class="n">old_init</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="o">.</span><span class="fm">__init__</span>
+<span class="n">PdfFileReader</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="k">lambda</span> <span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">warndest</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwriteWarnings</span><span class="o">=</span><span class="kc">True</span><span class="p">:</span> \
+    <span class="n">old_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">stream</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="n">strict</span><span class="p">,</span> <span class="n">warndest</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwriteWarnings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="OdooPdfFileReader">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileReader">[docs]</a>
+<span class="k">class</span> <span class="nc">OdooPdfFileReader</span><span class="p">(</span><span class="n">PdfFileReader</span><span class="p">):</span>
+    <span class="c1"># OVERRIDE of PdfFileReader to add the management of multiple embedded files.</span>
+
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Returns the files inside the PDF.</span>
+<span class="sd">    :raises NotImplementedError: if document is encrypted and uses an unsupported encryption method.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+<div class="viewcode-block" id="OdooPdfFileReader.getAttachments">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileReader.getAttachments">[docs]</a>
+    <span class="k">def</span> <span class="nf">getAttachments</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">isEncrypted</span><span class="p">:</span>
+            <span class="c1"># If the PDF is owner-encrypted, try to unwrap it by giving it an empty user password.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">decrypt</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">file_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trailer</span><span class="p">[</span><span class="s2">&quot;/Root&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/Names&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/EmbeddedFiles&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/Names&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_path</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="n">attachment</span> <span class="o">=</span> <span class="n">file_path</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">getObject</span><span class="p">()</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s2">&quot;/F&quot;</span><span class="p">],</span> <span class="n">attachment</span><span class="p">[</span><span class="s2">&quot;/EF&quot;</span><span class="p">][</span><span class="s2">&quot;/F&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">getObject</span><span class="p">()</span><span class="o">.</span><span class="n">getData</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c1"># malformed pdf (i.e. invalid xref page)</span>
+            <span class="k">return</span> <span class="p">[]</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OdooPdfFileWriter">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter">[docs]</a>
+<span class="k">class</span> <span class="nc">OdooPdfFileWriter</span><span class="p">(</span><span class="n">PdfFileWriter</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Override of the init to initialise additional variables.</span>
+<span class="sd">        :param pdf_content: if given, will initialise the reader with the pdf content.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reader</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_pdfa</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="OdooPdfFileWriter.addAttachment">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter.addAttachment">[docs]</a>
+    <span class="k">def</span> <span class="nf">addAttachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add an attachment to the pdf. Supports adding multiple attachment, while respecting PDF/A rules.</span>
+<span class="sd">        :param name: The name of the attachement</span>
+<span class="sd">        :param data: The data of the attachement</span>
+<span class="sd">        :param subtype: The mime-type of the attachement. This is required by PDF/A, but not essential otherwise.</span>
+<span class="sd">        It should take the form of &quot;/xxx#2Fxxx&quot;. E.g. for &quot;text/xml&quot;: &quot;/text#2Fxml&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">adapted_subtype</span> <span class="o">=</span> <span class="n">subtype</span>
+        <span class="k">if</span> <span class="n">subtype</span><span class="p">:</span>
+            <span class="c1"># If we receive the subtype in an &#39;unformated&#39; (mimetype) format, we&#39;ll try to convert it to a pdf-valid one</span>
+            <span class="k">if</span> <span class="n">REGEX_SUBTYPE_UNFORMATED</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">subtype</span><span class="p">):</span>
+                <span class="n">adapted_subtype</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">subtype</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="s1">&#39;#2F&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">REGEX_SUBTYPE_FORMATED</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">adapted_subtype</span><span class="p">):</span>
+                <span class="c1"># The subtype still does not match the correct format, so we will not add it to the document</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Attempt to add an attachment with the incorrect subtype &#39;</span><span class="si">%s</span><span class="s2">&#39;. The subtype will be ignored.&quot;</span><span class="p">,</span> <span class="n">subtype</span><span class="p">)</span>
+                <span class="n">adapted_subtype</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_attachment_object</span><span class="p">({</span>
+            <span class="s1">&#39;filename&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span>
+            <span class="s1">&#39;subtype&#39;</span><span class="p">:</span> <span class="n">adapted_subtype</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/Names&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s1">&#39;/Names&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/EmbeddedFiles&#39;</span><span class="p">):</span>
+            <span class="n">names_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s2">&quot;/Names&quot;</span><span class="p">][</span><span class="s2">&quot;/EmbeddedFiles&quot;</span><span class="p">][</span><span class="s2">&quot;/Names&quot;</span><span class="p">]</span>
+            <span class="n">names_array</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">attachment</span><span class="o">.</span><span class="n">getObject</span><span class="p">()[</span><span class="s1">&#39;/F&#39;</span><span class="p">],</span> <span class="n">attachment</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">names_array</span> <span class="o">=</span> <span class="n">ArrayObject</span><span class="p">()</span>
+            <span class="n">names_array</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">attachment</span><span class="o">.</span><span class="n">getObject</span><span class="p">()[</span><span class="s1">&#39;/F&#39;</span><span class="p">],</span> <span class="n">attachment</span><span class="p">])</span>
+
+            <span class="n">embedded_files_names_dictionary</span> <span class="o">=</span> <span class="n">DictionaryObject</span><span class="p">()</span>
+            <span class="n">embedded_files_names_dictionary</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Names&quot;</span><span class="p">):</span> <span class="n">names_array</span>
+            <span class="p">})</span>
+            <span class="n">embedded_files_dictionary</span> <span class="o">=</span> <span class="n">DictionaryObject</span><span class="p">()</span>
+            <span class="n">embedded_files_dictionary</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/EmbeddedFiles&quot;</span><span class="p">):</span> <span class="n">embedded_files_names_dictionary</span>
+            <span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Names&quot;</span><span class="p">):</span> <span class="n">embedded_files_dictionary</span>
+            <span class="p">})</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/AF&#39;</span><span class="p">):</span>
+            <span class="n">attachment_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s1">&#39;/AF&#39;</span><span class="p">]</span>
+            <span class="n">attachment_array</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">attachment</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Create a new object containing an array referencing embedded file</span>
+            <span class="c1"># And reference this array in the root catalogue</span>
+            <span class="n">attachment_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">ArrayObject</span><span class="p">([</span><span class="n">attachment</span><span class="p">]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/AF&quot;</span><span class="p">):</span> <span class="n">attachment_array</span>
+            <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="OdooPdfFileWriter.embed_odoo_attachment">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter.embed_odoo_attachment">[docs]</a>
+    <span class="k">def</span> <span class="nf">embed_odoo_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attachment</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">attachment</span><span class="p">,</span> <span class="s2">&quot;embed_odoo_attachment cannot be called without attachment.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addAttachment</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">attachment</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="n">subtype</span> <span class="ow">or</span> <span class="n">attachment</span><span class="o">.</span><span class="n">mimetype</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OdooPdfFileWriter.cloneReaderDocumentRoot">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter.cloneReaderDocumentRoot">[docs]</a>
+    <span class="k">def</span> <span class="nf">cloneReaderDocumentRoot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reader</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">cloneReaderDocumentRoot</span><span class="p">(</span><span class="n">reader</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reader</span> <span class="o">=</span> <span class="n">reader</span>
+        <span class="c1"># Try to read the header coming in, and reuse it in our new PDF</span>
+        <span class="c1"># This is done in order to allows modifying PDF/A files after creating them (as PyPDF does not read it)</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">stream</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">readlines</span><span class="p">(</span><span class="mi">9</span><span class="p">)</span>
+        <span class="c1"># Should always be true, the first line of a pdf should have 9 bytes (%PDF-1.x plus a newline)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># If we found a header, set it back to the new pdf</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_header</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># Also check the second line. If it is PDF/A, it should be a line starting by % following by four bytes + \n</span>
+            <span class="n">second_line</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">readlines</span><span class="p">(</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">second_line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;latin-1&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;%&#39;</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">second_line</span><span class="p">)</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_header</span> <span class="o">+=</span> <span class="n">second_line</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">is_pdfa</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="c1"># Look if we have an ID in the incoming stream and use it.</span>
+        <span class="n">pdf_id</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">trailer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;/ID&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pdf_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ID</span> <span class="o">=</span> <span class="n">pdf_id</span></div>
+
+
+<div class="viewcode-block" id="OdooPdfFileWriter.convert_to_pdfa">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter.convert_to_pdfa">[docs]</a>
+    <span class="k">def</span> <span class="nf">convert_to_pdfa</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Transform the opened PDF file into a PDF/A compliant file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Set the PDF version to 1.7 (as PDF/A-3 is based on version 1.7) and make it PDF/A compliant.</span>
+        <span class="c1"># See https://github.com/veraPDF/veraPDF-validation-profiles/wiki/PDFA-Parts-2-and-3-rules#rule-612-1</span>
+
+        <span class="c1"># &quot; The file header shall begin at byte zero and shall consist of &quot;%PDF-1.n&quot; followed by a single EOL marker,</span>
+        <span class="c1"># where &#39;n&#39; is a single digit number between 0 (30h) and 7 (37h) &quot;</span>
+        <span class="c1"># &quot; The aforementioned EOL marker shall be immediately followed by a % (25h) character followed by at least four</span>
+        <span class="c1"># bytes, each of whose encoded byte values shall have a decimal value greater than 127 &quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_header</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;%PDF-1.7</span><span class="se">\n</span><span class="s2">%</span><span class="se">\xFF\xFF\xFF\xFF</span><span class="s2">&quot;</span>
+
+        <span class="c1"># Add a document ID to the trailer. This is only needed when using encryption with regular PDF, but is required</span>
+        <span class="c1"># when using PDF/A</span>
+        <span class="n">pdf_id</span> <span class="o">=</span> <span class="n">ByteStringObject</span><span class="p">(</span><span class="n">md5</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reader</span><span class="o">.</span><span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span><span class="o">.</span><span class="n">digest</span><span class="p">())</span>
+        <span class="c1"># The first string is based on the content at the time of creating the file, while the second is based on the</span>
+        <span class="c1"># content of the file when it was last updated. When creating a PDF, both are set to the same value.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ID</span> <span class="o">=</span> <span class="n">ArrayObject</span><span class="p">((</span><span class="n">pdf_id</span><span class="p">,</span> <span class="n">pdf_id</span><span class="p">))</span>
+
+        <span class="k">with</span> <span class="n">file_open</span><span class="p">(</span><span class="s1">&#39;tools/data/files/sRGB2014.icc&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">icc_profile</span><span class="p">:</span>
+            <span class="n">icc_profile_file_data</span> <span class="o">=</span> <span class="n">compress</span><span class="p">(</span><span class="n">icc_profile</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+        <span class="n">icc_profile_stream_obj</span> <span class="o">=</span> <span class="n">DecodedStreamObject</span><span class="p">()</span>
+        <span class="n">icc_profile_stream_obj</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="n">icc_profile_file_data</span><span class="p">)</span>
+        <span class="n">icc_profile_stream_obj</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Filter&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/FlateDecode&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/N&quot;</span><span class="p">):</span> <span class="n">NumberObject</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Length&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">icc_profile_file_data</span><span class="p">))),</span>
+        <span class="p">})</span>
+
+        <span class="n">icc_profile_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">icc_profile_stream_obj</span><span class="p">)</span>
+
+        <span class="n">output_intent_dict_obj</span> <span class="o">=</span> <span class="n">DictionaryObject</span><span class="p">()</span>
+        <span class="n">output_intent_dict_obj</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/S&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/GTS_PDFA1&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/OutputConditionIdentifier&quot;</span><span class="p">):</span> <span class="n">createStringObject</span><span class="p">(</span><span class="s2">&quot;sRGB&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/DestOutputProfile&quot;</span><span class="p">):</span> <span class="n">icc_profile_obj</span><span class="p">,</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Type&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/OutputIntent&quot;</span><span class="p">),</span>
+        <span class="p">})</span>
+
+        <span class="n">output_intent_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">output_intent_dict_obj</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/OutputIntents&quot;</span><span class="p">):</span> <span class="n">ArrayObject</span><span class="p">([</span><span class="n">output_intent_obj</span><span class="p">]),</span>
+        <span class="p">})</span>
+
+        <span class="n">pages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s1">&#39;/Pages&#39;</span><span class="p">][</span><span class="s1">&#39;/Kids&#39;</span><span class="p">]</span>
+
+        <span class="c1"># PDF/A needs the glyphs width array embedded in the pdf to be consistent with the ones from the font file.</span>
+        <span class="c1"># But it seems like it is not the case when exporting from wkhtmltopdf.</span>
+        <span class="k">if</span> <span class="n">TTFont</span><span class="p">:</span>
+            <span class="n">fonts</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="c1"># First browse through all the pages of the pdf file, to get a reference to all the fonts used in the PDF.</span>
+            <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">font</span> <span class="ow">in</span> <span class="n">page</span><span class="o">.</span><span class="n">getObject</span><span class="p">()[</span><span class="s1">&#39;/Resources&#39;</span><span class="p">][</span><span class="s1">&#39;/Font&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">for</span> <span class="n">descendant</span> <span class="ow">in</span> <span class="n">font</span><span class="o">.</span><span class="n">getObject</span><span class="p">()[</span><span class="s1">&#39;/DescendantFonts&#39;</span><span class="p">]:</span>
+                        <span class="n">fonts</span><span class="p">[</span><span class="n">descendant</span><span class="o">.</span><span class="n">idnum</span><span class="p">]</span> <span class="o">=</span> <span class="n">descendant</span><span class="o">.</span><span class="n">getObject</span><span class="p">()</span>
+
+            <span class="c1"># Then for each font, rewrite the width array with the information taken directly from the font file.</span>
+            <span class="c1"># The new width are calculated such as width = round(1000 * font_glyph_width / font_units_per_em)</span>
+            <span class="c1"># See: http://martin.hoppenheit.info/blog/2018/pdfa-validation-and-inconsistent-glyph-width-information/</span>
+            <span class="k">for</span> <span class="n">font</span> <span class="ow">in</span> <span class="n">fonts</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">font_file</span> <span class="o">=</span> <span class="n">font</span><span class="p">[</span><span class="s1">&#39;/FontDescriptor&#39;</span><span class="p">][</span><span class="s1">&#39;/FontFile2&#39;</span><span class="p">]</span>
+                <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">decompress</span><span class="p">(</span><span class="n">font_file</span><span class="o">.</span><span class="n">_data</span><span class="p">))</span>
+                <span class="n">ttfont</span> <span class="o">=</span> <span class="n">TTFont</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                <span class="n">font_upm</span> <span class="o">=</span> <span class="n">ttfont</span><span class="p">[</span><span class="s1">&#39;head&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unitsPerEm</span>
+                <span class="k">if</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">fontTools</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">parse_version</span><span class="p">(</span><span class="s1">&#39;4.37.2&#39;</span><span class="p">):</span>
+                    <span class="n">glyphs</span> <span class="o">=</span> <span class="n">ttfont</span><span class="o">.</span><span class="n">getGlyphSet</span><span class="p">()</span><span class="o">.</span><span class="n">_hmtx</span><span class="o">.</span><span class="n">metrics</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">glyphs</span> <span class="o">=</span> <span class="n">ttfont</span><span class="o">.</span><span class="n">getGlyphSet</span><span class="p">()</span><span class="o">.</span><span class="n">hMetrics</span>
+                <span class="n">glyph_widths</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">glyphs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">key</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;glyph&#39;</span><span class="p">:</span>
+                        <span class="n">glyph_widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">NumberObject</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="mf">1000.0</span> <span class="o">*</span> <span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">font_upm</span><span class="p">)))</span>
+
+                <span class="n">font</span><span class="p">[</span><span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/W&#39;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">ArrayObject</span><span class="p">([</span><span class="n">NumberObject</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">ArrayObject</span><span class="p">(</span><span class="n">glyph_widths</span><span class="p">)])</span>
+                <span class="n">stream</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;The fonttools package is not installed. Generated PDF may not be PDF/A compliant.&#39;</span><span class="p">)</span>
+
+        <span class="n">outlines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="p">[</span><span class="s1">&#39;/Outlines&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getObject</span><span class="p">()</span>
+        <span class="n">outlines</span><span class="p">[</span><span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/Count&#39;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">NumberObject</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Set odoo as producer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addMetadata</span><span class="p">({</span>
+            <span class="s1">&#39;/Creator&#39;</span><span class="p">:</span> <span class="s2">&quot;Odoo&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;/Producer&#39;</span><span class="p">:</span> <span class="s2">&quot;Odoo&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_pdfa</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="OdooPdfFileWriter.add_file_metadata">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.pdf.OdooPdfFileWriter.add_file_metadata">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_file_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metadata_content</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the XMP metadata of the pdf, wrapping it with the necessary XMP header/footer.</span>
+<span class="sd">        These are required for a PDF/A file to be completely compliant. Ommiting them would result in validation errors.</span>
+<span class="sd">        :param metadata_content: bytes of the metadata to add to the pdf.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># See https://wwwimages2.adobe.com/content/dam/acom/en/devnet/xmp/pdfs/XMP%20SDK%20Release%20cc-2016-08/XMPSpecificationPart1.pdf</span>
+        <span class="c1"># Page 10/11</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;&lt;?xpacket begin=&quot;&quot; id=&quot;W5M0MpCehiHzreSzNTczkc9d&quot;?&gt;&#39;</span>
+        <span class="n">footer</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;&lt;?xpacket end=&quot;w&quot;?&gt;&#39;</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="si">%s%s%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">metadata_content</span><span class="p">,</span> <span class="n">footer</span><span class="p">)</span>
+        <span class="n">file_entry</span> <span class="o">=</span> <span class="n">DecodedStreamObject</span><span class="p">()</span>
+        <span class="n">file_entry</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
+        <span class="n">file_entry</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Type&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Metadata&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Subtype&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/XML&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Length&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">metadata</span><span class="p">))),</span>
+        <span class="p">})</span>
+
+        <span class="c1"># Add the new metadata to the pdf, then redirect the reference to refer to this new object.</span>
+        <span class="n">metadata_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">file_entry</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_root_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Metadata&quot;</span><span class="p">):</span> <span class="n">metadata_object</span><span class="p">})</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_create_attachment_object</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attachment</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39; Create a PyPdf2.generic object representing an embedded file.</span>
+
+<span class="sd">        :param attachment: A dictionary containing:</span>
+<span class="sd">            * filename: The name of the file to embed (required)</span>
+<span class="sd">            * content:  The bytes of the file to embed (required)</span>
+<span class="sd">            * subtype: The mime-type of the file to embed (optional)</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">file_entry</span> <span class="o">=</span> <span class="n">DecodedStreamObject</span><span class="p">()</span>
+        <span class="n">file_entry</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">])</span>
+        <span class="n">file_entry</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Type&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/EmbeddedFile&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Params&quot;</span><span class="p">):</span>
+                <span class="n">DictionaryObject</span><span class="p">({</span>
+                    <span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/CheckSum&#39;</span><span class="p">):</span> <span class="n">createStringObject</span><span class="p">(</span><span class="n">md5</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()),</span>
+                    <span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/ModDate&#39;</span><span class="p">):</span> <span class="n">createStringObject</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">DEFAULT_PDF_DATETIME_FORMAT</span><span class="p">)),</span>
+                    <span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/Size&#39;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">}),</span>
+        <span class="p">})</span>
+        <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;subtype&#39;</span><span class="p">):</span>
+            <span class="n">file_entry</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Subtype&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;subtype&#39;</span><span class="p">]),</span>
+            <span class="p">})</span>
+        <span class="n">file_entry_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">file_entry</span><span class="p">)</span>
+        <span class="n">filename_object</span> <span class="o">=</span> <span class="n">createStringObject</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;filename&#39;</span><span class="p">])</span>
+        <span class="n">filespec_object</span> <span class="o">=</span> <span class="n">DictionaryObject</span><span class="p">({</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/AFRelationship&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Data&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Type&quot;</span><span class="p">):</span> <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Filespec&quot;</span><span class="p">),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/F&quot;</span><span class="p">):</span> <span class="n">filename_object</span><span class="p">,</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/EF&quot;</span><span class="p">):</span>
+                <span class="n">DictionaryObject</span><span class="p">({</span>
+                    <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/F&quot;</span><span class="p">):</span> <span class="n">file_entry_object</span><span class="p">,</span>
+                    <span class="n">NameObject</span><span class="p">(</span><span class="s1">&#39;/UF&#39;</span><span class="p">):</span> <span class="n">file_entry_object</span><span class="p">,</span>
+                <span class="p">}),</span>
+            <span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/UF&quot;</span><span class="p">):</span> <span class="n">filename_object</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;description&#39;</span><span class="p">):</span>
+            <span class="n">filespec_object</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">NameObject</span><span class="p">(</span><span class="s2">&quot;/Desc&quot;</span><span class="p">):</span> <span class="n">createStringObject</span><span class="p">(</span><span class="n">attachment</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">])})</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_addObject</span><span class="p">(</span><span class="n">filespec_object</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

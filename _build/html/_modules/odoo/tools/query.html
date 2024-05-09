@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.query &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.query</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.query</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tools.sql</span> <span class="kn">import</span> <span class="n">make_identifier</span><span class="p">,</span> <span class="n">SQL</span><span class="p">,</span> <span class="n">IDENT_RE</span>
+
+
+<span class="k">def</span> <span class="nf">_sql_table</span><span class="p">(</span><span class="n">table</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Wrap an optional table as an SQL object. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> <span class="k">if</span> <span class="n">IDENT_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">table</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">table</span>
+
+
+<span class="k">def</span> <span class="nf">_sql_from_table</span><span class="p">(</span><span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a FROM clause element from ``alias`` and ``table``. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">table</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> AS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">alias</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_sql_from_join</span><span class="p">(</span><span class="n">kind</span><span class="p">:</span> <span class="n">SQL</span><span class="p">,</span> <span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">SQL</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a FROM clause element for a JOIN. &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> ON (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="n">_sql_from_table</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">table</span><span class="p">),</span> <span class="n">condition</span><span class="p">)</span>
+
+
+<span class="n">_SQL_JOINS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;JOIN&quot;</span><span class="p">:</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;JOIN&quot;</span><span class="p">),</span>
+    <span class="s2">&quot;LEFT JOIN&quot;</span><span class="p">:</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;LEFT JOIN&quot;</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">_generate_table_alias</span><span class="p">(</span><span class="n">src_table_alias</span><span class="p">,</span> <span class="n">link</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Generate a standard table alias name. An alias is generated as following:</span>
+
+<span class="sd">        - the base is the source table name (that can already be an alias)</span>
+<span class="sd">        - then, the joined table is added in the alias using a &#39;link field name&#39;</span>
+<span class="sd">          that is used to render unique aliases for a given path</span>
+<span class="sd">        - the name is shortcut if it goes beyond PostgreSQL&#39;s identifier limits</span>
+
+<span class="sd">        .. code-block:: pycon</span>
+
+<span class="sd">            &gt;&gt;&gt; _generate_table_alias(&#39;res_users&#39;, link=&#39;parent_id&#39;)</span>
+<span class="sd">            &#39;res_users__parent_id&#39;</span>
+
+<span class="sd">        :param str src_table_alias: alias of the source table</span>
+<span class="sd">        :param str link: field name</span>
+<span class="sd">        :return str: alias</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">make_identifier</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">src_table_alias</span><span class="si">}</span><span class="s2">__</span><span class="si">{</span><span class="n">link</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Query">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query">[docs]</a>
+<span class="k">class</span> <span class="nc">Query</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Simple implementation of a query object, managing tables with aliases,</span>
+<span class="sd">    join clauses (with aliases, condition and parameters), where clauses (with</span>
+<span class="sd">    parameters), order, limit and offset.</span>
+
+<span class="sd">    :param cr: database cursor (for lazy evaluation)</span>
+<span class="sd">    :param alias: name or alias of the table</span>
+<span class="sd">    :param table: a table expression (``str`` or ``SQL`` object), optional</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># database cursor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span> <span class="o">=</span> <span class="n">cr</span>
+
+        <span class="c1"># tables {alias: table(SQL|None)}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="o">=</span> <span class="p">{</span><span class="n">alias</span><span class="p">:</span> <span class="n">_sql_table</span><span class="p">(</span><span class="n">table</span><span class="p">)}</span>
+
+        <span class="c1"># joins {alias: (kind(SQL), table(SQL|None), condition(SQL))}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># holds the list of WHERE conditions (to be joined with &#39;AND&#39;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># order, limit, offset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_order</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># memoized result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Query.make_alias">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.make_alias">[docs]</a>
+    <span class="k">def</span> <span class="nf">make_alias</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">link</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return an alias based on ``alias`` and ``link``. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">_generate_table_alias</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">link</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Query.add_table">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.add_table">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a table with a given alias to the from clause. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="ow">and</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Alias </span><span class="si">{</span><span class="n">alias</span><span class="si">!r}</span><span class="s2"> already in </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sql_table</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Query.add_join">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.add_join">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">SQL</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a join clause with the given alias, table and condition. &quot;&quot;&quot;</span>
+        <span class="n">sql_kind</span> <span class="o">=</span> <span class="n">_SQL_JOINS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">kind</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+        <span class="k">assert</span> <span class="n">sql_kind</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Invalid JOIN type </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="k">assert</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Alias </span><span class="si">{</span><span class="n">alias</span><span class="si">!r}</span><span class="s2"> already used&quot;</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">_sql_table</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">==</span> <span class="p">(</span><span class="n">sql_kind</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">condition</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">sql_kind</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">condition</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Query.add_where">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.add_where">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_where</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">where_clause</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span><span class="p">,</span> <span class="n">where_params</span><span class="o">=</span><span class="p">()):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a condition to the where clause. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="n">where_clause</span><span class="p">,</span> <span class="o">*</span><span class="n">where_params</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Query.join">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.join">[docs]</a>
+    <span class="k">def</span> <span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lhs_alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lhs_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rhs_table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rhs_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">link</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Perform a join between a table already present in the current Query object and</span>
+<span class="sd">        another table.  This method is essentially a shortcut for methods :meth:`~.make_alias`</span>
+<span class="sd">        and :meth:`~.add_join`.</span>
+
+<span class="sd">        :param str lhs_alias: alias of a table already defined in the current Query object.</span>
+<span class="sd">        :param str lhs_column: column of `lhs_alias` to be used for the join&#39;s ON condition.</span>
+<span class="sd">        :param str rhs_table: name of the table to join to `lhs_alias`.</span>
+<span class="sd">        :param str rhs_column: column of `rhs_alias` to be used for the join&#39;s ON condition.</span>
+<span class="sd">        :param str link: used to generate the alias for the joined table, this string should</span>
+<span class="sd">            represent the relationship (the link) between both tables.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">lhs_alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="ow">or</span> <span class="n">lhs_alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">,</span> <span class="s2">&quot;Alias </span><span class="si">%r</span><span class="s2"> not in </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="n">rhs_alias</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_alias</span><span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="n">link</span><span class="p">)</span>
+        <span class="n">condition</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="n">lhs_column</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">rhs_alias</span><span class="p">,</span> <span class="n">rhs_column</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_join</span><span class="p">(</span><span class="s1">&#39;JOIN&#39;</span><span class="p">,</span> <span class="n">rhs_alias</span><span class="p">,</span> <span class="n">rhs_table</span><span class="p">,</span> <span class="n">condition</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rhs_alias</span></div>
+
+
+<div class="viewcode-block" id="Query.left_join">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.left_join">[docs]</a>
+    <span class="k">def</span> <span class="nf">left_join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lhs_alias</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lhs_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rhs_table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rhs_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">link</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a LEFT JOIN to the current table (if necessary), and return the</span>
+<span class="sd">        alias corresponding to ``rhs_table``.</span>
+
+<span class="sd">        See the documentation of :meth:`join` for a better overview of the</span>
+<span class="sd">        arguments and what they do.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">lhs_alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="ow">or</span> <span class="n">lhs_alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">,</span> <span class="s2">&quot;Alias </span><span class="si">%r</span><span class="s2"> not in </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="n">rhs_alias</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_alias</span><span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="n">link</span><span class="p">)</span>
+        <span class="n">condition</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">lhs_alias</span><span class="p">,</span> <span class="n">lhs_column</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">rhs_alias</span><span class="p">,</span> <span class="n">rhs_column</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_join</span><span class="p">(</span><span class="s1">&#39;LEFT JOIN&#39;</span><span class="p">,</span> <span class="n">rhs_alias</span><span class="p">,</span> <span class="n">rhs_table</span><span class="p">,</span> <span class="n">condition</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rhs_alias</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">order</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_order</span>
+
+    <span class="nd">@order</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">order</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">SQL</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_order</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">table</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the query&#39;s main table, i.e., the first one in the FROM clause. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tables</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">from_clause</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the FROM clause of ``self``, without the FROM keyword. &quot;&quot;&quot;</span>
+        <span class="n">tables</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">_sql_from_table</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tables</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">tables</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">condition</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_joins</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_sql_from_join</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">alias</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">condition</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">where_clause</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the WHERE condition of ``self``, without the WHERE keyword. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; AND &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Query.is_empty">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.is_empty">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return whether the query is known to return nothing. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">==</span> <span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Query.select">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.select">[docs]</a>
+    <span class="k">def</span> <span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the SELECT query as an ``SQL`` object. &quot;&quot;&quot;</span>
+        <span class="n">sql_args</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">SQL</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">args</span> <span class="k">else</span> <span class="p">[</span><span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="s1">&#39;id&#39;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;</span><span class="si">%s%s%s%s%s%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sql_args</span><span class="p">)),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; FROM </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_clause</span><span class="p">),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; WHERE </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">where_clause</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; ORDER BY </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_order</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_order</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; LIMIT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; OFFSET </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Query.subselect">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.subselect">[docs]</a>
+    <span class="k">def</span> <span class="nf">subselect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Similar to :meth:`.select`, but for sub-queries.</span>
+<span class="sd">            This one avoids the ORDER BY clause when possible,</span>
+<span class="sd">            and includes parentheses around the subquery.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="c1"># inject the known result instead of the subquery</span>
+            <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="ow">or</span> <span class="p">(</span><span class="kc">None</span><span class="p">,))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">:</span>
+            <span class="c1"># in this case, the ORDER BY clause is necessary</span>
+            <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;(</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">))</span>
+
+        <span class="n">sql_args</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">SQL</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">args</span> <span class="k">else</span> <span class="p">[</span><span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="s1">&#39;id&#39;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;(</span><span class="si">%s%s%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sql_args</span><span class="p">)),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; FROM </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_clause</span><span class="p">),</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; WHERE </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">where_clause</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Query.get_sql">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.get_sql">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_sql</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns (query_from, query_where, query_params). &quot;&quot;&quot;</span>
+        <span class="n">from_string</span><span class="p">,</span> <span class="n">from_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_clause</span>
+        <span class="n">where_string</span><span class="p">,</span> <span class="n">where_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">where_clause</span>
+        <span class="k">return</span> <span class="n">from_string</span><span class="p">,</span> <span class="n">where_string</span><span class="p">,</span> <span class="n">from_params</span> <span class="o">+</span> <span class="n">where_params</span></div>
+
+
+<div class="viewcode-block" id="Query.get_result_ids">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.get_result_ids">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_result_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the result of ``self.select()`` as a tuple of ids. The result</span>
+<span class="sd">        is memoized for future use, which avoids making the same query twice.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span></div>
+
+
+<div class="viewcode-block" id="Query.set_result_ids">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.query.Query.set_result_ids">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_result_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Set up the query to return the lines given by ``ids``. The parameter</span>
+<span class="sd">        ``ordered`` tells whether the query must be ordered to match exactly the</span>
+<span class="sd">        sequence ``ids``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_joins</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_where_clauses</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">),</span> \
+            <span class="s2">&quot;Method set_result_ids() can only be called on a virgin Query&quot;</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ids</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_where</span><span class="p">(</span><span class="s2">&quot;FALSE&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ordered</span><span class="p">:</span>
+            <span class="c1"># This guarantees that self.select() returns the results in the</span>
+            <span class="c1"># expected order of ids:</span>
+            <span class="c1">#   SELECT &quot;stuff&quot;.id</span>
+            <span class="c1">#   FROM &quot;stuff&quot;</span>
+            <span class="c1">#   JOIN (SELECT * FROM unnest(%s) WITH ORDINALITY) AS &quot;stuff__ids&quot;</span>
+            <span class="c1">#       ON (&quot;stuff&quot;.&quot;id&quot; = &quot;stuff__ids&quot;.&quot;unnest&quot;)</span>
+            <span class="c1">#   ORDER BY &quot;stuff__ids&quot;.&quot;ordinality&quot;</span>
+            <span class="n">alias</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="s1">&#39;id&#39;</span><span class="p">,</span>
+                <span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;(SELECT * FROM unnest(</span><span class="si">%s</span><span class="s1">) WITH ORDINALITY)&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">ids</span><span class="p">)),</span> <span class="s1">&#39;unnest&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;ids&#39;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="s1">&#39;ordinality&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_where</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> IN </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="s1">&#39;id&#39;</span><span class="p">),</span> <span class="n">ids</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="o">=</span> <span class="n">ids</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">()</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt;Query: </span><span class="si">{</span><span class="n">sql</span><span class="o">.</span><span class="n">code</span><span class="si">!r}</span><span class="s2"> with params: </span><span class="si">{</span><span class="n">sql</span><span class="o">.</span><span class="n">params</span><span class="si">!r}</span><span class="s2">&gt;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_result_ids</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">:</span>
+                <span class="c1"># optimization: generate a SELECT FROM, and then count the rows</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;SELECT COUNT(*) FROM (</span><span class="si">%s</span><span class="s2">) t&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;COUNT(*)&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_result_ids</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_result_ids</span><span class="p">())</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

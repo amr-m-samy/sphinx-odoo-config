@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_property &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_property</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_property</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.osv.expression</span> <span class="kn">import</span> <span class="n">TERM_OPERATORS_NEGATION</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">ormcache</span>
+
+<span class="n">TYPE2FIELD</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;char&#39;</span><span class="p">:</span> <span class="s1">&#39;value_text&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;float&#39;</span><span class="p">:</span> <span class="s1">&#39;value_float&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;boolean&#39;</span><span class="p">:</span> <span class="s1">&#39;value_integer&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;integer&#39;</span><span class="p">:</span> <span class="s1">&#39;value_integer&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;text&#39;</span><span class="p">:</span> <span class="s1">&#39;value_text&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;binary&#39;</span><span class="p">:</span> <span class="s1">&#39;value_binary&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;many2one&#39;</span><span class="p">:</span> <span class="s1">&#39;value_reference&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="s1">&#39;value_datetime&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;datetime&#39;</span><span class="p">:</span> <span class="s1">&#39;value_datetime&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;selection&#39;</span><span class="p">:</span> <span class="s1">&#39;value_text&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;html&#39;</span><span class="p">:</span> <span class="s1">&#39;value_text&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">TYPE2CLEAN</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;boolean&#39;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="s1">&#39;integer&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;float&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;char&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;text&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;selection&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;binary&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">date</span><span class="p">()</span> <span class="k">if</span> <span class="n">val</span> <span class="k">else</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;datetime&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;html&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="Property">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property">[docs]</a>
+<span class="k">class</span> <span class="nc">Property</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.property&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Company Property&#39;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">res_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Resource&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If not set, acts as a default value for new resources&quot;</span><span class="p">,)</span>
+    <span class="n">company_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Company&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">fields_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Field&#39;</span><span class="p">,</span> <span class="n">ondelete</span><span class="o">=</span><span class="s1">&#39;cascade&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">value_float</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Float</span><span class="p">()</span>
+    <span class="n">value_integer</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">()</span>
+    <span class="n">value_text</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">()</span>  <span class="c1"># will contain (char, text)</span>
+    <span class="n">value_binary</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="n">attachment</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">value_reference</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">()</span>
+    <span class="n">value_datetime</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="p">()</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;char&#39;</span><span class="p">,</span> <span class="s1">&#39;Char&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="s1">&#39;Float&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="s1">&#39;Boolean&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="s1">&#39;Integer&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">,</span> <span class="s1">&#39;Text&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;binary&#39;</span><span class="p">,</span> <span class="s1">&#39;Binary&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;many2one&#39;</span><span class="p">,</span> <span class="s1">&#39;Many2One&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="s1">&#39;Date&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;DateTime&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="s1">&#39;Selection&#39;</span><span class="p">),</span>
+                             <span class="p">(</span><span class="s1">&#39;html&#39;</span><span class="p">,</span> <span class="s1">&#39;Html&#39;</span><span class="p">),</span>
+                             <span class="p">],</span>
+                            <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                            <span class="n">default</span><span class="o">=</span><span class="s1">&#39;many2one&#39;</span><span class="p">,</span>
+                            <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Property.init">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.init">[docs]</a>
+    <span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Ensure there is at most one active variant for each combination.</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            CREATE UNIQUE INDEX IF NOT EXISTS ir_property_unique_index</span>
+<span class="s2">            ON </span><span class="si">%s</span><span class="s2"> (fields_id, COALESCE(company_id, 0), COALESCE(res_id, &#39;&#39;))</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_update_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;value&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">values</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+
+        <span class="n">prop</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">type_</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">type_</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="p">:</span>
+                <span class="n">prop</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">type_</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">type</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">type_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="n">field</span> <span class="o">=</span> <span class="n">TYPE2FIELD</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">type_</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Invalid type&#39;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">field</span> <span class="o">==</span> <span class="s1">&#39;value_reference&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">BaseModel</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">field_id</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;fields_id&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">field_id</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">prop</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+                    <span class="n">field_id</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">fields_id</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">field_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">field_id</span><span class="p">)</span>
+
+                <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">field_id</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">relation</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="n">values</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+<div class="viewcode-block" id="Property.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="c1"># if any of the records we&#39;re writing on has a res_id=False *or*</span>
+        <span class="c1"># we&#39;re writing a res_id=False on any record</span>
+        <span class="n">default_set</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_values</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">default_set</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="c1"># turning a record value into a fallback value</span>
+            <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">res_id</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="p">)</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="c1"># changing a fallback value</span>
+            <span class="ow">not</span> <span class="n">record</span><span class="o">.</span><span class="n">res_id</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span><span class="o">.</span><span class="n">convert_to_record</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span> <span class="k">for</span> <span class="n">fname</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="bp">self</span>
+        <span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">default_set</span><span class="p">:</span>
+            <span class="c1"># DLE P44: test `test_27_company_dependent`</span>
+            <span class="c1"># Easy solution, need to flush write when changing a property.</span>
+            <span class="c1"># Maybe it would be better to be able to compute all impacted cache value and update those instead</span>
+            <span class="c1"># Then clear_cache must be removed as well.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">r</span></div>
+
+
+<div class="viewcode-block" id="Property.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="n">vals_list</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_update_values</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">]</span>
+        <span class="n">created_default</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">v</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Property</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">created_default</span><span class="p">:</span>
+            <span class="c1"># DLE P44: test `test_27_company_dependent`</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">r</span></div>
+
+
+<div class="viewcode-block" id="Property.unlink">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.unlink">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">default_deleted</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">res_id</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">default_deleted</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">r</span></div>
+
+
+<div class="viewcode-block" id="Property.get_by_record">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.get_by_record">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_by_record</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;char&#39;</span><span class="p">,</span> <span class="s1">&#39;text&#39;</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_text</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;float&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_float</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value_integer</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;integer&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_integer</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;binary&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_binary</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_reference</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">resource_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_reference</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">resource_id</span><span class="p">))</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;datetime&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_datetime</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;date&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_datetime</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">Date</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value_datetime</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_set_default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">company</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Set the given field&#39;s generic value for the given company.</span>
+
+<span class="sd">        :param name: the field&#39;s name</span>
+<span class="sd">        :param model: the field&#39;s model name</span>
+<span class="sd">        :param value: the field&#39;s value</span>
+<span class="sd">        :param company: the company (record or id)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">field_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">company_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">company</span><span class="p">)</span> <span class="k">if</span> <span class="n">company</span> <span class="k">else</span> <span class="kc">False</span>
+        <span class="n">prop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+            <span class="p">(</span><span class="s1">&#39;fields_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">field_id</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">company_id</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="p">])</span>
+        <span class="k">if</span> <span class="n">prop</span><span class="p">:</span>
+            <span class="n">prop</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">prop</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;fields_id&#39;</span><span class="p">:</span> <span class="n">field_id</span><span class="p">,</span>
+                <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_id</span><span class="p">,</span>
+                <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="p">})</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">res_id</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Get the given field&#39;s generic value for the record.</span>
+
+<span class="sd">        :param name: the field&#39;s name</span>
+<span class="sd">        :param model: the field&#39;s model name</span>
+<span class="sd">        :param res_id: optional resource, format: &quot;&lt;id&gt;&quot; (int) or</span>
+<span class="sd">                       &quot;&lt;model&gt;,&lt;id&gt;&quot; (str)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">res_id</span><span class="p">:</span>
+            <span class="n">t</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_default_property</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span> <span class="ow">or</span> <span class="n">t</span> <span class="o">!=</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">v</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_property</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">res_id</span><span class="o">=</span><span class="n">res_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">p</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">get_by_record</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># only cache Property._get(res_id=False) as that&#39;s</span>
+    <span class="c1"># sub-optimally.</span>
+    <span class="n">COMPANY_KEY</span> <span class="o">=</span> <span class="s2">&quot;self.env.company.id&quot;</span>
+    <span class="nd">@ormcache</span><span class="p">(</span><span class="n">COMPANY_KEY</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;model&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_get_default_property</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+        <span class="n">prop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_property</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">res_id</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">prop</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">get_by_record</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">prop</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">prop</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">v</span>
+        <span class="k">return</span> <span class="s1">&#39;many2one&#39;</span><span class="p">,</span> <span class="n">v</span> <span class="ow">and</span> <span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_property</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">res_id</span><span class="p">):</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_domain</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">domain</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res_id</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res_id</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">res_id</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">,</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">res_id</span><span class="p">)</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">res_id</span><span class="p">)]</span> <span class="o">+</span> <span class="n">domain</span>
+            <span class="c1">#make the search with company_id asc to make sure that properties specific to a company are given first</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;company_id&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">browse</span><span class="p">(())</span>
+
+    <span class="k">def</span> <span class="nf">_get_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prop_name</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+        <span class="n">field_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prop_name</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">field_id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">company_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;fields_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">field_id</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">company_id</span><span class="p">,</span> <span class="kc">False</span><span class="p">])]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ids</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Read the property field `name` for the records of model `model` with</span>
+<span class="sd">            the given `ids`, and return a dictionary mapping `ids` to their</span>
+<span class="sd">            corresponding value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ids</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="n">field_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">company_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">id</span> <span class="ow">or</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="n">comodel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span>
+            <span class="n">model_pos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span>
+            <span class="n">value_pos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">comodel</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span>
+            <span class="c1"># retrieve values: both p.res_id and p.value_reference are formatted</span>
+            <span class="c1"># as &quot;&lt;rec._name&gt;,&lt;rec.id&gt;&quot;; the purpose of the LEFT JOIN is to</span>
+            <span class="c1"># return the value id if it exists, NULL otherwise</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT substr(p.res_id, </span><span class="si">%s</span><span class="s2">)::integer, r.id</span>
+<span class="s2">                FROM ir_property p</span>
+<span class="s2">                LEFT JOIN </span><span class="si">{}</span><span class="s2"> r ON substr(p.value_reference, </span><span class="si">%s</span><span class="s2">)::integer=r.id</span>
+<span class="s2">                WHERE p.fields_id=</span><span class="si">%s</span>
+<span class="s2">                    AND (p.company_id=</span><span class="si">%s</span><span class="s2"> OR p.company_id IS NULL)</span>
+<span class="s2">                    AND (p.res_id IN </span><span class="si">%s</span><span class="s2"> OR p.res_id IS NULL)</span>
+<span class="s2">                ORDER BY p.company_id NULLS FIRST</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">comodel</span><span class="o">.</span><span class="n">_table</span><span class="p">)</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">[</span><span class="n">model_pos</span><span class="p">,</span> <span class="n">value_pos</span><span class="p">,</span> <span class="n">field_id</span><span class="p">,</span> <span class="n">company_id</span><span class="p">]</span>
+            <span class="n">clean</span> <span class="o">=</span> <span class="n">comodel</span><span class="o">.</span><span class="n">browse</span>
+
+        <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="n">TYPE2FIELD</span><span class="p">:</span>
+            <span class="n">model_pos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span>
+            <span class="c1"># retrieve values: p.res_id is formatted as &quot;&lt;rec._name&gt;,&lt;rec.id&gt;&quot;</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                SELECT substr(p.res_id, </span><span class="si">%s</span><span class="s2">)::integer, p.</span><span class="si">{}</span>
+<span class="s2">                FROM ir_property p</span>
+<span class="s2">                WHERE p.fields_id=</span><span class="si">%s</span>
+<span class="s2">                    AND (p.company_id=</span><span class="si">%s</span><span class="s2"> OR p.company_id IS NULL)</span>
+<span class="s2">                    AND (p.res_id IN </span><span class="si">%s</span><span class="s2"> OR p.res_id IS NULL)</span>
+<span class="s2">                ORDER BY p.company_id NULLS FIRST</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">TYPE2FIELD</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">type</span><span class="p">])</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">[</span><span class="n">model_pos</span><span class="p">,</span> <span class="n">field_id</span><span class="p">,</span> <span class="n">company_id</span><span class="p">]</span>
+            <span class="n">clean</span> <span class="o">=</span> <span class="n">TYPE2CLEAN</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">type</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># retrieve values</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+        <span class="n">cr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">refs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">,</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">sub_refs</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">split_for_in_conditions</span><span class="p">(</span><span class="n">refs</span><span class="p">):</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">params</span> <span class="o">+</span> <span class="p">[</span><span class="n">sub_refs</span><span class="p">])</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+
+        <span class="c1"># determine all values and format them</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="nb">id</span><span class="p">:</span> <span class="n">clean</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">default</span><span class="p">))</span>
+            <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span>
+        <span class="p">}</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_set_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">default_value</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Assign the property field `name` for the records of model `model`</span>
+<span class="sd">            with `values` (dictionary mapping record ids to their value).</span>
+<span class="sd">            If the value for a given record is the same as the default</span>
+<span class="sd">            value, the property entry will not be stored, to avoid bloating</span>
+<span class="sd">            the database.</span>
+<span class="sd">            If `default_value` is provided, that value will be used instead</span>
+<span class="sd">            of the computed default value, to determine whether the value</span>
+<span class="sd">            for a record should be stored or not.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">id</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">BaseModel</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">values</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">default_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_domain</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">domain</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">()</span>
+            <span class="c1"># retrieve the default value for the field</span>
+            <span class="n">default_value</span> <span class="o">=</span> <span class="n">clean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">))</span>
+
+        <span class="c1"># retrieve the properties corresponding to the given record ids</span>
+        <span class="n">field_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">company_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">refs</span> <span class="o">=</span> <span class="p">{(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">id</span><span class="p">)):</span> <span class="nb">id</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">values</span><span class="p">}</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+            <span class="p">(</span><span class="s1">&#39;fields_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">field_id</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;company_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">company_id</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">refs</span><span class="p">)),</span>
+        <span class="p">])</span>
+
+        <span class="c1"># modify existing properties</span>
+        <span class="k">for</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">props</span><span class="p">:</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="n">refs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">prop</span><span class="o">.</span><span class="n">res_id</span><span class="p">)</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">clean</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="nb">id</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="n">default_value</span><span class="p">:</span>
+                <span class="c1"># avoid prop.unlink(), as it clears the record cache that can</span>
+                <span class="c1"># contain the value of other properties to set on record!</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM ir_property WHERE id=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">prop</span><span class="o">.</span><span class="n">id</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">clean</span><span class="p">(</span><span class="n">prop</span><span class="o">.</span><span class="n">get_by_record</span><span class="p">()):</span>
+                <span class="n">prop</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+
+        <span class="c1"># create new properties for records that do not have one yet</span>
+        <span class="n">vals_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">ref</span><span class="p">,</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">refs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">clean</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="nb">id</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">default_value</span><span class="p">:</span>
+                <span class="n">vals_list</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;fields_id&#39;</span><span class="p">:</span> <span class="n">field_id</span><span class="p">,</span>
+                    <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">company_id</span><span class="p">,</span>
+                    <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">ref</span><span class="p">,</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                    <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span>
+                    <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+                <span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Property.search_multi">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_property.Property.search_multi">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">search_multi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a domain for the records that match the given condition. &quot;&quot;&quot;</span>
+        <span class="n">default_matches</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">negate</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># For &quot;is set&quot; and &quot;is not set&quot;, same logic for all types</span>
+        <span class="k">if</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;in&#39;</span> <span class="ow">and</span> <span class="kc">False</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+            <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;not in&#39;</span>
+            <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;not in&#39;</span> <span class="ow">and</span> <span class="kc">False</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+            <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;in&#39;</span>
+            <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="s1">&#39;not like&#39;</span><span class="p">,</span> <span class="s1">&#39;not ilike&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
+            <span class="n">operator</span> <span class="o">=</span> <span class="n">TERM_OPERATORS_NEGATION</span><span class="p">[</span><span class="n">operator</span><span class="p">]</span>
+            <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;=&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;!=&#39;</span>
+            <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">makeref</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">value</span> <span class="ow">and</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="si">}</span><span class="s1">,</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s1">&#39;</span>
+
+            <span class="k">if</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;=&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&gt;=&#39;</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">makeref</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="s1">&#39;not in&#39;</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">makeref</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;=like&#39;</span><span class="p">,</span> <span class="s1">&#39;=ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;like&#39;</span><span class="p">,</span> <span class="s1">&#39;not like&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="s1">&#39;not ilike&#39;</span><span class="p">):</span>
+                <span class="c1"># most probably inefficient... but correct</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span>
+                <span class="n">target_names</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="n">operator</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+                <span class="n">target_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">target_names</span><span class="p">]</span>
+                <span class="n">operator</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">makeref</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">target_ids</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;any&#39;</span><span class="p">,</span> <span class="s1">&#39;not any&#39;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;not any&#39;</span><span class="p">:</span>
+                    <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;in&#39;</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">makeref</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span><span class="o">.</span><span class="n">_search</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
+
+        <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="s1">&#39;float&#39;</span><span class="p">):</span>
+            <span class="c1"># No record is created in ir.property if the field&#39;s type is float or integer with a value</span>
+            <span class="c1"># equal to 0. Then to match with the records that are linked to a property field equal to 0,</span>
+            <span class="c1"># the negation of the operator must be taken  to compute the goods and the domain returned</span>
+            <span class="c1"># to match the searched records is just the opposite.</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;float&#39;</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&gt;=&#39;</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;&lt;&#39;</span>
+                <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&gt;&#39;</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;&lt;=&#39;</span>
+                <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&lt;=&#39;</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;&gt;&#39;</span>
+                <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&lt;&#39;</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;&gt;=&#39;</span>
+                <span class="n">negate</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span><span class="p">:</span>
+            <span class="c1"># the value must be mapped to an integer value</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="c1"># retrieve the properties that match the condition</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_domain</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">domain</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">()</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span> <span class="o">+</span> <span class="p">[(</span><span class="n">TYPE2FIELD</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">type</span><span class="p">],</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span><span class="p">)])</span>
+
+        <span class="c1"># retrieve the records corresponding to the properties that match</span>
+        <span class="n">good_ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">props</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">prop</span><span class="o">.</span><span class="n">res_id</span><span class="p">:</span>
+                <span class="n">__</span><span class="p">,</span> <span class="n">res_id</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">res_id</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+                <span class="n">good_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">res_id</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">default_matches</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">default_matches</span><span class="p">:</span>
+            <span class="c1"># exclude all records with a property that does not match</span>
+            <span class="n">props</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span> <span class="o">+</span> <span class="p">[(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)])</span>
+            <span class="n">all_ids</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">res_id</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">res_id</span> <span class="ow">in</span> <span class="n">props</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">)}</span>
+            <span class="n">bad_ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">all_ids</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">good_ids</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">negate</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">bad_ids</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;not in&#39;</span><span class="p">,</span> <span class="n">bad_ids</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="n">negate</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;not in&#39;</span><span class="p">,</span> <span class="n">good_ids</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">good_ids</span><span class="p">)]</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

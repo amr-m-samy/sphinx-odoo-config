@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.which &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.which</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.which</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+<span class="sd">&quot;&quot;&quot; Which - locate a command</span>
+
+<span class="sd">    * adapted from Brian Curtin&#39;s http://bugs.python.org/file15381/shutil_which.patch</span>
+<span class="sd">    * see http://bugs.python.org/issue444582</span>
+<span class="sd">    * uses ``PATHEXT`` on Windows</span>
+<span class="sd">    * searches current directory before ``PATH`` on Windows,</span>
+<span class="sd">      but not before an explicitly passed path</span>
+<span class="sd">    * accepts both string or iterable for an explicitly passed path, or pathext</span>
+<span class="sd">    * accepts an explicitly passed empty path, or pathext (either &#39;&#39; or [])</span>
+<span class="sd">    * does not search ``PATH`` for files that have a path specified in their name already</span>
+<span class="sd">    * moved defpath and defpathext lists initialization to module level,</span>
+<span class="sd">      instead of initializing them on each function call</span>
+<span class="sd">    * changed interface: which_files() returns generator, which() returns first match,</span>
+<span class="sd">      or raises IOError(errno.ENOENT)</span>
+
+<span class="sd">    .. function:: which_files(file [, mode=os.F_OK | os.X_OK[, path=None[, pathext=None]]])</span>
+
+<span class="sd">       Return a generator which yields full paths in which the *file* name exists</span>
+<span class="sd">       in a directory that is part of the file name, or on *path*,</span>
+<span class="sd">       and has the given *mode*.</span>
+<span class="sd">       By default, *mode* matches an inclusive OR of os.F_OK and os.X_OK - an </span>
+<span class="sd">       existing executable file.</span>
+<span class="sd">       The *path* is, by default, the ``PATH`` variable on the platform,</span>
+<span class="sd">       or the string/iterable passed in as *path*.</span>
+<span class="sd">       In the event that a ``PATH`` variable is not found, :const:`os.defpath` is used.</span>
+<span class="sd">       On Windows, a current directory is searched before using the ``PATH`` variable,</span>
+<span class="sd">       but not before an explicitly passed *path*.</span>
+<span class="sd">       The *pathext* is only used on Windows to match files with given extensions appended as well.</span>
+<span class="sd">       It defaults to the ``PATHEXT`` variable, or the string/iterable passed in as *pathext*.</span>
+<span class="sd">       In the event that a ``PATHEXT`` variable is not found,</span>
+<span class="sd">       default value for Windows XP/Vista is used.</span>
+<span class="sd">       The command is always searched without extension first,</span>
+<span class="sd">       even when *pathext* is explicitly passed.</span>
+
+<span class="sd">    .. function:: which(file [, mode=os.F_OK | os.X_OK[, path=None[, pathext=None]]])</span>
+<span class="sd">       Return first match generated by which_files(file, mode, path, pathext),</span>
+<span class="sd">       or raise IOError(errno.ENOENT).</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="n">__docformat__</span> <span class="o">=</span> <span class="s1">&#39;restructuredtext en&#39;</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="s1">&#39;which which_files pathsep defpath defpathext F_OK R_OK W_OK X_OK&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">access</span><span class="p">,</span> <span class="n">defpath</span><span class="p">,</span> <span class="n">pathsep</span><span class="p">,</span> <span class="n">environ</span><span class="p">,</span> <span class="n">F_OK</span><span class="p">,</span> <span class="n">R_OK</span><span class="p">,</span> <span class="n">W_OK</span><span class="p">,</span> <span class="n">X_OK</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">exists</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">split</span><span class="p">,</span> <span class="n">join</span>
+<span class="n">ENOENT</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="n">windows</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;win&#39;</span><span class="p">)</span>
+
+<span class="n">defpath</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PATH&#39;</span><span class="p">,</span> <span class="n">defpath</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">pathsep</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">windows</span><span class="p">:</span>
+    <span class="n">defpath</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span> <span class="c1"># can insert without checking, when duplicates are removed</span>
+    <span class="c1"># given the quite usual mess in PATH on Windows, let&#39;s rather remove duplicates</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">defpath</span> <span class="o">=</span> <span class="p">[</span><span class="nb">dir</span> <span class="k">for</span> <span class="nb">dir</span> <span class="ow">in</span> <span class="n">defpath</span> <span class="k">if</span> <span class="nb">dir</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">dir</span><span class="o">.</span><span class="n">lower</span><span class="p">())]</span>
+    <span class="k">del</span> <span class="n">seen</span>
+
+    <span class="n">defpathext</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PATHEXT&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">pathsep</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">defpathext</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="which_files">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.which.which_files">[docs]</a>
+<span class="k">def</span> <span class="nf">which_files</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">F_OK</span> <span class="o">|</span> <span class="n">X_OK</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pathext</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Locate a file in a path supplied as a part of the file name,</span>
+<span class="sd">        or the user&#39;s path, or a supplied path.</span>
+<span class="sd">        The function yields full paths (not necessarily absolute paths),</span>
+<span class="sd">        in which the given file name matches an existing file in a directory on the path.</span>
+
+<span class="sd">        &gt;&gt;&gt; def test_which(expected, *args, **argd):</span>
+<span class="sd">        ...     result = list(which_files(*args, **argd))</span>
+<span class="sd">        ...     assert result == expected, &#39;which_files: %s != %s&#39; % (result, expected)</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     try:</span>
+<span class="sd">        ...         result = [ which(*args, **argd) ]</span>
+<span class="sd">        ...     except IOError:</span>
+<span class="sd">        ...         result = []</span>
+<span class="sd">        ...     assert result[:1] == expected[:1], &#39;which: %s != %s&#39; % (result[:1], expected[:1])</span>
+
+<span class="sd">        &gt;&gt;&gt; if windows: cmd = environ[&#39;COMSPEC&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], &#39;cmd&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], &#39;cmd.exe&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], &#39;cmd&#39;, path=dirname(cmd))</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], &#39;cmd&#39;, pathext=&#39;.exe&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], cmd)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], cmd, path=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], cmd, pathext=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], cmd[:-4])</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([cmd], cmd[:-4], path=&#39;&lt;nonexistent&gt;&#39;)</span>
+
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([], &#39;cmd&#39;, path=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([], &#39;cmd&#39;, pathext=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([], &#39;&lt;nonexistent&gt;/cmd&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if windows: test_which([], cmd[:-4], pathext=&#39;&lt;nonexistent&gt;&#39;)</span>
+
+<span class="sd">        &gt;&gt;&gt; if not windows: sh = &#39;/bin/sh&#39;</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], &#39;sh&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], &#39;sh&#39;, path=dirname(sh))</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], &#39;sh&#39;, pathext=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], sh)</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], sh, path=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([sh], sh, pathext=&#39;&lt;nonexistent&gt;&#39;)</span>
+
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([], &#39;sh&#39;, mode=W_OK)  # not running as root, are you?</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([], &#39;sh&#39;, path=&#39;&lt;nonexistent&gt;&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; if not windows: test_which([], &#39;&lt;nonexistent&gt;/sh&#39;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">filepath</span><span class="p">,</span> <span class="n">file</span> <span class="o">=</span> <span class="n">split</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">filepath</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="p">(</span><span class="n">filepath</span><span class="p">,)</span>
+    <span class="k">elif</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">defpath</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">pathsep</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">pathext</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pathext</span> <span class="o">=</span> <span class="n">defpathext</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pathext</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">pathext</span> <span class="o">=</span> <span class="n">pathext</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">pathsep</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;&#39;</span> <span class="ow">in</span> <span class="n">pathext</span><span class="p">:</span>
+        <span class="n">pathext</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="c1"># always check command without extension, even for custom pathext</span>
+
+    <span class="k">for</span> <span class="nb">dir</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+        <span class="n">basepath</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">pathext</span><span class="p">:</span>
+            <span class="n">fullpath</span> <span class="o">=</span> <span class="n">basepath</span> <span class="o">+</span> <span class="n">ext</span>
+            <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">fullpath</span><span class="p">)</span> <span class="ow">and</span> <span class="n">access</span><span class="p">(</span><span class="n">fullpath</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+                <span class="k">yield</span> <span class="n">fullpath</span></div>
+
+
+<div class="viewcode-block" id="which">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.which.which">[docs]</a>
+<span class="k">def</span> <span class="nf">which</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">F_OK</span> <span class="o">|</span> <span class="n">X_OK</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pathext</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Locate a file in a path supplied as a part of the file name,</span>
+<span class="sd">        or the user&#39;s path, or a supplied path.</span>
+<span class="sd">        The function returns full path (not necessarily absolute path),</span>
+<span class="sd">        in which the given file name matches an existing file in a directory on the path,</span>
+<span class="sd">        or raises IOError(errno.ENOENT).</span>
+
+<span class="sd">        &gt;&gt;&gt; # for doctest see which_files()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">which_files</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">pathext</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="n">ENOENT</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> not found&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">mode</span> <span class="o">&amp;</span> <span class="n">X_OK</span> <span class="ow">and</span> <span class="s1">&#39;command&#39;</span> <span class="ow">or</span> <span class="s1">&#39;file&#39;</span><span class="p">),</span> <span class="n">file</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">doctest</span>
+    <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

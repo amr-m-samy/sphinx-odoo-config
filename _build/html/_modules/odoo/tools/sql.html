@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.sql &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.sql</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.sql</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="c1"># pylint: disable=sql-injection</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">enum</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">binascii</span> <span class="kn">import</span> <span class="n">crc32</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+
+<span class="kn">from</span> <span class="nn">.misc</span> <span class="kn">import</span> <span class="n">named_to_positional_printf</span>
+
+<span class="n">_schema</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.schema&#39;</span><span class="p">)</span>
+
+<span class="n">IDENT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^[a-z0-9_][a-z0-9_$\-]*$&#39;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+
+<span class="n">_CONFDELTYPES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;RESTRICT&#39;</span><span class="p">:</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;NO ACTION&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;CASCADE&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;SET NULL&#39;</span><span class="p">:</span> <span class="s1">&#39;n&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;SET DEFAULT&#39;</span><span class="p">:</span> <span class="s1">&#39;d&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="SQL">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.SQL">[docs]</a>
+<span class="k">class</span> <span class="nc">SQL</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; An object that wraps SQL code with its parameters, like::</span>
+
+<span class="sd">        sql = SQL(&quot;UPDATE TABLE foo SET a = %s, b = %s&quot;, &#39;hello&#39;, 42)</span>
+<span class="sd">        cr.execute(sql)</span>
+
+<span class="sd">    The code is given as a ``%``-format string, and supports either positional</span>
+<span class="sd">    arguments (with `%s`) or named arguments (with `%(name)s`). Escaped</span>
+<span class="sd">    characters (like ``&quot;%%&quot;``) are not supported, though. The arguments are</span>
+<span class="sd">    meant to be merged into the code using the `%` formatting operator.</span>
+
+<span class="sd">    The SQL wrapper is designed to be composable: the arguments can be either</span>
+<span class="sd">    actual parameters, or SQL objects themselves::</span>
+
+<span class="sd">        sql = SQL(</span>
+<span class="sd">            &quot;UPDATE TABLE %s SET %s&quot;,</span>
+<span class="sd">            SQL.identifier(tablename),</span>
+<span class="sd">            SQL(&quot;%s = %s&quot;, SQL.identifier(columnname), value),</span>
+<span class="sd">        )</span>
+
+<span class="sd">    The combined SQL code is given by ``sql.code``, while the corresponding</span>
+<span class="sd">    combined parameters are given by the list ``sql.params``. This allows to</span>
+<span class="sd">    combine any number of SQL terms without having to separately combine their</span>
+<span class="sd">    parameters, which can be tedious, bug-prone, and is the main downside of</span>
+<span class="sd">    `psycopg2.sql &lt;https://www.psycopg.org/docs/sql.html&gt;`.</span>
+
+<span class="sd">    The second purpose of the wrapper is to discourage SQL injections. Indeed,</span>
+<span class="sd">    if ``code`` is a string literal (not a dynamic string), then the SQL object</span>
+<span class="sd">    made with ``code`` is guaranteed to be safe, provided the SQL objects</span>
+<span class="sd">    within its parameters are themselves safe.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;__code&#39;</span><span class="p">,</span> <span class="s1">&#39;__args&#39;</span><span class="p">)</span>
+
+    <span class="c1"># pylint: disable=keyword-arg-before-vararg</span>
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span> <span class="o">|</span> <span class="n">SQL</span><span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">SQL</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">code</span>
+
+        <span class="c1"># validate the format of code and parameters</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;SQL() takes either positional arguments, or named arguments&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">%</span> <span class="nb">tuple</span><span class="p">(</span><span class="s2">&quot;&quot;</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">code</span><span class="p">,</span> <span class="n">args</span> <span class="o">=</span> <span class="n">named_to_positional_printf</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__code</span> <span class="o">=</span> <span class="n">code</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__args</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the combined SQL code string. &quot;&quot;&quot;</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># stack of intermediate results</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__postfix</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">SQL</span><span class="p">):</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">arity</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">__args</span><span class="p">):</span>
+                <span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="n">arity</span><span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">__code</span> <span class="o">%</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="n">arity</span><span class="p">:])]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">__code</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">stack</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">params</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the combined SQL code params as a list of values. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__postfix</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">SQL</span><span class="p">)]</span>
+
+    <span class="k">def</span> <span class="nf">__postfix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return a postfix iterator for the SQL tree ``self``. &quot;&quot;&quot;</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="p">[(</span><span class="bp">self</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]</span>
+        <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">node</span><span class="p">,</span> <span class="n">ispostfix</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">ispostfix</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">SQL</span><span class="p">):</span>
+                <span class="k">yield</span> <span class="n">node</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">node</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="n">arg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">__args</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;SQL(</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">repr</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">]))</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__code</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">code</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">params</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Yields ``self.code`` and ``self.params``. This was introduced for</span>
+<span class="sd">        backward compatibility, as it enables to access the SQL and parameters</span>
+<span class="sd">        by deconstructing the object::</span>
+
+<span class="sd">            sql = SQL(...)</span>
+<span class="sd">            code, params = sql</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span>
+        <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span>
+
+<div class="viewcode-block" id="SQL.join">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.SQL.join">[docs]</a>
+    <span class="k">def</span> <span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Join SQL objects or parameters with ``self`` as a separator. &quot;&quot;&quot;</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="c1"># optimizations for special cases</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">SQL</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__args</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__code</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">),</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="c1"># general case: alternate args with self</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+            <span class="n">items</span><span class="p">[</span><span class="n">index</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg</span>
+        <span class="k">return</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">),</span> <span class="o">*</span><span class="n">items</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SQL.identifier">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.SQL.identifier">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">identifier</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">subname</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SQL</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return an SQL object that represents an identifier. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">IDENT_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> invalid for SQL.identifier()&quot;</span>
+        <span class="k">if</span> <span class="n">subname</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">IDENT_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">subname</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">subname</span><span class="si">!r}</span><span class="s2"> invalid for SQL.identifier()&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot;.&quot;</span><span class="si">{</span><span class="n">subname</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="existing_tables">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.existing_tables">[docs]</a>
+<span class="k">def</span> <span class="nf">existing_tables</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablenames</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the names of existing tables among ``tablenames``. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT c.relname</span>
+<span class="s2">          FROM pg_class c</span>
+<span class="s2">          JOIN pg_namespace n ON (n.oid = c.relnamespace)</span>
+<span class="s2">         WHERE c.relname IN </span><span class="si">%s</span>
+<span class="s2">           AND c.relkind IN (&#39;r&#39;, &#39;v&#39;, &#39;m&#39;)</span>
+<span class="s2">           AND n.nspname = current_schema</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">tablenames</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span></div>
+
+
+
+<div class="viewcode-block" id="table_exists">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.table_exists">[docs]</a>
+<span class="k">def</span> <span class="nf">table_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return whether the given table exists. &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">existing_tables</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="p">{</span><span class="n">tablename</span><span class="p">}))</span> <span class="o">==</span> <span class="mi">1</span></div>
+
+
+
+<div class="viewcode-block" id="TableKind">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.TableKind">[docs]</a>
+<span class="k">class</span> <span class="nc">TableKind</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">Regular</span> <span class="o">=</span> <span class="s1">&#39;r&#39;</span>
+    <span class="n">Temporary</span> <span class="o">=</span> <span class="s1">&#39;t&#39;</span>
+    <span class="n">View</span> <span class="o">=</span> <span class="s1">&#39;v&#39;</span>
+    <span class="n">Materialized</span> <span class="o">=</span> <span class="s1">&#39;m&#39;</span>
+    <span class="n">Foreign</span> <span class="o">=</span> <span class="s1">&#39;f&#39;</span>
+    <span class="n">Other</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="table_kind">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.table_kind">[docs]</a>
+<span class="k">def</span> <span class="nf">table_kind</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TableKind</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the kind of a table, if ``tablename`` is a regular or foreign</span>
+<span class="sd">    table, or a view (ignores indexes, sequences, toast tables, and partitioned</span>
+<span class="sd">    tables; unlogged tables are considered regular)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT c.relkind, c.relpersistence</span>
+<span class="s2">          FROM pg_class c</span>
+<span class="s2">          JOIN pg_namespace n ON (n.oid = c.relnamespace)</span>
+<span class="s2">         WHERE c.relname = </span><span class="si">%s</span>
+<span class="s2">           AND n.nspname = current_schema</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cr</span><span class="o">.</span><span class="n">rowcount</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">kind</span><span class="p">,</span> <span class="n">persistence</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+    <span class="c1"># special case: permanent, temporary, and unlogged tables differ by their</span>
+    <span class="c1"># relpersistence, they&#39;re all &quot;ordinary&quot; (relkind = r)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">&#39;r&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">TableKind</span><span class="o">.</span><span class="n">Temporary</span> <span class="k">if</span> <span class="n">persistence</span> <span class="o">==</span> <span class="s1">&#39;t&#39;</span> <span class="k">else</span> <span class="n">TableKind</span><span class="o">.</span><span class="n">Regular</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">TableKind</span><span class="p">(</span><span class="n">kind</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="c1"># NB: or raise? unclear if it makes sense to allow table_kind to</span>
+        <span class="c1">#     &quot;work&quot; with something like an index or sequence</span>
+        <span class="k">return</span> <span class="n">TableKind</span><span class="o">.</span><span class="n">Other</span></div>
+
+
+
+<span class="c1"># prescribed column order by type: columns aligned on 4 bytes, columns aligned</span>
+<span class="c1"># on 1 byte, columns aligned on 8 bytes(values have been chosen to minimize</span>
+<span class="c1"># padding in rows; unknown column types are put last)</span>
+<span class="n">SQL_ORDER_BY_TYPE</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s1">&#39;int4&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>          <span class="c1"># 4 bytes aligned on 4 bytes</span>
+    <span class="s1">&#39;varchar&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>       <span class="c1"># variable aligned on 4 bytes</span>
+    <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>          <span class="c1"># 4 bytes aligned on 4 bytes</span>
+    <span class="s1">&#39;jsonb&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>         <span class="c1"># jsonb</span>
+    <span class="s1">&#39;text&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>          <span class="c1"># variable aligned on 4 bytes</span>
+    <span class="s1">&#39;numeric&#39;</span><span class="p">:</span> <span class="mi">6</span><span class="p">,</span>       <span class="c1"># variable aligned on 4 bytes</span>
+    <span class="s1">&#39;bool&#39;</span><span class="p">:</span> <span class="mi">7</span><span class="p">,</span>          <span class="c1"># 1 byte aligned on 1 byte</span>
+    <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>     <span class="c1"># 8 bytes aligned on 8 bytes</span>
+    <span class="s1">&#39;float8&#39;</span><span class="p">:</span> <span class="mi">9</span><span class="p">,</span>        <span class="c1"># 8 bytes aligned on 8 bytes</span>
+<span class="p">})</span>
+
+
+<div class="viewcode-block" id="create_model_table">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.create_model_table">[docs]</a>
+<span class="k">def</span> <span class="nf">create_model_table</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">comment</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">()):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create the table for a model. &quot;&quot;&quot;</span>
+    <span class="n">colspecs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;id SERIAL NOT NULL&#39;</span><span class="p">),</span>
+        <span class="o">*</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">colname</span><span class="p">),</span> <span class="n">SQL</span><span class="p">(</span><span class="n">coltype</span><span class="p">))</span> <span class="k">for</span> <span class="n">colname</span><span class="p">,</span> <span class="n">coltype</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;PRIMARY KEY(id)&#39;</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="n">queries</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;CREATE TABLE </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">colspecs</span><span class="p">)),</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">comment</span><span class="p">:</span>
+        <span class="n">queries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;COMMENT ON TABLE </span><span class="si">%s</span><span class="s2"> IS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">comment</span><span class="p">,</span>
+        <span class="p">))</span>
+    <span class="k">for</span> <span class="n">colname</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">colcomment</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+        <span class="n">queries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;COMMENT ON COLUMN </span><span class="si">%s</span><span class="s2"> IS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">,</span> <span class="n">colname</span><span class="p">),</span> <span class="n">colcomment</span><span class="p">,</span>
+        <span class="p">))</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">queries</span><span class="p">))</span>
+
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: created&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="table_columns">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.table_columns">[docs]</a>
+<span class="k">def</span> <span class="nf">table_columns</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a dict mapping column names to their configuration. The latter is</span>
+<span class="sd">        a dict with the data from the table ``information_schema.columns``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Do not select the field `character_octet_length` from `information_schema.columns`</span>
+    <span class="c1"># because specific access right restriction in the context of shared hosting (Heroku, OVH, ...)</span>
+    <span class="c1"># might prevent a postgres user to read this field.</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39; SELECT column_name, udt_name, character_maximum_length, is_nullable</span>
+<span class="sd">            FROM information_schema.columns WHERE table_name=%s &#39;&#39;&#39;</span><span class="p">,</span>
+        <span class="n">tablename</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;column_name&#39;</span><span class="p">]:</span> <span class="n">row</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">dictfetchall</span><span class="p">()}</span></div>
+
+
+
+<div class="viewcode-block" id="column_exists">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.column_exists">[docs]</a>
+<span class="k">def</span> <span class="nf">column_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return whether the given column exists. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; SELECT 1 FROM information_schema.columns</span>
+<span class="sd">            WHERE table_name=%s AND column_name=%s &quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="k">return</span> <span class="n">cr</span><span class="o">.</span><span class="n">rowcount</span></div>
+
+
+
+<div class="viewcode-block" id="create_column">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.create_column">[docs]</a>
+<span class="k">def</span> <span class="nf">create_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">,</span> <span class="n">comment</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create a column with the given type. &quot;&quot;&quot;</span>
+    <span class="n">sql</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ADD COLUMN </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="n">columntype</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;DEFAULT false&quot;</span> <span class="k">if</span> <span class="n">columntype</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;BOOLEAN&#39;</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">comment</span><span class="p">:</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">; </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">sql</span><span class="p">,</span> <span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;COMMENT ON COLUMN </span><span class="si">%s</span><span class="s2"> IS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">),</span> <span class="n">comment</span><span class="p">,</span>
+        <span class="p">))</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: added column </span><span class="si">%r</span><span class="s2"> of type </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="rename_column">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.rename_column">[docs]</a>
+<span class="k">def</span> <span class="nf">rename_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Rename the given column. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> RENAME COLUMN </span><span class="si">%s</span><span class="s2"> TO </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname1</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname2</span><span class="p">),</span>
+    <span class="p">))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: renamed column </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="convert_column">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.convert_column">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Convert the column to the given type. &quot;&quot;&quot;</span>
+    <span class="n">using</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">::</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span> <span class="n">SQL</span><span class="p">(</span><span class="n">columntype</span><span class="p">))</span>
+    <span class="n">_convert_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">,</span> <span class="n">using</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="convert_column_translatable">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.convert_column_translatable">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_column_translatable</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Convert the column from/to a &#39;jsonb&#39; translated field column. &quot;&quot;&quot;</span>
+    <span class="n">drop_index</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">make_index_name</span><span class="p">(</span><span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">),</span> <span class="n">tablename</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">columntype</span> <span class="o">==</span> <span class="s2">&quot;jsonb&quot;</span><span class="p">:</span>
+        <span class="n">using</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;CASE WHEN </span><span class="si">%s</span><span class="s2"> IS NOT NULL THEN jsonb_build_object(&#39;en_US&#39;, </span><span class="si">%s</span><span class="s2">::varchar) END&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">using</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-&gt;&gt;&#39;en_US&#39;&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">))</span>
+    <span class="n">_convert_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">,</span> <span class="n">using</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_convert_column</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">,</span> <span class="n">using</span><span class="p">:</span> <span class="n">SQL</span><span class="p">):</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ALTER COLUMN </span><span class="si">%s</span><span class="s2"> DROP DEFAULT, ALTER COLUMN </span><span class="si">%s</span><span class="s2"> TYPE </span><span class="si">%s</span><span class="s2"> USING </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span> <span class="n">SQL</span><span class="p">(</span><span class="n">columntype</span><span class="p">),</span> <span class="n">using</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">NotSupportedError</span><span class="p">:</span>
+        <span class="n">drop_depending_views</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">)</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: column </span><span class="si">%r</span><span class="s2"> changed to type </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">,</span> <span class="n">columntype</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="drop_depending_views">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.drop_depending_views">[docs]</a>
+<span class="k">def</span> <span class="nf">drop_depending_views</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;drop views depending on a field to allow the ORM to resize it in-place&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">get_depending_views</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span><span class="p">):</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+            <span class="s2">&quot;DROP </span><span class="si">%s</span><span class="s2"> IF EXISTS </span><span class="si">%s</span><span class="s2"> CASCADE&quot;</span><span class="p">,</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;MATERIALIZED VIEW&quot;</span> <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;m&quot;</span> <span class="k">else</span> <span class="s2">&quot;VIEW&quot;</span><span class="p">),</span>
+            <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">v</span><span class="p">),</span>
+        <span class="p">))</span>
+        <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Drop view </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_depending_views">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.get_depending_views">[docs]</a>
+<span class="k">def</span> <span class="nf">get_depending_views</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span><span class="p">):</span>
+    <span class="c1"># http://stackoverflow.com/a/11773226/75349</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT distinct quote_ident(dependee.relname), dependee.relkind</span>
+<span class="s2">        FROM pg_depend</span>
+<span class="s2">        JOIN pg_rewrite ON pg_depend.objid = pg_rewrite.oid</span>
+<span class="s2">        JOIN pg_class as dependee ON pg_rewrite.ev_class = dependee.oid</span>
+<span class="s2">        JOIN pg_class as dependent ON pg_depend.refobjid = dependent.oid</span>
+<span class="s2">        JOIN pg_attribute ON pg_depend.refobjid = pg_attribute.attrelid</span>
+<span class="s2">            AND pg_depend.refobjsubid = pg_attribute.attnum</span>
+<span class="s2">        WHERE dependent.relname = </span><span class="si">%s</span>
+<span class="s2">        AND pg_attribute.attnum &gt; 0</span>
+<span class="s2">        AND pg_attribute.attname = </span><span class="si">%s</span>
+<span class="s2">        AND dependee.relkind in (&#39;v&#39;, &#39;m&#39;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="set_not_null">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.set_not_null">[docs]</a>
+<span class="k">def</span> <span class="nf">set_not_null</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Add a NOT NULL constraint on the given column. &quot;&quot;&quot;</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ALTER COLUMN </span><span class="si">%s</span><span class="s2"> SET NOT NULL&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: column </span><span class="si">%r</span><span class="s2">: added constraint NOT NULL&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: unable to set NOT NULL on column </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="drop_not_null">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.drop_not_null">[docs]</a>
+<span class="k">def</span> <span class="nf">drop_not_null</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Drop the NOT NULL constraint on the given column. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ALTER COLUMN </span><span class="si">%s</span><span class="s2"> DROP NOT NULL&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname</span><span class="p">),</span>
+    <span class="p">))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: column </span><span class="si">%r</span><span class="s2">: dropped constraint NOT NULL&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">columnname</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="constraint_definition">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.constraint_definition">[docs]</a>
+<span class="k">def</span> <span class="nf">constraint_definition</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the given constraint&#39;s definition. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT COALESCE(d.description, pg_get_constraintdef(c.oid))</span>
+<span class="s2">        FROM pg_constraint c</span>
+<span class="s2">        JOIN pg_class t ON t.oid = c.conrelid</span>
+<span class="s2">        LEFT JOIN pg_description d ON c.oid = d.objoid</span>
+<span class="s2">        WHERE t.relname = </span><span class="si">%s</span><span class="s2"> AND conname = </span><span class="si">%s</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">cr</span><span class="o">.</span><span class="n">rowcount</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="add_constraint">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.add_constraint">[docs]</a>
+<span class="k">def</span> <span class="nf">add_constraint</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">,</span> <span class="n">definition</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Add a constraint on the given table. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;%&quot;</span> <span class="ow">in</span> <span class="n">definition</span><span class="p">:</span>
+        <span class="n">definition</span> <span class="o">=</span> <span class="n">definition</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;%&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%%</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">query1</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ADD CONSTRAINT </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">constraintname</span><span class="p">),</span> <span class="n">SQL</span><span class="p">(</span><span class="n">definition</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">query2</span> <span class="o">=</span> <span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;COMMENT ON CONSTRAINT </span><span class="si">%s</span><span class="s2"> ON </span><span class="si">%s</span><span class="s2"> IS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">constraintname</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">definition</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query1</span><span class="p">,</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query2</span><span class="p">,</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: added constraint </span><span class="si">%r</span><span class="s2"> as </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">,</span> <span class="n">definition</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: unable to add constraint </span><span class="si">%r</span><span class="s2"> as </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">,</span> <span class="n">definition</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="drop_constraint">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.drop_constraint">[docs]</a>
+<span class="k">def</span> <span class="nf">drop_constraint</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; drop the given constraint. &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">(</span><span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+                <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> DROP CONSTRAINT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">constraintname</span><span class="p">),</span>
+            <span class="p">))</span>
+            <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: dropped constraint </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_schema</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: unable to drop constraint </span><span class="si">%r</span><span class="s2">!&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">constraintname</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="add_foreign_key">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.add_foreign_key">[docs]</a>
+<span class="k">def</span> <span class="nf">add_foreign_key</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create the given foreign key, and return ``True``. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;ALTER TABLE </span><span class="si">%s</span><span class="s2"> ADD FOREIGN KEY (</span><span class="si">%s</span><span class="s2">) REFERENCES </span><span class="si">%s</span><span class="s2">(</span><span class="si">%s</span><span class="s2">) ON DELETE </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename1</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname1</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename2</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">columnname2</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="n">ondelete</span><span class="p">),</span>
+    <span class="p">))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: added foreign key </span><span class="si">%r</span><span class="s2"> references </span><span class="si">%r</span><span class="s2">(</span><span class="si">%r</span><span class="s2">) ON DELETE </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                  <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="get_foreign_keys">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.get_foreign_keys">[docs]</a>
+<span class="k">def</span> <span class="nf">get_foreign_keys</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">):</span>
+    <span class="n">deltype</span> <span class="o">=</span> <span class="n">_CONFDELTYPES</span><span class="p">[</span><span class="n">ondelete</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            SELECT fk.conname as name</span>
+<span class="sd">            FROM pg_constraint AS fk</span>
+<span class="sd">            JOIN pg_class AS c1 ON fk.conrelid = c1.oid</span>
+<span class="sd">            JOIN pg_class AS c2 ON fk.confrelid = c2.oid</span>
+<span class="sd">            JOIN pg_attribute AS a1 ON a1.attrelid = c1.oid AND fk.conkey[1] = a1.attnum</span>
+<span class="sd">            JOIN pg_attribute AS a2 ON a2.attrelid = c2.oid AND fk.confkey[1] = a2.attnum</span>
+<span class="sd">            WHERE fk.contype = &#39;f&#39;</span>
+<span class="sd">            AND c1.relname = %s</span>
+<span class="sd">            AND a1.attname = %s</span>
+<span class="sd">            AND c2.relname = %s</span>
+<span class="sd">            AND a2.attname = %s</span>
+<span class="sd">            AND fk.confdeltype = %s</span>
+<span class="sd">        &quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">deltype</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span></div>
+
+
+
+<div class="viewcode-block" id="fix_foreign_key">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.fix_foreign_key">[docs]</a>
+<span class="k">def</span> <span class="nf">fix_foreign_key</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Update the foreign keys between tables to match the given one, and</span>
+<span class="sd">        return ``True`` if the given foreign key has been recreated.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Do not use &#39;information_schema&#39; here, as those views are awfully slow!</span>
+    <span class="n">deltype</span> <span class="o">=</span> <span class="n">_CONFDELTYPES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ondelete</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; SELECT con.conname, c2.relname, a2.attname, con.confdeltype as deltype</span>
+<span class="sd">              FROM pg_constraint as con, pg_class as c1, pg_class as c2,</span>
+<span class="sd">                   pg_attribute as a1, pg_attribute as a2</span>
+<span class="sd">             WHERE con.contype=&#39;f&#39; AND con.conrelid=c1.oid AND con.confrelid=c2.oid</span>
+<span class="sd">               AND array_lower(con.conkey, 1)=1 AND con.conkey[1]=a1.attnum</span>
+<span class="sd">               AND array_lower(con.confkey, 1)=1 AND con.confkey[1]=a2.attnum</span>
+<span class="sd">               AND a1.attrelid=c1.oid AND a2.attrelid=c2.oid</span>
+<span class="sd">               AND c1.relname=%s AND a1.attname=%s &quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">fk</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">found</span> <span class="ow">and</span> <span class="n">fk</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="p">(</span><span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">deltype</span><span class="p">):</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">drop_constraint</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename1</span><span class="p">,</span> <span class="n">fk</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">found</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">add_foreign_key</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">tablename1</span><span class="p">,</span> <span class="n">columnname1</span><span class="p">,</span> <span class="n">tablename2</span><span class="p">,</span> <span class="n">columnname2</span><span class="p">,</span> <span class="n">ondelete</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="index_exists">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.index_exists">[docs]</a>
+<span class="k">def</span> <span class="nf">index_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return whether the given index exists. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;SELECT 1 FROM pg_indexes WHERE indexname=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">indexname</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">cr</span><span class="o">.</span><span class="n">rowcount</span></div>
+
+
+
+<div class="viewcode-block" id="check_index_exist">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.check_index_exist">[docs]</a>
+<span class="k">def</span> <span class="nf">check_index_exist</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">index_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">indexname</span><span class="si">}</span><span class="s2"> does not exist&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="create_index">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.create_index">[docs]</a>
+<span class="k">def</span> <span class="nf">create_index</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">expressions</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;btree&#39;</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create the given index unless it exists. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">index_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">):</span>
+        <span class="k">return</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;CREATE INDEX </span><span class="si">%s</span><span class="s2"> ON </span><span class="si">%s</span><span class="s2"> USING </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">indexname</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="n">method</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span> <span class="k">for</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot; WHERE </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="p">(</span><span class="n">where</span><span class="p">))</span> <span class="k">if</span> <span class="n">where</span> <span class="k">else</span> <span class="n">SQL</span><span class="p">(),</span>
+    <span class="p">))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: created index </span><span class="si">%r</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">expressions</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="create_unique_index">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.create_unique_index">[docs]</a>
+<span class="k">def</span> <span class="nf">create_unique_index</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">expressions</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create the given index unless it exists. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">index_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">):</span>
+        <span class="k">return</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+        <span class="s2">&quot;CREATE UNIQUE INDEX </span><span class="si">%s</span><span class="s2"> ON </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">indexname</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span> <span class="k">for</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">),</span>
+    <span class="p">))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: created index </span><span class="si">%r</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">expressions</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="drop_index">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.drop_index">[docs]</a>
+<span class="k">def</span> <span class="nf">drop_index</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">indexname</span><span class="p">,</span> <span class="n">tablename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Drop the given index if it exists. &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;DROP INDEX IF EXISTS </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">indexname</span><span class="p">)))</span>
+    <span class="n">_schema</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Table </span><span class="si">%r</span><span class="s2">: dropped index </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tablename</span><span class="p">,</span> <span class="n">indexname</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="drop_view_if_exists">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.drop_view_if_exists">[docs]</a>
+<span class="k">def</span> <span class="nf">drop_view_if_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">viewname</span><span class="p">):</span>
+    <span class="n">kind</span> <span class="o">=</span> <span class="n">table_kind</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">viewname</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="n">TableKind</span><span class="o">.</span><span class="n">View</span><span class="p">:</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;DROP VIEW </span><span class="si">%s</span><span class="s2"> CASCADE&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">viewname</span><span class="p">)))</span>
+    <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="n">TableKind</span><span class="o">.</span><span class="n">Materialized</span><span class="p">:</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;DROP MATERIALIZED VIEW </span><span class="si">%s</span><span class="s2"> CASCADE&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">viewname</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="escape_psql">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.escape_psql">[docs]</a>
+<span class="k">def</span> <span class="nf">escape_psql</span><span class="p">(</span><span class="n">to_escape</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">to_escape</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\%&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\_&#39;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="pg_varchar">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.pg_varchar">[docs]</a>
+<span class="k">def</span> <span class="nf">pg_varchar</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Returns the VARCHAR declaration for the provided size:</span>
+
+<span class="sd">    * If no size (or an empty or negative size is provided) return an</span>
+<span class="sd">      &#39;infinite&#39; VARCHAR</span>
+<span class="sd">    * Otherwise return a VARCHAR(n)</span>
+
+<span class="sd">    :param int size: varchar size, optional</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">size</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;VARCHAR parameter should be an int, got </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">size</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;VARCHAR(</span><span class="si">%d</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="n">size</span>
+    <span class="k">return</span> <span class="s1">&#39;VARCHAR&#39;</span></div>
+
+
+
+<div class="viewcode-block" id="reverse_order">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.reverse_order">[docs]</a>
+<span class="k">def</span> <span class="nf">reverse_order</span><span class="p">(</span><span class="n">order</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Reverse an ORDER BY clause &quot;&quot;&quot;</span>
+    <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">order</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="s1">&#39;asc&#39;</span> <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="p">[</span><span class="s1">&#39;desc&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="s1">&#39;desc&#39;</span>
+        <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">direction</span><span class="p">))</span>
+    <span class="k">return</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">items</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="increment_fields_skiplock">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.increment_fields_skiplock">[docs]</a>
+<span class="k">def</span> <span class="nf">increment_fields_skiplock</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Increment &#39;friendly&#39; the given `fields` of the current `records`.</span>
+<span class="sd">        If record is locked, we just skip the update.</span>
+<span class="sd">        It doesn&#39;t invalidate the cache since the update is not critical.</span>
+
+<span class="sd">        :param records: recordset to update</span>
+<span class="sd">        :param fields: integer fields to increment</span>
+<span class="sd">        :returns: whether the specified fields were incremented on any record.</span>
+<span class="sd">        :rtype: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">records</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">records</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;integer&#39;</span>
+
+    <span class="n">cr</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">_cr</span>
+    <span class="n">tablename</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">_table</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">SQL</span><span class="p">(</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        UPDATE %s</span>
+<span class="sd">           SET %s</span>
+<span class="sd">         WHERE id IN (SELECT id FROM %s WHERE id = ANY(%s) FOR UPDATE SKIP LOCKED)</span>
+<span class="sd">        &quot;&quot;&quot;</span><span class="p">,</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> = COALESCE(</span><span class="si">%s</span><span class="s2">, 0) + 1&quot;</span><span class="p">,</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">field</span><span class="p">),</span> <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">field</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span>
+        <span class="p">),</span>
+        <span class="n">SQL</span><span class="o">.</span><span class="n">identifier</span><span class="p">(</span><span class="n">tablename</span><span class="p">),</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">rowcount</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="value_to_translated_trigram_pattern">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.value_to_translated_trigram_pattern">[docs]</a>
+<span class="k">def</span> <span class="nf">value_to_translated_trigram_pattern</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Escape value to match a translated field&#39;s trigram index content</span>
+
+<span class="sd">    The trigram index function jsonb_path_query_array(&quot;column_name&quot;, &#39;$.*&#39;)::text</span>
+<span class="sd">    uses all translations&#39; representations to build the indexed text. So the</span>
+<span class="sd">    original text needs to be JSON-escaped correctly to match it.</span>
+
+<span class="sd">    :param str value: value provided in domain</span>
+<span class="sd">    :return: a pattern to match the indexed text</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="c1"># matching less than 3 characters will not take advantage of the index</span>
+        <span class="k">return</span> <span class="s1">&#39;%&#39;</span>
+
+    <span class="c1"># apply JSON escaping to value; the argument ensure_ascii=False prevents</span>
+    <span class="c1"># json.dumps from escaping unicode to ascii, which is consistent with the</span>
+    <span class="c1"># index function jsonb_path_query_array(&quot;column_name&quot;, &#39;$.*&#39;)::text</span>
+    <span class="n">json_escaped</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># apply PG wildcard escaping to JSON-escaped text</span>
+    <span class="n">wildcard_escaped</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(_|%|</span><span class="se">\\</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">\1&#39;</span><span class="p">,</span> <span class="n">json_escaped</span><span class="p">)</span>
+
+    <span class="c1"># add wildcards around it to get the pattern</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;%</span><span class="si">{</span><span class="n">wildcard_escaped</span><span class="si">}</span><span class="s2">%&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="pattern_to_translated_trigram_pattern">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.pattern_to_translated_trigram_pattern">[docs]</a>
+<span class="k">def</span> <span class="nf">pattern_to_translated_trigram_pattern</span><span class="p">(</span><span class="n">pattern</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Escape pattern to match a translated field&#39;s trigram index content</span>
+
+<span class="sd">    The trigram index function jsonb_path_query_array(&quot;column_name&quot;, &#39;$.*&#39;)::text</span>
+<span class="sd">    uses all translations&#39; representations to build the indexed text. So the</span>
+<span class="sd">    original pattern needs to be JSON-escaped correctly to match it.</span>
+
+<span class="sd">    :param str pattern: value provided in domain</span>
+<span class="sd">    :return: a pattern to match the indexed text</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># find the parts around (non-escaped) wildcard characters (_, %)</span>
+    <span class="n">sub_patterns</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">        (</span>
+<span class="s1">            (?:.)*?           # 0 or more charaters including the newline character</span>
+<span class="s1">            (?&lt;!\\)(?:\\\\)*  # 0 or even number of backslashes to promise the next wildcard character is not escaped</span>
+<span class="s1">        )</span>
+<span class="s1">        (?:_|%|$)             # a non-escaped wildcard charater or end of the string</span>
+<span class="s1">        &#39;&#39;&#39;</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+
+    <span class="c1"># unescape PG wildcards from each sub pattern (\% becomes %)</span>
+    <span class="n">sub_texts</span> <span class="o">=</span> <span class="p">[</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">(.|$)&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\1&#39;</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">sub_patterns</span><span class="p">]</span>
+
+    <span class="c1"># apply JSON escaping to sub texts having at least 3 characters (&quot; becomes \&quot;);</span>
+    <span class="c1"># the argument ensure_ascii=False prevents from escaping unicode to ascii</span>
+    <span class="n">json_escaped</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">sub_texts</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">]</span>
+
+    <span class="c1"># apply PG wildcard escaping to JSON-escaped texts (% becomes \%)</span>
+    <span class="n">wildcard_escaped</span> <span class="o">=</span> <span class="p">[</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(_|%|</span><span class="se">\\</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">\1&#39;</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">json_escaped</span><span class="p">]</span>
+
+    <span class="c1"># replace the original wildcard characters by %</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;%</span><span class="si">{</span><span class="s1">&#39;%&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">wildcard_escaped</span><span class="p">)</span><span class="si">}</span><span class="s2">%&quot;</span> <span class="k">if</span> <span class="n">wildcard_escaped</span> <span class="k">else</span> <span class="s2">&quot;%&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="make_identifier">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.make_identifier">[docs]</a>
+<span class="k">def</span> <span class="nf">make_identifier</span><span class="p">(</span><span class="n">identifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return ``identifier``, possibly modified to fit PostgreSQL&#39;s identifier size limitation.</span>
+<span class="sd">    If too long, ``identifier`` is truncated and padded with a hash to make it mostly unique.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># if length exceeds the PostgreSQL limit of 63 characters.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">63</span><span class="p">:</span>
+        <span class="c1"># We have to fit a crc32 hash and one underscore into a 63 character</span>
+        <span class="c1"># alias. The remaining space we can use to add a human readable prefix.</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">identifier</span><span class="p">[:</span><span class="mi">54</span><span class="p">]</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">crc32</span><span class="p">(</span><span class="n">identifier</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="si">:</span><span class="s2">08x</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="n">identifier</span></div>
+
+
+
+<div class="viewcode-block" id="make_index_name">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.sql.make_index_name">[docs]</a>
+<span class="k">def</span> <span class="nf">make_index_name</span><span class="p">(</span><span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">column_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return an index name according to conventions for the given table and column. &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">make_identifier</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">__</span><span class="si">{</span><span class="n">column_name</span><span class="si">}</span><span class="s2">_index&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

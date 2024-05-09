@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_cloc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_cloc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_cloc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">cloc</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">tagged</span>
+
+<span class="n">XML_TEST</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;!-- Comment --&gt;</span>
+<span class="s2">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="s2">&lt;odoo&gt;</span>
+<span class="s2">    &lt;node&gt;Line&lt;/node&gt;</span>
+<span class="s2">    &lt;!-- Comment --&gt;</span>
+<span class="s2">    &lt;node&gt;Line&lt;/node&gt;</span>
+<span class="s2">    &lt;!-- Comment</span>
+<span class="s2">        Multi</span>
+<span class="s2">    Line --&gt;</span>
+<span class="s2">    &lt;![CDATA[</span>
+<span class="s2">        Line</span>
+<span class="s2">    ]]&gt;</span>
+<span class="s2">    &lt;![CDATA[</span>
+<span class="s2">        &lt;!-- comment in CDATA --&gt;</span>
+<span class="s2">        cdata Line</span>
+<span class="s2">    yes6]]&gt;</span>
+<span class="s2">    &lt;![CDATA[&lt;!-- not a comment--&gt;]]&gt;</span>
+<span class="s2">    &lt;![CDATA[&lt;!-- not a comment</span>
+<span class="s2">     but counted as is</span>
+<span class="s2">    --&gt;]]&gt;</span>
+<span class="s2">    &lt;!-- &lt;![CDATA[ This is a valid comment ]]&gt; --&gt;</span>
+<span class="s2">    &lt;!-- &lt;![CDATA[ Multi line</span>
+<span class="s2">    comment]]&gt; --&gt;</span>
+<span class="s2">    &lt;record id=&quot;my_id&quot; model=&quot;model&quot;&gt;</span>
+<span class="s2">        &lt;field name=&quot;name&quot;&gt;name&lt;/field&gt;</span>
+<span class="s2">    &lt;/record&gt;</span>
+<span class="s2">    &lt;![CDATA[ &lt;!-- no a comment]]&gt;</span>
+<span class="s2">    &lt;node&gt;not a comment but found as is&lt;/node&gt;</span>
+<span class="s2">    &lt;!-- comment --&gt;</span>
+<span class="s2">    &lt;node&gt;After closed comment back to normal&lt;/node&gt;</span>
+<span class="s2">&lt;/odoo&gt;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+<span class="n">PY_TEST_NO_RETURN</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;line = 1</span>
+<span class="s1">line = 2&#39;&#39;&#39;</span>
+
+<span class="n">PY_TEST</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># comment 1</span>
+
+<span class="s1">def func(): # eol comment 3</span>
+<span class="s1">    &quot;&quot;&quot; docstring</span>
+<span class="s1">    &quot;&quot;&quot;</span>
+<span class="s1">    pass</span>
+
+<span class="s1">def query():</span>
+<span class="s1">    long_query = &quot;&quot;&quot;</span>
+<span class="s1">        SELECT *</span>
+<span class="s1">        FROM table</span>
+<span class="s1">        WHERE id = 1;</span>
+<span class="s1">    &quot;&quot;&quot;</span>
+<span class="s1">    return query</span>
+
+<span class="s1">print(i.lineno, i, getattr(i,&#39;s&#39;,None), getattr(i,&#39;value&#39;,None))</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">JS_TEST</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">/*</span>
+<span class="s1">comment</span>
+<span class="s1">*/</span>
+
+<span class="s1">function() {</span>
+<span class="s1">    return 1+2; // comment</span>
+<span class="s1">}</span>
+
+<span class="s1">function() {</span>
+<span class="s1">    hello = 4; /*</span>
+<span class="s1">        comment</span>
+<span class="s1">    */</span>
+<span class="s1">    console.log(hello);</span>
+<span class="s1">    regex = /\/*h/;</span>
+<span class="s1">    legit_code_counted = 1;</span>
+<span class="s1">    regex2 = /.*/;</span>
+<span class="s1">}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">CSS_TEST</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">/*</span>
+<span class="s1">  Comment</span>
+<span class="s1">*/</span>
+
+<span class="s1">p {</span>
+<span class="s1">  text-align: center;</span>
+<span class="s1">  color: red;</span>
+<span class="s1">  text-overflow: &#39; /* &#39;;</span>
+<span class="s1">}</span>
+
+
+<span class="s1">#content, #footer, #supplement {</span>
+<span class="s1">   position: absolute;</span>
+<span class="s1">   left: 510px;</span>
+<span class="s1">   width: 200px;</span>
+<span class="s1">   text-overflow: &#39; */ &#39;;</span>
+<span class="s1">}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">SCSS_TEST</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">/*</span>
+<span class="s1">  Comment</span>
+<span class="s1">*/</span>
+
+<span class="s1">// Standalone list views</span>
+<span class="s1">.o_content &gt; .o_list_view &gt; .table-responsive &gt; .table {</span>
+<span class="s1">    // List views always have the table-sm class, maybe we should remove</span>
+<span class="s1">    // it (and consider it does not exist) and change the default table paddings</span>
+<span class="s1">    @include o-list-view-full-width-padding($base-x: $table-cell-padding-x-sm, $base-y: $table-cell-padding-y-sm, $ratio: 2);</span>
+<span class="s1">    &amp;:not(.o_list_table_grouped) {</span>
+<span class="s1">        @include media-breakpoint-up(xl) {</span>
+<span class="s1">            @include o-list-view-full-width-padding($base-x: $table-cell-padding-x-sm, $base-y: $table-cell-padding-y-sm, $ratio: 2.5);</span>
+<span class="s1">        }</span>
+<span class="s1">    }</span>
+
+<span class="s1">    .o_optional_columns_dropdown_toggle {</span>
+<span class="s1">        padding: 8px 10px;</span>
+<span class="s1">    }</span>
+<span class="s1">}</span>
+
+<span class="s1">#content, #footer, #supplement {</span>
+<span class="s1">   text-overflow: &#39;/*&#39;;</span>
+<span class="s1">   left: 510px;</span>
+<span class="s1">   width: 200px;</span>
+<span class="s1">   text-overflow: &#39;*/&#39;;</span>
+<span class="s1">}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<div class="viewcode-block" id="TestClocCustomization">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization">[docs]</a>
+<span class="k">class</span> <span class="nc">TestClocCustomization</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestClocCustomization.create_xml_id">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.create_xml_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">rec</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="n">rec</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;module&#39;</span><span class="p">:</span> <span class="n">module</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.create_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.create_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">studio</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.model_res_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;integer&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;store&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;compute&#39;</span><span class="p">:</span> <span class="s2">&quot;for rec in self: rec[&#39;x_invoice_count&#39;] = 10&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="c1"># Simulate the effect of https://github.com/odoo/odoo/commit/9afce4805fc8bac45fdba817488aa867fddff69b</span>
+        <span class="c1"># Updating a module create xml_id of the module even for manual field if it&#39;s the original module</span>
+        <span class="c1"># of the model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">field</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.create_server_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.create_server_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_server_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">for rec in records:</span>
+<span class="s2">    rec[&#39;name&#39;] = test</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.server&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.model_res_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.test_ignore_auto_generated_computed_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.test_ignore_auto_generated_computed_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_ignore_auto_generated_computed_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Check that we count custom fields with no module or studio not auto generated</span>
+<span class="sd">            Having an xml_id but no existing module is consider as not belonging to a module</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">f1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_invoice_count&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s1">&#39;studio_customization&#39;</span><span class="p">,</span> <span class="s1">&#39;invoice_count&#39;</span><span class="p">,</span> <span class="n">f1</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Studio auto generated count field should not be counted in cloc&#39;</span><span class="p">)</span>
+        <span class="n">f2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_studio_custom_field&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s1">&#39;studio_customization&#39;</span><span class="p">,</span> <span class="s1">&#39;studio_custom&#39;</span><span class="p">,</span> <span class="n">f2</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;Count other studio computed field&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_custom_field&#39;</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Count fields without xml_id&#39;</span><span class="p">)</span>
+        <span class="n">f4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_custom_field_export&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s1">&#39;__export__&#39;</span><span class="p">,</span> <span class="s1">&#39;studio_custom&#39;</span><span class="p">,</span> <span class="n">f4</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;Count fields with xml_id but without module&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.test_several_xml_id">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.test_several_xml_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_several_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sa</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_server_action</span><span class="p">(</span><span class="s2">&quot;Test double xml_id&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__export__&quot;</span><span class="p">,</span> <span class="s2">&quot;first&quot;</span><span class="p">,</span> <span class="n">sa</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;base&quot;</span><span class="p">,</span> <span class="s2">&quot;second&quot;</span><span class="p">,</span> <span class="n">sa</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Count Should count SA with a non standard xml_id&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__import__&quot;</span><span class="p">,</span> <span class="s2">&quot;third&quot;</span><span class="p">,</span> <span class="n">sa</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;SA with several xml_id should be counted only once&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.test_cloc_exclude_xml_id">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.test_cloc_exclude_xml_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cloc_exclude_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sa</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_server_action</span><span class="p">(</span><span class="s2">&quot;Test double xml_id&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__cloc_exclude__&quot;</span><span class="p">,</span> <span class="s2">&quot;sa_first&quot;</span><span class="p">,</span> <span class="n">sa</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__upgrade__&quot;</span><span class="p">,</span> <span class="s2">&quot;sa_second&quot;</span><span class="p">,</span> <span class="n">sa</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Should not count SA with cloc_exclude xml_id&#39;</span><span class="p">)</span>
+
+        <span class="n">f1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_field</span><span class="p">(</span><span class="s1">&#39;x_invoice_count&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__cloc_exclude__&quot;</span><span class="p">,</span> <span class="s2">&quot;field_first&quot;</span><span class="p">,</span> <span class="n">f1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_xml_id</span><span class="p">(</span><span class="s2">&quot;__upgrade__&quot;</span><span class="p">,</span> <span class="s2">&quot;field_second&quot;</span><span class="p">,</span> <span class="n">f1</span><span class="p">)</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Should not count Field with cloc_exclude xml_id&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestClocCustomization.test_field_no_xml_id">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocCustomization.test_field_no_xml_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_field_no_xml_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s2">&quot;x_no_xml_id&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;field_description&#39;</span><span class="p">:</span> <span class="s2">&quot;no_xml_id&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.model_res_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;ttype&#39;</span><span class="p">:</span> <span class="s1">&#39;integer&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;store&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;compute&#39;</span><span class="p">:</span> <span class="s2">&quot;for rec in self: rec[&#39;x_invoice_count&#39;] = 10&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;Should count field with no xml_id at all&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestClocParser">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocParser">[docs]</a>
+<span class="k">class</span> <span class="nc">TestClocParser</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestClocParser.test_parser">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocParser.test_parser">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_parser</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">xml_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_xml</span><span class="p">(</span><span class="n">XML_TEST</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">xml_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">31</span><span class="p">))</span>
+        <span class="n">py_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_py</span><span class="p">(</span><span class="n">PY_TEST_NO_RETURN</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">py_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">py_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_py</span><span class="p">(</span><span class="n">PY_TEST</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_python_version</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># Multi line str lineno return the begining of the str</span>
+            <span class="c1"># in python 3.8, it result in a different count for</span>
+            <span class="c1"># multi str used in expressions</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">py_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">py_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+        <span class="n">js_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_js</span><span class="p">(</span><span class="n">JS_TEST</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">js_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">17</span><span class="p">))</span>
+        <span class="n">css_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_css</span><span class="p">(</span><span class="n">CSS_TEST</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">css_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">17</span><span class="p">))</span>
+        <span class="n">scss_count</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">parse_scss</span><span class="p">(</span><span class="n">SCSS_TEST</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">scss_count</span><span class="p">,</span> <span class="p">(</span><span class="mi">17</span><span class="p">,</span> <span class="mi">26</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestClocStdNoCusto">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocStdNoCusto">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestClocStdNoCusto</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestClocStdNoCusto.test_no_custo_install">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_cloc.TestClocStdNoCusto.test_no_custo_install">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_no_custo_install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Make sure after the installation of module</span>
+<span class="sd">            no database customization is counted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cl</span> <span class="o">=</span> <span class="n">cloc</span><span class="o">.</span><span class="n">Cloc</span><span class="p">()</span>
+        <span class="n">cl</span><span class="o">.</span><span class="n">count_customization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">cl</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;odoo/studio&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Module should not generate customization in database&#39;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

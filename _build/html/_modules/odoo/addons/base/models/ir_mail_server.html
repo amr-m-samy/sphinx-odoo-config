@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_mail_server &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_mail_server</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_mail_server</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">email.message</span> <span class="kn">import</span> <span class="n">EmailMessage</span>
+<span class="kn">from</span> <span class="nn">email.utils</span> <span class="kn">import</span> <span class="n">make_msgid</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">email</span>
+<span class="kn">import</span> <span class="nn">email.policy</span>
+<span class="kn">import</span> <span class="nn">idna</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">smtplib</span>
+<span class="kn">import</span> <span class="nn">ssl</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gaierror</span><span class="p">,</span> <span class="n">timeout</span>
+<span class="kn">from</span> <span class="nn">OpenSSL</span> <span class="kn">import</span> <span class="n">crypto</span> <span class="k">as</span> <span class="n">SSLCrypto</span>
+<span class="kn">from</span> <span class="nn">OpenSSL.crypto</span> <span class="kn">import</span> <span class="n">Error</span> <span class="k">as</span> <span class="n">SSLCryptoError</span><span class="p">,</span> <span class="n">FILETYPE_PEM</span>
+<span class="kn">from</span> <span class="nn">OpenSSL.SSL</span> <span class="kn">import</span> <span class="n">Error</span> <span class="k">as</span> <span class="n">SSLError</span>
+<span class="kn">from</span> <span class="nn">urllib3.contrib.pyopenssl</span> <span class="kn">import</span> <span class="n">PyOpenSSLContext</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">ustr</span><span class="p">,</span> <span class="n">pycompat</span><span class="p">,</span> <span class="n">formataddr</span><span class="p">,</span> <span class="n">email_normalize</span><span class="p">,</span> <span class="n">encapsulate_email</span><span class="p">,</span> <span class="n">email_domain_extract</span><span class="p">,</span> <span class="n">email_domain_normalize</span>
+
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_test_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.tests&#39;</span><span class="p">)</span>
+
+<span class="n">SMTP_TIMEOUT</span> <span class="o">=</span> <span class="mi">60</span>
+
+
+<div class="viewcode-block" id="MailDeliveryException">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.MailDeliveryException">[docs]</a>
+<span class="k">class</span> <span class="nc">MailDeliveryException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Specific exception subclass for mail delivery errors&quot;&quot;&quot;</span></div>
+
+
+
+<span class="c1"># Python 3: patch SMTP&#39;s internal printer/debugger</span>
+<span class="k">def</span> <span class="nf">_print_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">))</span>
+<span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP</span><span class="o">.</span><span class="n">_print_debug</span> <span class="o">=</span> <span class="n">_print_debug</span>
+
+<span class="c1"># Python 3: workaround for bpo-35805, only partially fixed in Python 3.8.</span>
+<span class="n">RFC5322_IDENTIFICATION_HEADERS</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;message-id&#39;</span><span class="p">,</span> <span class="s1">&#39;in-reply-to&#39;</span><span class="p">,</span> <span class="s1">&#39;references&#39;</span><span class="p">,</span> <span class="s1">&#39;resent-msg-id&#39;</span><span class="p">}</span>
+<span class="n">_noFoldPolicy</span> <span class="o">=</span> <span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">SMTP</span><span class="o">.</span><span class="n">clone</span><span class="p">(</span><span class="n">max_line_length</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="viewcode-block" id="IdentificationFieldsNoFoldPolicy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IdentificationFieldsNoFoldPolicy">[docs]</a>
+<span class="k">class</span> <span class="nc">IdentificationFieldsNoFoldPolicy</span><span class="p">(</span><span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">EmailPolicy</span><span class="p">):</span>
+    <span class="c1"># Override _fold() to avoid folding identification fields, excluded by RFC2047 section 5</span>
+    <span class="c1"># These are particularly important to preserve, as MTAs will often rewrite non-conformant</span>
+    <span class="c1"># Message-ID headers, causing a loss of thread information (replies are lost)</span>
+    <span class="k">def</span> <span class="nf">_fold</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">RFC5322_IDENTIFICATION_HEADERS</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_noFoldPolicy</span><span class="o">.</span><span class="n">_fold</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_fold</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<span class="c1"># Global monkey-patch for our preferred SMTP policy, preserving the non-default linesep</span>
+<span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">SMTP</span> <span class="o">=</span> <span class="n">IdentificationFieldsNoFoldPolicy</span><span class="p">(</span><span class="n">linesep</span><span class="o">=</span><span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">SMTP</span><span class="o">.</span><span class="n">linesep</span><span class="p">)</span>
+
+<span class="c1"># Python 2: replace smtplib&#39;s stderr</span>
+<div class="viewcode-block" id="WriteToLogger">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.WriteToLogger">[docs]</a>
+<span class="k">class</span> <span class="nc">WriteToLogger</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="WriteToLogger.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.WriteToLogger.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">s</span><span class="p">)</span></div>
+</div>
+
+<span class="n">smtplib</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">WriteToLogger</span><span class="p">()</span>
+
+<div class="viewcode-block" id="is_ascii">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.is_ascii">[docs]</a>
+<span class="k">def</span> <span class="nf">is_ascii</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="nb">ord</span><span class="p">(</span><span class="n">cp</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">128</span> <span class="k">for</span> <span class="n">cp</span> <span class="ow">in</span> <span class="n">s</span><span class="p">)</span></div>
+
+
+<span class="n">address_pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;([^&quot; ,&lt;@]+@[^&gt;&quot; ,]+)&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="extract_rfc2822_addresses">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.extract_rfc2822_addresses">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_rfc2822_addresses</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a list of valid RFC2822 addresses</span>
+<span class="sd">       that can be found in ``source``, ignoring</span>
+<span class="sd">       malformed ones and non-ASCII ones.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="n">address_pattern</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+    <span class="n">valid_addresses</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">candidates</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">valid_addresses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">formataddr</span><span class="p">((</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">c</span><span class="p">),</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;ascii&#39;</span><span class="p">))</span>
+        <span class="k">except</span> <span class="n">idna</span><span class="o">.</span><span class="n">IDNAError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">valid_addresses</span></div>
+
+
+
+<div class="viewcode-block" id="IrMailServer">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer">[docs]</a>
+<span class="k">class</span> <span class="nc">IrMailServer</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents an SMTP server, able to send outgoing emails, with SSL and TLS capabilities.&quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;ir.mail_server&quot;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Mail Server&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;sequence, id&#39;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">NO_VALID_RECIPIENT</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;At least one valid recipient address should be &quot;</span>
+                          <span class="s2">&quot;specified for outgoing emails (To/Cc/Bcc)&quot;</span><span class="p">)</span>
+    <span class="n">NO_FOUND_FROM</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;You must either provide a sender address explicitly or configure &quot;</span>
+          <span class="s2">&quot;using the combination of `mail.catchall.domain` and `mail.default.from` &quot;</span>
+          <span class="s2">&quot;ICPs, in the server configuration file or with the --email-from startup &quot;</span>
+          <span class="s2">&quot;parameter.&quot;</span><span class="p">)</span>
+    <span class="n">NO_FOUND_SMTP_FROM</span> <span class="o">=</span> <span class="s2">&quot;The Return-Path or From header is required for any outbound email&quot;</span>
+    <span class="n">NO_VALID_FROM</span> <span class="o">=</span> <span class="s2">&quot;Malformed &#39;Return-Path&#39; or &#39;From&#39; address. It should contain one valid plain ASCII email&quot;</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">from_filter</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span>
+        <span class="s2">&quot;FROM Filtering&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Comma-separated list of addresses or domains for which this server can be used.</span><span class="se">\n</span><span class="s1">&#39;</span>
+             <span class="s1">&#39;e.g.: &quot;notification@odoo.com&quot; or &quot;odoo.com&quot;&#39;</span><span class="p">)</span>
+    <span class="n">smtp_host</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;SMTP Server&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Hostname or IP of SMTP server&quot;</span><span class="p">)</span>
+    <span class="n">smtp_port</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;SMTP Port&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;SMTP Port. Usually 465 for SSL, and 25 or 587 for other cases.&quot;</span><span class="p">)</span>
+    <span class="n">smtp_authentication</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([</span>
+        <span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;Username&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;certificate&#39;</span><span class="p">,</span> <span class="s1">&#39;SSL Certificate&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;cli&#39;</span><span class="p">,</span> <span class="s1">&#39;Command Line Interface&#39;</span><span class="p">)</span>
+    <span class="p">],</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Authenticate with&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;login&#39;</span><span class="p">)</span>
+    <span class="n">smtp_authentication_info</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Authentication Info&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_smtp_authentication_info&#39;</span><span class="p">)</span>
+    <span class="n">smtp_user</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Username&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Optional username for SMTP authentication&quot;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s1">&#39;base.group_system&#39;</span><span class="p">)</span>
+    <span class="n">smtp_pass</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Password&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Optional password for SMTP authentication&quot;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s1">&#39;base.group_system&#39;</span><span class="p">)</span>
+    <span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;None&#39;</span><span class="p">),</span>
+                                        <span class="p">(</span><span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;TLS (STARTTLS)&#39;</span><span class="p">),</span>
+                                        <span class="p">(</span><span class="s1">&#39;ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;SSL/TLS&#39;</span><span class="p">)],</span>
+                                       <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Connection Encryption&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span>
+                                       <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Choose the connection encryption scheme:</span><span class="se">\n</span><span class="s2">&quot;</span>
+                                            <span class="s2">&quot;- None: SMTP sessions are done in cleartext.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                                            <span class="s2">&quot;- TLS (STARTTLS): TLS encryption is requested at start of SMTP session (Recommended)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                                            <span class="s2">&quot;- SSL/TLS: SMTP sessions are encrypted with SSL/TLS through a dedicated port (default: 465)&quot;</span><span class="p">)</span>
+    <span class="n">smtp_ssl_certificate</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span>
+        <span class="s1">&#39;SSL Certificate&#39;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s1">&#39;base.group_system&#39;</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;SSL certificate used for authentication&#39;</span><span class="p">)</span>
+    <span class="n">smtp_ssl_private_key</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span>
+        <span class="s1">&#39;SSL Private Key&#39;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s1">&#39;base.group_system&#39;</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;SSL private key used for authentication&#39;</span><span class="p">)</span>
+    <span class="n">smtp_debug</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Debugging&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If enabled, the full output of SMTP sessions will &quot;</span>
+                                                         <span class="s2">&quot;be written to the server log at DEBUG level &quot;</span>
+                                                         <span class="s2">&quot;(this is very verbose and may include confidential info!)&quot;</span><span class="p">)</span>
+    <span class="n">sequence</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Priority&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;When no specific mail server is requested for a mail, the highest priority one &quot;</span>
+                                                                  <span class="s2">&quot;is used. Default priority is 10 (smaller number = higher priority)&quot;</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;smtp_authentication&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_smtp_authentication_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">==</span> <span class="s1">&#39;login&#39;</span><span class="p">:</span>
+                <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication_info</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span>
+                    <span class="s1">&#39;Connect to your server through your usual username and password. </span><span class="se">\n</span><span class="s1">&#39;</span>
+                    <span class="s1">&#39;This is the most basic SMTP authentication process and &#39;</span>
+                    <span class="s1">&#39;may not be accepted by all providers. </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">==</span> <span class="s1">&#39;certificate&#39;</span><span class="p">:</span>
+                <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication_info</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span>
+                    <span class="s1">&#39;Authenticate by using SSL certificates, belonging to your domain name. </span><span class="se">\n</span><span class="s1">&#39;</span>
+                    <span class="s1">&#39;SSL certificates allow you to authenticate your mail server for the entire domain name.&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">==</span> <span class="s1">&#39;cli&#39;</span><span class="p">:</span>
+                <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication_info</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span>
+                    <span class="s1">&#39;Use the SMTP configuration set in the &quot;Command Line Interface&quot; arguments.&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;smtp_ssl_certificate&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_ssl_private_key&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_smtp_ssl_files</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;We must provided both files or none.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">mail_server</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_certificate</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_private_key</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;SSL private key is missing for </span><span class="si">%s</span><span class="s1">.&#39;</span><span class="p">,</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_private_key</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_certificate</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;SSL certificate is missing for </span><span class="si">%s</span><span class="s1">.&#39;</span><span class="p">,</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+
+<div class="viewcode-block" id="IrMailServer.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure we cannot archive a server in-use&quot;&quot;&quot;</span>
+        <span class="n">usages_per_server</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+            <span class="n">usages_per_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_usages_compute</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">usages_per_server</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+
+        <span class="c1"># Write cannot be performed as some server are used, build detailed usage per server</span>
+        <span class="n">usage_details_per_server</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">is_multiple_server_usage</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">usages_per_server</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">server</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">usages_per_server</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">usage_details</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">is_multiple_server_usage</span><span class="p">:</span>
+                <span class="n">usage_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> (Dedicated Outgoing Mail Server):&#39;</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">display_name</span><span class="p">))</span>
+            <span class="n">usage_details</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;- </span><span class="si">{</span><span class="n">u</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">usages_per_server</span><span class="p">[</span><span class="n">server</span><span class="o">.</span><span class="n">id</span><span class="p">]))</span>
+            <span class="n">usage_details_per_server</span><span class="p">[</span><span class="n">server</span><span class="p">]</span> <span class="o">=</span> <span class="n">usage_details</span>
+
+        <span class="c1"># Raise the error with the ordered list of servers and concatenated detailed usages</span>
+        <span class="n">servers_ordered_by_name</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">usage_details_per_server</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">display_name</span><span class="p">)</span>
+        <span class="n">error_server_usage</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">server</span><span class="o">.</span><span class="n">display_name</span> <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">servers_ordered_by_name</span><span class="p">)</span>
+        <span class="n">error_usage_details</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">line</span>
+                                        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">servers_ordered_by_name</span>
+                                        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">usage_details_per_server</span><span class="p">[</span><span class="n">server</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">is_multiple_server_usage</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span>
+                <span class="n">_</span><span class="p">(</span><span class="s1">&#39;You cannot archive these Outgoing Mail Servers (</span><span class="si">%s</span><span class="s1">) because they are still used in the following case(s):</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+                  <span class="n">error_server_usage</span><span class="p">,</span> <span class="n">error_usage_details</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span>
+            <span class="n">_</span><span class="p">(</span><span class="s1">&#39;You cannot archive this Outgoing Mail Server (</span><span class="si">%s</span><span class="s1">) because it is still used in the following case(s):</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+              <span class="n">error_server_usage</span><span class="p">,</span> <span class="n">error_usage_details</span><span class="p">))</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_active_usages_compute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a dict server id to list of user-friendly outgoing mail servers usage of this record set.</span>
+
+<span class="sd">        This method must be overridden by all modules that uses this class in order to complete the list with</span>
+<span class="sd">        user-friendly string describing the active elements that could send mail through the instance of this class.</span>
+<span class="sd">        :return dict: { ir_mail_server.id: usage_str_list }.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_get_test_email_from</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="n">email_from</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">from_filter_parts</span> <span class="o">:=</span> <span class="p">[</span><span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">from_filter</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()]:</span>
+            <span class="c1"># find first found complete email in filter parts</span>
+            <span class="n">email_from</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">email</span> <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="n">from_filter_parts</span> <span class="k">if</span> <span class="s2">&quot;@&quot;</span> <span class="ow">in</span> <span class="n">email</span><span class="p">),</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="c1"># no complete email -&gt; consider noreply</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">email_from</span><span class="p">:</span>
+                <span class="n">email_from</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;noreply@</span><span class="si">{</span><span class="n">from_filter_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">email_from</span><span class="p">:</span>
+            <span class="c1"># Fallback to current user email if there&#39;s no from filter</span>
+            <span class="n">email_from</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">email</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">email_from</span> <span class="ow">or</span> <span class="s2">&quot;@&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">email_from</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Please configure an email on the current user to simulate &#39;</span>
+                              <span class="s1">&#39;sending an email message via this outgoing server&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">email_from</span>
+
+    <span class="k">def</span> <span class="nf">_get_test_email_to</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;noreply@odoo.com&quot;</span>
+
+<div class="viewcode-block" id="IrMailServer.test_smtp_connection">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer.test_smtp_connection">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_smtp_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">smtp</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">smtp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">mail_server_id</span><span class="o">=</span><span class="n">server</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">allow_archived</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="c1"># simulate sending an email from current user&#39;s address - without sending it!</span>
+                <span class="n">email_from</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">_get_test_email_from</span><span class="p">()</span>
+                <span class="n">email_to</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">_get_test_email_to</span><span class="p">()</span>
+                <span class="c1"># Testing the MAIL FROM step should detect sender filter problems</span>
+                <span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">repl</span><span class="p">)</span> <span class="o">=</span> <span class="n">smtp</span><span class="o">.</span><span class="n">mail</span><span class="p">(</span><span class="n">email_from</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">code</span> <span class="o">!=</span> <span class="mi">250</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The server refused the sender address (</span><span class="si">%(email_from)s</span><span class="s1">) with error </span><span class="si">%(repl)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">email_from</span><span class="o">=</span><span class="n">email_from</span><span class="p">,</span> <span class="n">repl</span><span class="o">=</span><span class="n">repl</span><span class="p">))</span>  <span class="c1"># noqa: TRY301</span>
+                <span class="c1"># Testing the RCPT TO step should detect most relaying problems</span>
+                <span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">repl</span><span class="p">)</span> <span class="o">=</span> <span class="n">smtp</span><span class="o">.</span><span class="n">rcpt</span><span class="p">(</span><span class="n">email_to</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">code</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">250</span><span class="p">,</span> <span class="mi">251</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The server refused the test recipient (</span><span class="si">%(email_to)s</span><span class="s1">) with error </span><span class="si">%(repl)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">email_to</span><span class="o">=</span><span class="n">email_to</span><span class="p">,</span> <span class="n">repl</span><span class="o">=</span><span class="n">repl</span><span class="p">))</span>  <span class="c1"># noqa: TRY301</span>
+                <span class="c1"># Beginning the DATA step should detect some deferred rejections</span>
+                <span class="c1"># Can&#39;t use self.data() as it would actually send the mail!</span>
+                <span class="n">smtp</span><span class="o">.</span><span class="n">putcmd</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">repl</span><span class="p">)</span> <span class="o">=</span> <span class="n">smtp</span><span class="o">.</span><span class="n">getreply</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">code</span> <span class="o">!=</span> <span class="mi">354</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The server refused the test connection with error </span><span class="si">%(repl)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">repl</span><span class="o">=</span><span class="n">repl</span><span class="p">))</span>  <span class="c1"># noqa: TRY301</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">UnicodeError</span><span class="p">,</span> <span class="n">idna</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">InvalidCodepoint</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Invalid server name!</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">gaierror</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;No response received. Check server address and port number.</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTPServerDisconnected</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The server has closed the connection unexpectedly. Check configuration served on this port number.</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTPResponseException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Server replied with following exception:</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTPNotSupportedError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;An option is not supported by the server:</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTPException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;An SMTP exception occurred. Check port number and connection security type.</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">,</span> <span class="n">SSLError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;An SSL exception occurred. Check connection security type.</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">except</span> <span class="n">UserError</span><span class="p">:</span>
+                <span class="k">raise</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Connection test on </span><span class="si">%s</span><span class="s2"> failed with a generic error.&quot;</span><span class="p">,</span> <span class="n">server</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Connection Test Failed! Here is what we got instead:</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">smtp</span><span class="p">:</span>
+                        <span class="n">smtp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="c1"># ignored, just a consequence of the previous exception</span>
+                    <span class="k">pass</span>
+
+        <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Connection Test Successful!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.client&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tag&#39;</span><span class="p">:</span> <span class="s1">&#39;display_notification&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;success&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;sticky&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="IrMailServer.connect">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer.connect">[docs]</a>
+    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">encryption</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">smtp_from</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ssl_certificate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ssl_private_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mail_server_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">allow_archived</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a new SMTP connection to the given SMTP server.</span>
+<span class="sd">           When running in test mode, this method does nothing and returns `None`.</span>
+
+<span class="sd">           :param host: host or IP of SMTP server to connect to, if mail_server_id not passed</span>
+<span class="sd">           :param int port: SMTP port to connect to</span>
+<span class="sd">           :param user: optional username to authenticate with</span>
+<span class="sd">           :param password: optional password to authenticate with</span>
+<span class="sd">           :param string encryption: optional, ``&#39;ssl&#39;`` | ``&#39;starttls&#39;``</span>
+<span class="sd">           :param smtp_from: FROM SMTP envelop, used to find the best mail server</span>
+<span class="sd">           :param ssl_certificate: filename of the SSL certificate used for authentication</span>
+<span class="sd">               Used when no mail server is given and overwrite  the odoo-bin argument &quot;smtp_ssl_certificate&quot;</span>
+<span class="sd">           :param ssl_private_key: filename of the SSL private key used for authentication</span>
+<span class="sd">               Used when no mail server is given and overwrite  the odoo-bin argument &quot;smtp_ssl_private_key&quot;</span>
+<span class="sd">           :param bool smtp_debug: toggle debugging of SMTP sessions (all i/o</span>
+<span class="sd">                              will be output in logs)</span>
+<span class="sd">           :param mail_server_id: ID of specific mail server to use (overrides other parameters)</span>
+<span class="sd">           :param bool allow_archived: by default (False), an exception is raised when calling this method on an</span>
+<span class="sd">           archived record (using mail_server_id param). It can be set to True for testing so that the exception is no</span>
+<span class="sd">           longer raised.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Do not actually connect while running in test mode</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_test_mode</span><span class="p">():</span>
+            <span class="k">return</span>
+
+        <span class="n">mail_server</span> <span class="o">=</span> <span class="n">smtp_encryption</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">mail_server_id</span><span class="p">:</span>
+            <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">mail_server_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_archived</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The server &quot;</span><span class="si">%s</span><span class="s1">&quot; cannot be used because it is archived.&#39;</span><span class="p">,</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">display_name</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+            <span class="n">mail_server</span><span class="p">,</span> <span class="n">smtp_from</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">_find_mail_server</span><span class="p">(</span><span class="n">smtp_from</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mail_server</span><span class="p">:</span>
+            <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span>
+        <span class="n">ssl_context</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">mail_server</span> <span class="ow">and</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">!=</span> <span class="s2">&quot;cli&quot;</span><span class="p">:</span>
+            <span class="n">smtp_server</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_host</span>
+            <span class="n">smtp_port</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_port</span>
+            <span class="k">if</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">==</span> <span class="s2">&quot;certificate&quot;</span><span class="p">:</span>
+                <span class="n">smtp_user</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">smtp_password</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">smtp_user</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_user</span>
+                <span class="n">smtp_password</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_pass</span>
+            <span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_encryption</span>
+            <span class="n">smtp_debug</span> <span class="o">=</span> <span class="n">smtp_debug</span> <span class="ow">or</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_debug</span>
+            <span class="n">from_filter</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">from_filter</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">==</span> <span class="s2">&quot;certificate&quot;</span>
+               <span class="ow">and</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_certificate</span>
+               <span class="ow">and</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_private_key</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">PyOpenSSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS</span><span class="p">)</span>
+                    <span class="n">smtp_ssl_certificate</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_certificate</span><span class="p">)</span>
+                    <span class="n">certificate</span> <span class="o">=</span> <span class="n">SSLCrypto</span><span class="o">.</span><span class="n">load_certificate</span><span class="p">(</span><span class="n">FILETYPE_PEM</span><span class="p">,</span> <span class="n">smtp_ssl_certificate</span><span class="p">)</span>
+                    <span class="n">smtp_ssl_private_key</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_ssl_private_key</span><span class="p">)</span>
+                    <span class="n">private_key</span> <span class="o">=</span> <span class="n">SSLCrypto</span><span class="o">.</span><span class="n">load_privatekey</span><span class="p">(</span><span class="n">FILETYPE_PEM</span><span class="p">,</span> <span class="n">smtp_ssl_private_key</span><span class="p">)</span>
+                    <span class="n">ssl_context</span><span class="o">.</span><span class="n">_ctx</span><span class="o">.</span><span class="n">use_certificate</span><span class="p">(</span><span class="n">certificate</span><span class="p">)</span>
+                    <span class="n">ssl_context</span><span class="o">.</span><span class="n">_ctx</span><span class="o">.</span><span class="n">use_privatekey</span><span class="p">(</span><span class="n">private_key</span><span class="p">)</span>
+                    <span class="c1"># Check that the private key match the certificate</span>
+                    <span class="n">ssl_context</span><span class="o">.</span><span class="n">_ctx</span><span class="o">.</span><span class="n">check_privatekey</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">SSLCryptoError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The private key or the certificate is not a valid file. </span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="n">SSLError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Could not load your certificate / private key. </span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># we were passed individual smtp parameters or nothing and there is no default server</span>
+            <span class="n">smtp_server</span> <span class="o">=</span> <span class="n">host</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_server&#39;</span><span class="p">)</span>
+            <span class="n">smtp_port</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_port&#39;</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span> <span class="k">if</span> <span class="n">port</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">port</span>
+            <span class="n">smtp_user</span> <span class="o">=</span> <span class="n">user</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_user&#39;</span><span class="p">)</span>
+            <span class="n">smtp_password</span> <span class="o">=</span> <span class="n">password</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_password&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mail_server</span><span class="p">:</span>
+                <span class="n">from_filter</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">from_filter</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">from_filter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_default_from_filter</span><span class="p">()</span>
+
+            <span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">encryption</span>
+            <span class="k">if</span> <span class="n">smtp_encryption</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_ssl&#39;</span><span class="p">):</span>
+                <span class="n">smtp_encryption</span> <span class="o">=</span> <span class="s1">&#39;starttls&#39;</span> <span class="c1"># smtp_ssl =&gt; STARTTLS as of v7</span>
+            <span class="n">smtp_ssl_certificate_filename</span> <span class="o">=</span> <span class="n">ssl_certificate</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_ssl_certificate_filename&#39;</span><span class="p">)</span>
+            <span class="n">smtp_ssl_private_key_filename</span> <span class="o">=</span> <span class="n">ssl_private_key</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;smtp_ssl_private_key_filename&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">smtp_ssl_certificate_filename</span> <span class="ow">and</span> <span class="n">smtp_ssl_private_key_filename</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">PyOpenSSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS</span><span class="p">)</span>
+                    <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">smtp_ssl_certificate_filename</span><span class="p">,</span> <span class="n">keyfile</span><span class="o">=</span><span class="n">smtp_ssl_private_key_filename</span><span class="p">)</span>
+                    <span class="c1"># Check that the private key match the certificate</span>
+                    <span class="n">ssl_context</span><span class="o">.</span><span class="n">_ctx</span><span class="o">.</span><span class="n">check_privatekey</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">SSLCryptoError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;The private key or the certificate is not a valid file. </span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="n">SSLError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Could not load your certificate / private key. </span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">smtp_server</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Missing SMTP Server&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span>
+                 <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Please define at least one SMTP server, &quot;</span>
+                   <span class="s2">&quot;or provide the SMTP parameters explicitly.&quot;</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="n">smtp_encryption</span> <span class="o">==</span> <span class="s1">&#39;ssl&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;SMTP_SSL&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span>
+                    <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Your Odoo Server does not support SMTP-over-SSL. &quot;</span>
+                      <span class="s2">&quot;You could use STARTTLS instead. &quot;</span>
+                       <span class="s2">&quot;If SSL is needed, an upgrade to Python 2.6 on the server-side &quot;</span>
+                       <span class="s2">&quot;should do the trick.&quot;</span><span class="p">))</span>
+            <span class="n">connection</span> <span class="o">=</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP_SSL</span><span class="p">(</span><span class="n">smtp_server</span><span class="p">,</span> <span class="n">smtp_port</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">SMTP_TIMEOUT</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">ssl_context</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">connection</span> <span class="o">=</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP</span><span class="p">(</span><span class="n">smtp_server</span><span class="p">,</span> <span class="n">smtp_port</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">SMTP_TIMEOUT</span><span class="p">)</span>
+
+        <span class="n">connection</span><span class="o">.</span><span class="n">set_debuglevel</span><span class="p">(</span><span class="n">smtp_debug</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">smtp_encryption</span> <span class="o">==</span> <span class="s1">&#39;starttls&#39;</span><span class="p">:</span>
+            <span class="c1"># starttls() will perform ehlo() if needed first</span>
+            <span class="c1"># and will discard the previous list of services</span>
+            <span class="c1"># after successfully performing STARTTLS command,</span>
+            <span class="c1"># (as per RFC 3207) so for example any AUTH</span>
+            <span class="c1"># capability that appears only on encrypted channels</span>
+            <span class="c1"># will be correctly detected for next step</span>
+            <span class="n">connection</span><span class="o">.</span><span class="n">starttls</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="n">ssl_context</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">smtp_user</span><span class="p">:</span>
+            <span class="c1"># Attempt authentication - will raise if AUTH service not supported</span>
+            <span class="n">local</span><span class="p">,</span> <span class="n">at</span><span class="p">,</span> <span class="n">domain</span> <span class="o">=</span> <span class="n">smtp_user</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">at</span><span class="p">:</span>
+                <span class="n">smtp_user</span> <span class="o">=</span> <span class="n">local</span> <span class="o">+</span> <span class="n">at</span> <span class="o">+</span> <span class="n">idna</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+            <span class="n">mail_server</span><span class="o">.</span><span class="n">_smtp_login</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">smtp_user</span><span class="p">,</span> <span class="n">smtp_password</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Some methods of SMTP don&#39;t check whether EHLO/HELO was sent.</span>
+        <span class="c1"># Anyway, as it may have been sent by login(), all subsequent usages should consider this command as sent.</span>
+        <span class="n">connection</span><span class="o">.</span><span class="n">ehlo_or_helo_if_needed</span><span class="p">()</span>
+
+        <span class="c1"># Store the &quot;from_filter&quot; of the mail server / odoo-bin argument to  know if we</span>
+        <span class="c1"># need to change the FROM headers or not when we will prepare the mail message</span>
+        <span class="n">connection</span><span class="o">.</span><span class="n">from_filter</span> <span class="o">=</span> <span class="n">from_filter</span>
+        <span class="n">connection</span><span class="o">.</span><span class="n">smtp_from</span> <span class="o">=</span> <span class="n">smtp_from</span>
+
+        <span class="k">return</span> <span class="n">connection</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_smtp_login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">smtp_user</span><span class="p">,</span> <span class="n">smtp_password</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Authenticate the SMTP connection.</span>
+
+<span class="sd">        Can be overridden in other module for different authentication methods.Can be</span>
+<span class="sd">        called on the model itself or on a singleton.</span>
+
+<span class="sd">        :param connection: The SMTP connection to authenticate</span>
+<span class="sd">        :param smtp_user: The user to used for the authentication</span>
+<span class="sd">        :param smtp_password: The password to used for the authentication</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">connection</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">smtp_user</span><span class="p">,</span> <span class="n">smtp_password</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IrMailServer.build_email">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer.build_email">[docs]</a>
+    <span class="k">def</span> <span class="nf">build_email</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_from</span><span class="p">,</span> <span class="n">email_to</span><span class="p">,</span> <span class="n">subject</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">email_cc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">email_bcc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reply_to</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">attachments</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">message_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">references</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_id</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="s1">&#39;plain&#39;</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">body_alternative</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">subtype_alternative</span><span class="o">=</span><span class="s1">&#39;plain&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs an RFC2822 email.message.Message object based on the keyword arguments passed, and returns it.</span>
+
+<span class="sd">           :param string email_from: sender email address</span>
+<span class="sd">           :param list email_to: list of recipient addresses (to be joined with commas)</span>
+<span class="sd">           :param string subject: email subject (no pre-encoding/quoting necessary)</span>
+<span class="sd">           :param string body: email body, of the type ``subtype`` (by default, plaintext).</span>
+<span class="sd">                               If html subtype is used, the message will be automatically converted</span>
+<span class="sd">                               to plaintext and wrapped in multipart/alternative, unless an explicit</span>
+<span class="sd">                               ``body_alternative`` version is passed.</span>
+<span class="sd">           :param string body_alternative: optional alternative body, of the type specified in ``subtype_alternative``</span>
+<span class="sd">           :param string reply_to: optional value of Reply-To header</span>
+<span class="sd">           :param string object_id: optional tracking identifier, to be included in the message-id for</span>
+<span class="sd">                                    recognizing replies. Suggested format for object-id is &quot;res_id-model&quot;,</span>
+<span class="sd">                                    e.g. &quot;12345-crm.lead&quot;.</span>
+<span class="sd">           :param string subtype: optional mime subtype for the text body (usually &#39;plain&#39; or &#39;html&#39;),</span>
+<span class="sd">                                  must match the format of the ``body`` parameter. Default is &#39;plain&#39;,</span>
+<span class="sd">                                  making the content part of the mail &quot;text/plain&quot;.</span>
+<span class="sd">           :param string subtype_alternative: optional mime subtype of ``body_alternative`` (usually &#39;plain&#39;</span>
+<span class="sd">                                              or &#39;html&#39;). Default is &#39;plain&#39;.</span>
+<span class="sd">           :param list attachments: list of (filename, filecontents) pairs, where filecontents is a string</span>
+<span class="sd">                                    containing the bytes of the attachment</span>
+<span class="sd">           :param message_id:</span>
+<span class="sd">           :param references:</span>
+<span class="sd">           :param list email_cc: optional list of string values for CC header (to be joined with commas)</span>
+<span class="sd">           :param list email_bcc: optional list of string values for BCC header (to be joined with commas)</span>
+<span class="sd">           :param dict headers: optional map of headers to set on the outgoing mail (may override the</span>
+<span class="sd">                                other headers, including Subject, Reply-To, Message-Id, etc.)</span>
+<span class="sd">           :rtype: email.message.EmailMessage</span>
+<span class="sd">           :return: the new RFC2822 email message</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">email_from</span> <span class="o">=</span> <span class="n">email_from</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;domain_notifications_email&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_default_from_address</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">email_from</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">NO_FOUND_FROM</span>
+
+        <span class="n">headers</span> <span class="o">=</span> <span class="n">headers</span> <span class="ow">or</span> <span class="p">{}</span>         <span class="c1"># need valid dict later</span>
+        <span class="n">email_cc</span> <span class="o">=</span> <span class="n">email_cc</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="n">email_bcc</span> <span class="o">=</span> <span class="n">email_bcc</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">body</span> <span class="ow">or</span> <span class="sa">u</span><span class="s1">&#39;&#39;</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">EmailMessage</span><span class="p">(</span><span class="n">policy</span><span class="o">=</span><span class="n">email</span><span class="o">.</span><span class="n">policy</span><span class="o">.</span><span class="n">SMTP</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">message_id</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">object_id</span><span class="p">:</span>
+                <span class="n">message_id</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">generate_tracking_message_id</span><span class="p">(</span><span class="n">object_id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">message_id</span> <span class="o">=</span> <span class="n">make_msgid</span><span class="p">()</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Message-Id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">message_id</span>
+        <span class="k">if</span> <span class="n">references</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;references&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">references</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Subject&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">subject</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">email_from</span>
+        <span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Reply-To&#39;</span><span class="p">]</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Reply-To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">reply_to</span> <span class="ow">or</span> <span class="n">email_from</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">email_to</span>
+        <span class="k">if</span> <span class="n">email_cc</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Cc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">email_cc</span>
+        <span class="k">if</span> <span class="n">email_bcc</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Bcc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">email_bcc</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Date&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">headers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">msg</span><span class="p">[</span><span class="n">pycompat</span><span class="o">.</span><span class="n">to_text</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">key</span><span class="p">))]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="n">email_body</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">subtype</span> <span class="o">==</span> <span class="s1">&#39;html&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">body_alternative</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;MIME-Version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;1.0&#39;</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">add_alternative</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">html2plaintext</span><span class="p">(</span><span class="n">email_body</span><span class="p">),</span> <span class="n">subtype</span><span class="o">=</span><span class="s1">&#39;plain&#39;</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">add_alternative</span><span class="p">(</span><span class="n">email_body</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="n">subtype</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">body_alternative</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;MIME-Version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;1.0&#39;</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">add_alternative</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">body_alternative</span><span class="p">),</span> <span class="n">subtype</span><span class="o">=</span><span class="n">subtype_alternative</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">add_alternative</span><span class="p">(</span><span class="n">email_body</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="n">subtype</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">set_content</span><span class="p">(</span><span class="n">email_body</span><span class="p">,</span> <span class="n">subtype</span><span class="o">=</span><span class="n">subtype</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">attachments</span><span class="p">:</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">fcontent</span><span class="p">,</span> <span class="n">mime</span><span class="p">)</span> <span class="ow">in</span> <span class="n">attachments</span><span class="p">:</span>
+                <span class="n">maintype</span><span class="p">,</span> <span class="n">subtype</span> <span class="o">=</span> <span class="n">mime</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">mime</span> <span class="ow">and</span> <span class="s1">&#39;/&#39;</span> <span class="ow">in</span> <span class="n">mime</span> <span class="k">else</span> <span class="p">(</span><span class="s1">&#39;application&#39;</span><span class="p">,</span> <span class="s1">&#39;octet-stream&#39;</span><span class="p">)</span>
+                <span class="n">msg</span><span class="o">.</span><span class="n">add_attachment</span><span class="p">(</span><span class="n">fcontent</span><span class="p">,</span> <span class="n">maintype</span><span class="p">,</span> <span class="n">subtype</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">fname</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">msg</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_default_bounce_address</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Computes the default bounce address. It is used to set the envelop</span>
+<span class="sd">        address if no envelop address is provided in the message.</span>
+
+<span class="sd">        :return str/None: defaults to the ``--email-from`` CLI/config parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;email_from&quot;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_default_from_address</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Computes the default from address. It is used for the &quot;header from&quot;</span>
+<span class="sd">        address when no other has been received.</span>
+
+<span class="sd">        :return str/None: defaults to the ``--email-from`` CLI/config parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;email_from&quot;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_default_from_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Computes the default from_filter. It is used when no specific</span>
+<span class="sd">        ir.mail_server is used when sending emails, hence having no value for</span>
+<span class="sd">        from_filter.</span>
+
+<span class="sd">        :return str/None: defaults to &#39;mail.default.from_filter&#39;, then</span>
+<span class="sd">          ``--from-filter`` CLI/config parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span>
+            <span class="s1">&#39;mail.default.from_filter&#39;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;from_filter&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_prepare_email_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">smtp_session</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Prepare the SMTP information (from, to, message) before sending.</span>
+
+<span class="sd">        :param message: the email.message.Message to send, information like the</span>
+<span class="sd">            Return-Path, the From, etc... will be used to find the smtp_from and to smtp_to</span>
+<span class="sd">        :param smtp_session: the opened SMTP session to use to authenticate the sender</span>
+<span class="sd">        :return: smtp_from, smtp_to_list, message</span>
+<span class="sd">            smtp_from: email to used during the authentication to the mail server</span>
+<span class="sd">            smtp_to_list: list of email address which will receive the email</span>
+<span class="sd">            message: the email.message.Message to send</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use the default bounce address **only if** no Return-Path was</span>
+        <span class="c1"># provided by caller.  Caller may be using Variable Envelope Return</span>
+        <span class="c1"># Path (VERP) to detect no-longer valid email addresses.</span>
+        <span class="c1"># context may force a value, e.g. mail.alias.domain usage</span>
+        <span class="n">bounce_address</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;domain_bounce_address&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Return-Path&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_default_bounce_address</span><span class="p">()</span> <span class="ow">or</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span>
+
+        <span class="n">smtp_from</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">bounce_address</span>
+        <span class="k">assert</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">NO_FOUND_SMTP_FROM</span>
+
+        <span class="n">email_to</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span>
+        <span class="n">email_cc</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Cc&#39;</span><span class="p">]</span>
+        <span class="n">email_bcc</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Bcc&#39;</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Bcc&#39;</span><span class="p">]</span>
+
+        <span class="c1"># All recipient addresses must only contain ASCII characters</span>
+        <span class="n">smtp_to_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">address</span>
+            <span class="k">for</span> <span class="n">base</span> <span class="ow">in</span> <span class="p">[</span><span class="n">email_to</span><span class="p">,</span> <span class="n">email_cc</span><span class="p">,</span> <span class="n">email_bcc</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="n">extract_rfc2822_addresses</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">address</span>
+        <span class="p">]</span>
+        <span class="k">assert</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">NO_VALID_RECIPIENT</span>
+
+        <span class="n">x_forge_to</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;X-Forge-To&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">x_forge_to</span><span class="p">:</span>
+            <span class="c1"># `To:` header forged, e.g. for posting on discuss.channels, to avoid confusion</span>
+            <span class="k">del</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;X-Forge-To&#39;</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span>           <span class="c1"># avoid multiple To: headers!</span>
+            <span class="n">message</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_forge_to</span>
+
+        <span class="c1"># Try to not spoof the mail from headers; fetch session-based or contextualized</span>
+        <span class="c1"># values for encapsulation computation</span>
+        <span class="n">from_filter</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">smtp_session</span><span class="p">,</span> <span class="s1">&#39;from_filter&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">smtp_from</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">smtp_session</span><span class="p">,</span> <span class="s1">&#39;smtp_from&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">or</span> <span class="n">smtp_from</span>
+        <span class="n">notifications_email</span> <span class="o">=</span> <span class="n">email_normalize</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;domain_notifications_email&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_default_from_address</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">notifications_email</span> <span class="ow">and</span> <span class="n">smtp_from</span> <span class="o">==</span> <span class="n">notifications_email</span> <span class="ow">and</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">notifications_email</span><span class="p">:</span>
+            <span class="n">smtp_from</span> <span class="o">=</span> <span class="n">encapsulate_email</span><span class="p">(</span><span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">],</span> <span class="n">notifications_email</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">smtp_from</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span>
+            <span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">smtp_from</span>
+
+        <span class="c1"># Check if it&#39;s still possible to put the bounce address as smtp_from</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match_from_filter</span><span class="p">(</span><span class="n">bounce_address</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">):</span>
+            <span class="c1"># Mail headers FROM will be spoofed to be able to receive bounce notifications</span>
+            <span class="c1"># Because the mail server support the domain of the bounce address</span>
+            <span class="n">smtp_from</span> <span class="o">=</span> <span class="n">bounce_address</span>
+
+        <span class="c1"># The email&#39;s &quot;Envelope From&quot; (Return-Path) must only contain ASCII characters.</span>
+        <span class="n">smtp_from_rfc2822</span> <span class="o">=</span> <span class="n">extract_rfc2822_addresses</span><span class="p">(</span><span class="n">smtp_from</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">smtp_from_rfc2822</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">NO_VALID_FROM</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;Malformed &#39;Return-Path&#39; or &#39;From&#39; address: </span><span class="si">{</span><span class="n">smtp_from</span><span class="si">}</span><span class="s2"> - &quot;</span>
+                <span class="s2">&quot;It should contain one valid plain ASCII email&quot;</span>
+            <span class="p">)</span>
+        <span class="n">smtp_from</span> <span class="o">=</span> <span class="n">smtp_from_rfc2822</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="n">message</span>
+
+<div class="viewcode-block" id="IrMailServer.send_email">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_mail_server.IrMailServer.send_email">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">send_email</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">mail_server_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_server</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">smtp_user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_password</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_encryption</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">smtp_ssl_certificate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_ssl_private_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">smtp_debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sends an email directly (no queuing).</span>
+
+<span class="sd">        No retries are done, the caller should handle MailDeliveryException in order to ensure that</span>
+<span class="sd">        the mail is never lost.</span>
+
+<span class="sd">        If the mail_server_id is provided, sends using this mail server, ignoring other smtp_* arguments.</span>
+<span class="sd">        If mail_server_id is None and smtp_server is None, use the default mail server (highest priority).</span>
+<span class="sd">        If mail_server_id is None and smtp_server is not None, use the provided smtp_* arguments.</span>
+<span class="sd">        If both mail_server_id and smtp_server are None, look for an &#39;smtp_server&#39; value in server config,</span>
+<span class="sd">        and fails if not found.</span>
+
+<span class="sd">        :param message: the email.message.Message to send. The envelope sender will be extracted from the</span>
+<span class="sd">                        ``Return-Path`` (if present), or will be set to the default bounce address.</span>
+<span class="sd">                        The envelope recipients will be extracted from the combined list of ``To``,</span>
+<span class="sd">                        ``CC`` and ``BCC`` headers.</span>
+<span class="sd">        :param smtp_session: optional pre-established SMTP session. When provided,</span>
+<span class="sd">                             overrides `mail_server_id` and all the `smtp_*` parameters.</span>
+<span class="sd">                             Passing the matching `mail_server_id` may yield better debugging/log</span>
+<span class="sd">                             messages. The caller is in charge of disconnecting the session.</span>
+<span class="sd">        :param mail_server_id: optional id of ir.mail_server to use for sending. overrides other smtp_* arguments.</span>
+<span class="sd">        :param smtp_server: optional hostname of SMTP server to use</span>
+<span class="sd">        :param smtp_encryption: optional TLS mode, one of &#39;none&#39;, &#39;starttls&#39; or &#39;ssl&#39; (see ir.mail_server fields for explanation)</span>
+<span class="sd">        :param smtp_port: optional SMTP port, if mail_server_id is not passed</span>
+<span class="sd">        :param smtp_user: optional SMTP user, if mail_server_id is not passed</span>
+<span class="sd">        :param smtp_password: optional SMTP password to use, if mail_server_id is not passed</span>
+<span class="sd">        :param smtp_ssl_certificate: filename of the SSL certificate used for authentication</span>
+<span class="sd">        :param smtp_ssl_private_key: filename of the SSL private key used for authentication</span>
+<span class="sd">        :param smtp_debug: optional SMTP debug flag, if mail_server_id is not passed</span>
+<span class="sd">        :return: the Message-ID of the message that was just sent, if successfully sent, otherwise raises</span>
+<span class="sd">                 MailDeliveryException and logs root cause.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">smtp</span> <span class="o">=</span> <span class="n">smtp_session</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">smtp</span><span class="p">:</span>
+            <span class="n">smtp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+                <span class="n">smtp_server</span><span class="p">,</span> <span class="n">smtp_port</span><span class="p">,</span> <span class="n">smtp_user</span><span class="p">,</span> <span class="n">smtp_password</span><span class="p">,</span> <span class="n">smtp_encryption</span><span class="p">,</span>
+                <span class="n">smtp_from</span><span class="o">=</span><span class="n">message</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">],</span> <span class="n">ssl_certificate</span><span class="o">=</span><span class="n">smtp_ssl_certificate</span><span class="p">,</span> <span class="n">ssl_private_key</span><span class="o">=</span><span class="n">smtp_ssl_private_key</span><span class="p">,</span>
+                <span class="n">smtp_debug</span><span class="o">=</span><span class="n">smtp_debug</span><span class="p">,</span> <span class="n">mail_server_id</span><span class="o">=</span><span class="n">mail_server_id</span><span class="p">,)</span>
+
+        <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_email_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp</span><span class="p">)</span>
+
+        <span class="c1"># Do not actually send emails in testing mode!</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_test_mode</span><span class="p">():</span>
+            <span class="n">_test_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;skip sending email in test mode&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Message-Id&#39;</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">message_id</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s1">&#39;Message-Id&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span> <span class="o">&lt;</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
+                <span class="c1"># header folding code is buggy and adds redundant carriage</span>
+                <span class="c1"># returns, it got fixed in 3.7.4 thanks to bpo-34424</span>
+                <span class="n">message_str</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+                <span class="n">message_str</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\r</span><span class="s1">+(?!</span><span class="se">\n</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">message_str</span><span class="p">)</span>
+
+                <span class="n">mail_options</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">((</span><span class="ow">not</span> <span class="n">is_ascii</span><span class="p">(</span><span class="n">addr</span><span class="p">)</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">smtp_to_list</span> <span class="o">+</span> <span class="p">[</span><span class="n">smtp_from</span><span class="p">])):</span>
+                    <span class="c1"># non ascii email found, require SMTPUTF8 extension,</span>
+                    <span class="c1"># the relay may reject it</span>
+                    <span class="n">mail_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;SMTPUTF8&quot;</span><span class="p">)</span>
+                <span class="n">smtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="n">message_str</span><span class="p">,</span> <span class="n">mail_options</span><span class="o">=</span><span class="n">mail_options</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">smtp</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">)</span>
+
+            <span class="c1"># do not quit() a pre-established smtp_session</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">smtp_session</span><span class="p">:</span>
+                <span class="n">smtp</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTPServerDisconnected</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">smtp_server</span><span class="p">),</span> <span class="n">e</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">ustr</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Mail delivery failed via SMTP server &#39;</span><span class="si">%s</span><span class="s2">&#39;.</span><span class="se">\n</span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">MailDeliveryException</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Mail Delivery Failed&quot;</span><span class="p">),</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">message_id</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_find_mail_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_from</span><span class="p">,</span> <span class="n">mail_servers</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Find the appropriate mail server for the given email address.</span>
+
+<span class="sd">        Returns: Record&lt;ir.mail_server&gt;, email_from</span>
+<span class="sd">        - Mail server to use to send the email (None if we use the odoo-bin arguments)</span>
+<span class="sd">        - Email FROM to use to send the email (in some case, it might be impossible</span>
+<span class="sd">          to use the given email address directly if no mail server is configured for)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">email_from_normalized</span> <span class="o">=</span> <span class="n">email_normalize</span><span class="p">(</span><span class="n">email_from</span><span class="p">)</span>
+        <span class="n">email_from_domain</span> <span class="o">=</span> <span class="n">email_domain_extract</span><span class="p">(</span><span class="n">email_from_normalized</span><span class="p">)</span>
+        <span class="n">notifications_email</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;domain_notifications_email&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">email_normalize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_default_from_address</span><span class="p">())</span>
+        <span class="n">notifications_domain</span> <span class="o">=</span> <span class="n">email_domain_extract</span><span class="p">(</span><span class="n">notifications_email</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">mail_servers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mail_servers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([],</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;sequence&#39;</span><span class="p">)</span>
+        <span class="c1"># 0. Archived mail server should never be used</span>
+        <span class="n">mail_servers</span> <span class="o">=</span> <span class="n">mail_servers</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">first_match</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">normalize_method</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">mail_server</span> <span class="ow">in</span> <span class="n">mail_servers</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">from_filter</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="n">normalize_method</span><span class="p">(</span><span class="n">email</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="o">==</span> <span class="n">target</span>
+                    <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">from_filter</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+                <span class="p">):</span>
+                    <span class="k">return</span> <span class="n">mail_server</span>
+
+        <span class="c1"># 1. Try to find a mail server for the right mail from</span>
+        <span class="k">if</span> <span class="n">mail_server</span> <span class="o">:=</span> <span class="n">first_match</span><span class="p">(</span><span class="n">email_from_normalized</span><span class="p">,</span> <span class="n">email_normalize</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">mail_server</span><span class="p">,</span> <span class="n">email_from</span>
+
+        <span class="k">if</span> <span class="n">mail_server</span> <span class="o">:=</span> <span class="n">first_match</span><span class="p">(</span><span class="n">email_from_domain</span><span class="p">,</span> <span class="n">email_domain_normalize</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">mail_server</span><span class="p">,</span> <span class="n">email_from</span>
+
+        <span class="c1"># 2. Try to find a mail server for &lt;notifications@domain.com&gt;</span>
+        <span class="k">if</span> <span class="n">notifications_email</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mail_server</span> <span class="o">:=</span> <span class="n">first_match</span><span class="p">(</span><span class="n">notifications_email</span><span class="p">,</span> <span class="n">email_normalize</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">mail_server</span><span class="p">,</span> <span class="n">notifications_email</span>
+
+            <span class="k">if</span> <span class="n">mail_server</span> <span class="o">:=</span> <span class="n">first_match</span><span class="p">(</span><span class="n">notifications_domain</span><span class="p">,</span> <span class="n">email_domain_normalize</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">mail_server</span><span class="p">,</span> <span class="n">notifications_email</span>
+
+        <span class="c1"># 3. Take the first mail server without &quot;from_filter&quot; because</span>
+        <span class="c1"># nothing else has been found... Will spoof the FROM because</span>
+        <span class="c1"># we have no other choices (will use the notification email if available</span>
+        <span class="c1"># otherwise we will use the user email)</span>
+        <span class="k">if</span> <span class="n">mail_server</span> <span class="o">:=</span> <span class="n">mail_servers</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="ow">not</span> <span class="n">m</span><span class="o">.</span><span class="n">from_filter</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">mail_server</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">notifications_email</span> <span class="ow">or</span> <span class="n">email_from</span>
+
+        <span class="c1"># 4. Return the first mail server even if it was configured for another domain</span>
+        <span class="k">if</span> <span class="n">mail_servers</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;No mail server matches the from_filter, using </span><span class="si">%s</span><span class="s2"> as fallback&quot;</span><span class="p">,</span>
+                <span class="n">notifications_email</span> <span class="ow">or</span> <span class="n">email_from</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">mail_servers</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">notifications_email</span> <span class="ow">or</span> <span class="n">email_from</span>
+
+        <span class="c1"># 5: SMTP config in odoo-bin arguments</span>
+        <span class="n">from_filter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_default_from_filter</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match_from_filter</span><span class="p">(</span><span class="n">email_from</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">email_from</span>
+
+        <span class="k">if</span> <span class="n">notifications_email</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match_from_filter</span><span class="p">(</span><span class="n">notifications_email</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">notifications_email</span>
+
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;The from filter of the CLI configuration does not match the notification email &quot;</span>
+            <span class="s2">&quot;or the user email, using </span><span class="si">%s</span><span class="s2"> as fallback&quot;</span><span class="p">,</span>
+            <span class="n">notifications_email</span> <span class="ow">or</span> <span class="n">email_from</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">notifications_email</span> <span class="ow">or</span> <span class="n">email_from</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_match_from_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_from</span><span class="p">,</span> <span class="n">from_filter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return True is the given email address match the &quot;from_filter&quot; field.</span>
+
+<span class="sd">        The from filter can be Falsy (always match),</span>
+<span class="sd">        a domain name or an full email address.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">from_filter</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="n">normalized_mail_from</span> <span class="o">=</span> <span class="n">email_normalize</span><span class="p">(</span><span class="n">email_from</span><span class="p">)</span>
+        <span class="n">normalized_domain</span> <span class="o">=</span> <span class="n">email_domain_extract</span><span class="p">(</span><span class="n">normalized_mail_from</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">email_filter</span> <span class="ow">in</span> <span class="p">[</span><span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="p">(</span><span class="n">from_filter</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()]:</span>
+            <span class="k">if</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">email_filter</span> <span class="ow">and</span> <span class="n">email_normalize</span><span class="p">(</span><span class="n">email_filter</span><span class="p">)</span> <span class="o">==</span> <span class="n">normalized_mail_from</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="s1">&#39;@&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">email_filter</span> <span class="ow">and</span> <span class="n">email_domain_normalize</span><span class="p">(</span><span class="n">email_filter</span><span class="p">)</span> <span class="o">==</span> <span class="n">normalized_domain</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="s1">&#39;smtp_encryption&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_onchange_encryption</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">smtp_encryption</span> <span class="o">==</span> <span class="s1">&#39;ssl&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">smtp_port</span> <span class="o">=</span> <span class="mi">465</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;SMTP_SSL&#39;</span> <span class="ow">in</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s1">&#39;warning&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Warning&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Your server does not seem to support SSL, you may want to try STARTTLS instead&#39;</span><span class="p">),</span>
+                <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">smtp_port</span> <span class="o">=</span> <span class="mi">25</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_is_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return True if we are running the tests, so we do not send real emails.</span>
+
+<span class="sd">        Can be overridden in tests after mocking the SMTP lib to test in depth the</span>
+<span class="sd">        outgoing mail server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s1">&#39;testing&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">in_test_mode</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

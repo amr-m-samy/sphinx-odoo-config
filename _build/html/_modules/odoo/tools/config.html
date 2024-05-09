@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.config &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">configparser</span> <span class="k">as</span> <span class="nn">ConfigParser</span>
+<span class="kn">import</span> <span class="nn">errno</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">optparse</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">expandvars</span><span class="p">,</span> <span class="n">expanduser</span><span class="p">,</span> <span class="n">abspath</span><span class="p">,</span> <span class="n">realpath</span><span class="p">,</span> <span class="n">normcase</span>
+<span class="kn">from</span> <span class="nn">..</span> <span class="kn">import</span> <span class="n">release</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">loglevels</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">appdirs</span>
+
+<span class="kn">from</span> <span class="nn">passlib.context</span> <span class="kn">import</span> <span class="n">CryptContext</span>
+<span class="n">crypt_context</span> <span class="o">=</span> <span class="n">CryptContext</span><span class="p">(</span><span class="n">schemes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;pbkdf2_sha512&#39;</span><span class="p">,</span> <span class="s1">&#39;plaintext&#39;</span><span class="p">],</span>
+                             <span class="n">deprecated</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;plaintext&#39;</span><span class="p">],</span>
+                             <span class="n">pbkdf2_sha512__rounds</span><span class="o">=</span><span class="mi">600_000</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MyOption">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.MyOption">[docs]</a>
+<span class="k">class</span> <span class="nc">MyOption</span> <span class="p">(</span><span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; optparse Option with two additional attributes.</span>
+
+<span class="sd">    The list of command line options (getopt.Option) is used to create the</span>
+<span class="sd">    list of the configuration file options. When reading the file, and then</span>
+<span class="sd">    reading the command line arguments, we don&#39;t want optparse.parse results</span>
+<span class="sd">    to override the configuration file values. But if we provide default</span>
+<span class="sd">    values to optparse, optparse will return them and we can&#39;t know if they</span>
+<span class="sd">    were really provided by the user or not. A solution is to not use</span>
+<span class="sd">    optparse&#39;s default attribute, but use a custom one (that will be copied</span>
+<span class="sd">    to create the default values of the configuration file).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">opts</span><span class="p">,</span> <span class="o">**</span><span class="n">attrs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_default</span> <span class="o">=</span> <span class="n">attrs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;my_default&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyOption</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">opts</span><span class="p">,</span> <span class="o">**</span><span class="n">attrs</span><span class="p">)</span></div>
+
+
+<span class="n">DEFAULT_LOG_HANDLER</span> <span class="o">=</span> <span class="s1">&#39;:INFO&#39;</span>
+<span class="k">def</span> <span class="nf">_get_default_datadir</span><span class="p">():</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;~&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">home</span><span class="p">):</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">appdirs</span><span class="o">.</span><span class="n">user_data_dir</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;win32&#39;</span><span class="p">,</span> <span class="s1">&#39;darwin&#39;</span><span class="p">]:</span>
+            <span class="n">func</span> <span class="o">=</span> <span class="n">appdirs</span><span class="o">.</span><span class="n">site_data_dir</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">func</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">**</span><span class="n">kwarg</span><span class="p">:</span> <span class="s2">&quot;/var/lib/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">kwarg</span><span class="p">[</span><span class="s1">&#39;appname&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="c1"># No &quot;version&quot; kwarg as session and filestore paths are shared against series</span>
+    <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">appname</span><span class="o">=</span><span class="n">release</span><span class="o">.</span><span class="n">product_name</span><span class="p">,</span> <span class="n">appauthor</span><span class="o">=</span><span class="n">release</span><span class="o">.</span><span class="n">author</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_deduplicate_loggers</span><span class="p">(</span><span class="n">loggers</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Avoid saving multiple logging levels for the same loggers to a save</span>
+<span class="sd">    file, that just takes space and the list can potentially grow unbounded</span>
+<span class="sd">    if for some odd reason people use :option`--save`` all the time.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># dict(iterable) -&gt; the last item of iterable for any given key wins,</span>
+    <span class="c1"># which is what we want and expect. Output order should not matter as</span>
+    <span class="c1"># there are no duplicates within the output sequence</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">logger</span><span class="p">,</span> <span class="n">level</span> <span class="ow">in</span> <span class="nb">dict</span><span class="p">(</span><span class="n">it</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">loggers</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="configmanager">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager">[docs]</a>
+<span class="k">class</span> <span class="nc">configmanager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructor.</span>
+
+<span class="sd">        :param fname: a shortcut allowing to instantiate :class:`configmanager`</span>
+<span class="sd">                      from Python code without resorting to environment</span>
+<span class="sd">                      variable</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Options not exposed on the command line. Command line options will be added</span>
+        <span class="c1"># from optparse&#39;s parser.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;admin_passwd&#39;</span><span class="p">:</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;csv_internal_sep&#39;</span><span class="p">:</span> <span class="s1">&#39;,&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;publisher_warranty_url&#39;</span><span class="p">:</span> <span class="s1">&#39;http://services.openerp.com/publisher-warranty/&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;reportgz&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;root_path&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;websocket_keep_alive_timeout&#39;</span><span class="p">:</span> <span class="mi">3600</span><span class="p">,</span>
+            <span class="s1">&#39;websocket_rate_limit_burst&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="s1">&#39;websocket_rate_limit_delay&#39;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Not exposed in the configuration file.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blacklist_for_save</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span>
+            <span class="s1">&#39;publisher_warranty_url&#39;</span><span class="p">,</span> <span class="s1">&#39;load_language&#39;</span><span class="p">,</span> <span class="s1">&#39;root_path&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;save&#39;</span><span class="p">,</span> <span class="s1">&#39;config&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="s1">&#39;stop_after_init&#39;</span><span class="p">,</span> <span class="s1">&#39;dev_mode&#39;</span><span class="p">,</span> <span class="s1">&#39;shell_interface&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;longpolling_port&#39;</span><span class="p">,</span>
+        <span class="p">])</span>
+
+        <span class="c1"># dictionary mapping option destination (keys in self.options) to MyOptions.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">casts</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">misc</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_file</span> <span class="o">=</span> <span class="n">fname</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_LOGLEVELS</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([</span>
+            <span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loglevels</span><span class="p">,</span> <span class="s1">&#39;LOG_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">x</span><span class="p">),</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">logging</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;CRITICAL&#39;</span><span class="p">,</span> <span class="s1">&#39;ERROR&#39;</span><span class="p">,</span> <span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="s1">&#39;INFO&#39;</span><span class="p">,</span> <span class="s1">&#39;DEBUG&#39;</span><span class="p">,</span> <span class="s1">&#39;NOTSET&#39;</span><span class="p">)</span>
+        <span class="p">])</span>
+
+        <span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="o">.</span><span class="n">description</span><span class="p">,</span> <span class="n">release</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parser</span> <span class="o">=</span> <span class="n">parser</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionParser</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="n">version</span><span class="p">,</span> <span class="n">option_class</span><span class="o">=</span><span class="n">MyOption</span><span class="p">)</span>
+
+        <span class="c1"># Server startup config</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Common options&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-c&quot;</span><span class="p">,</span> <span class="s2">&quot;--config&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;config&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify alternate config file&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="s2">&quot;--save&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;save&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s2">&quot;save configuration to ~/.odoorc (or to ~/.openerp_serverrc if it exists)&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-i&quot;</span><span class="p">,</span> <span class="s2">&quot;--init&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;init&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;install one or more modules (comma-separated list, use </span><span class="se">\&quot;</span><span class="s2">all</span><span class="se">\&quot;</span><span class="s2"> for all modules), requires -d&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-u&quot;</span><span class="p">,</span> <span class="s2">&quot;--update&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;update&quot;</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s2">&quot;update one or more modules (comma-separated list, use </span><span class="se">\&quot;</span><span class="s2">all</span><span class="se">\&quot;</span><span class="s2"> for all modules). Requires -d.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--without-demo&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;without_demo&quot;</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s2">&quot;disable loading demo data for modules to be installed (comma-separated, use </span><span class="se">\&quot;</span><span class="s2">all</span><span class="se">\&quot;</span><span class="s2"> for all modules). Requires -d and -i. Default is </span><span class="si">%d</span><span class="s2">efault&quot;</span><span class="p">,</span>
+                          <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-P&quot;</span><span class="p">,</span> <span class="s2">&quot;--import-partial&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;import_partial&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use this for big data importation, if it crashes you will be able to continue at the current state. Provide a filename to store intermediate importation states.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--pidfile&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;pidfile&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;file where the server pid will be stored&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--addons-path&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;addons_path&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify additional addons paths (separated by commas).&quot;</span><span class="p">,</span>
+                         <span class="n">action</span><span class="o">=</span><span class="s2">&quot;callback&quot;</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_check_addons_path</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;string&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--upgrade-path&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;upgrade_path&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify an additional upgrade path.&quot;</span><span class="p">,</span>
+                         <span class="n">action</span><span class="o">=</span><span class="s2">&quot;callback&quot;</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_check_upgrade_path</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;string&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--load&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;server_wide_modules&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Comma-separated list of server-wide modules.&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;base,web&#39;</span><span class="p">)</span>
+
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-D&quot;</span><span class="p">,</span> <span class="s2">&quot;--data-dir&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;data_dir&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="n">_get_default_datadir</span><span class="p">(),</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Directory where to store Odoo data&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># HTTP</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;HTTP Service Configuration&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--http-interface&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_interface&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Listen interface address for HTTP services. &quot;</span>
+                              <span class="s2">&quot;Keep empty to listen on all interfaces (0.0.0.0)&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-p&quot;</span><span class="p">,</span> <span class="s2">&quot;--http-port&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_port&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">8069</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Listen port for the main HTTP service&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PORT&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--longpolling-port&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;longpolling_port&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Deprecated alias to the gevent-port option&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PORT&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--gevent-port&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;gevent_port&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">8072</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Listen port for the gevent worker&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PORT&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--no-http&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_enable&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_false&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Disable the HTTP and Longpolling services entirely&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--proxy-mode&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;proxy_mode&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Activate reverse proxy WSGI wrappers (headers rewriting) &quot;</span>
+                              <span class="s2">&quot;Only enable this when running behind a trusted web proxy!&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--x-sendfile&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;x_sendfile&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Activate X-Sendfile (apache) and X-Accel-Redirect (nginx) &quot;</span>
+                              <span class="s2">&quot;HTTP response header to delegate the delivery of large &quot;</span>
+                              <span class="s2">&quot;files (assets/attachments) to the web server.&quot;</span><span class="p">)</span>
+        <span class="c1"># HTTP: hidden backwards-compatibility for &quot;*xmlrpc*&quot; options</span>
+        <span class="n">hidden</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">SUPPRESS_HELP</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--xmlrpc-interface&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_interface&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">hidden</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--xmlrpc-port&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_port&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">hidden</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--no-xmlrpc&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;http_enable&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_false&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">hidden</span><span class="p">)</span>
+
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># WEB</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Web interface Configuration&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db-filter&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;dbfilter&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;REGEXP&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Regular expressions for filtering available databases for Web UI. &quot;</span>
+                              <span class="s2">&quot;The expression can use </span><span class="si">%d</span><span class="s2"> (domain) and %h (host) placeholders.&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># Testing Group</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Testing Configuration&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--test-file&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;test_file&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Launch a python test file.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--test-enable&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;callback&quot;</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_test_enable_callback</span><span class="p">,</span>
+                         <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;test_enable&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Enable unit tests.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--test-tags&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;test_tags&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Comma-separated list of specs to filter which tests to execute. Enable unit tests if set. &quot;</span>
+                         <span class="s2">&quot;A filter spec has the format: [-][tag][/module][:class][.method] &quot;</span>
+                         <span class="s2">&quot;The &#39;-&#39; specifies if we want to include or exclude tests matching this spec. &quot;</span>
+                         <span class="s2">&quot;The tag will match tags added on a class with a @tagged decorator &quot;</span>
+                         <span class="s2">&quot;(all Test classes have &#39;standard&#39; and &#39;at_install&#39; tags &quot;</span>
+                         <span class="s2">&quot;until explicitly removed, see the decorator documentation). &quot;</span>
+                         <span class="s2">&quot;&#39;*&#39; will match all tags. &quot;</span>
+                         <span class="s2">&quot;If tag is omitted on include mode, its value is &#39;standard&#39;. &quot;</span>
+                         <span class="s2">&quot;If tag is omitted on exclude mode, its value is &#39;*&#39;. &quot;</span>
+                         <span class="s2">&quot;The module, class, and method will respectively match the module name, test class name and test method name. &quot;</span>
+                         <span class="s2">&quot;Example: --test-tags :TestClass.test_func,/test_module,external &quot;</span>
+
+                         <span class="s2">&quot;Filtering and executing the tests happens twice: right &quot;</span>
+                         <span class="s2">&quot;after each module installation/update and at the end &quot;</span>
+                         <span class="s2">&quot;of the modules loading. At each stage tests are filtered &quot;</span>
+                         <span class="s2">&quot;by --test-tags specs and additionally by dynamic specs &quot;</span>
+                         <span class="s2">&quot;&#39;at_install&#39; and &#39;post_install&#39; correspondingly.&quot;</span><span class="p">)</span>
+
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--screencasts&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;screencasts&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;DIR&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Screencasts will go in DIR/</span><span class="si">{db_name}</span><span class="s2">/screencasts.&quot;</span><span class="p">)</span>
+        <span class="n">temp_tests_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">(),</span> <span class="s1">&#39;odoo_tests&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--screenshots&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;screenshots&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="n">temp_tests_dir</span><span class="p">,</span>
+                         <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;DIR&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Screenshots will go in DIR/</span><span class="si">{db_name}</span><span class="s2">/screenshots. Defaults to </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="n">temp_tests_dir</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># Logging Group</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Logging Configuration&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--logfile&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;logfile&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;file where the server log will be stored&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--syslog&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;syslog&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Send the log to the syslog server&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-handler&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;append&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="p">[],</span> <span class="n">my_default</span><span class="o">=</span><span class="n">DEFAULT_LOG_HANDLER</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PREFIX:LEVEL&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;setup a handler at LEVEL for a given PREFIX. An empty PREFIX indicates the root logger. This option can be repeated. Example: &quot;odoo.orm:DEBUG&quot; or &quot;werkzeug:CRITICAL&quot; (default: &quot;:INFO&quot;)&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-web&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;append_const&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;log_handler&quot;</span><span class="p">,</span> <span class="n">const</span><span class="o">=</span><span class="s2">&quot;odoo.http:DEBUG&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;shortcut for --log-handler=odoo.http:DEBUG&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-sql&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;append_const&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;log_handler&quot;</span><span class="p">,</span> <span class="n">const</span><span class="o">=</span><span class="s2">&quot;odoo.sql_db:DEBUG&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;shortcut for --log-handler=odoo.sql_db:DEBUG&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-db&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;log_db&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Logging database&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-db-level&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;log_db_level&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Logging database level&quot;</span><span class="p">)</span>
+        <span class="c1"># For backward-compatibility, map the old log levels to something</span>
+        <span class="c1"># quite close.</span>
+        <span class="n">levels</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;info&#39;</span><span class="p">,</span> <span class="s1">&#39;debug_rpc&#39;</span><span class="p">,</span> <span class="s1">&#39;warn&#39;</span><span class="p">,</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span> <span class="s1">&#39;critical&#39;</span><span class="p">,</span> <span class="s1">&#39;runbot&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;debug_sql&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="s1">&#39;debug&#39;</span><span class="p">,</span> <span class="s1">&#39;debug_rpc_answer&#39;</span><span class="p">,</span> <span class="s1">&#39;notset&#39;</span>
+        <span class="p">]</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--log-level&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;log_level&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;choice&#39;</span><span class="p">,</span>
+                         <span class="n">choices</span><span class="o">=</span><span class="n">levels</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the level of the logging. Accepted values: </span><span class="si">%s</span><span class="s1">.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">levels</span><span class="p">,))</span>
+
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># SMTP Group</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;SMTP Configuration&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--email-from&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;email_from&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SMTP email address for sending email&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--from-filter&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;from_filter&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify for which email address the SMTP configuration can be used&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_server&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SMTP server for sending email&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-port&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_port&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SMTP port&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-ssl&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_ssl&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;if passed, SMTP connections will be encrypted with SSL (STARTTLS)&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-user&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_user&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SMTP username for sending email&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-password&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_password&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SMTP password for sending email&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-ssl-certificate-filename&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_ssl_certificate_filename&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SSL certificate used for authentication&#39;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--smtp-ssl-private-key-filename&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;smtp_ssl_private_key_filename&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;specify the SSL private key used for authentication&#39;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Database related options&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-d&quot;</span><span class="p">,</span> <span class="s2">&quot;--database&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_name&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database name&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-r&quot;</span><span class="p">,</span> <span class="s2">&quot;--db_user&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_user&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database user name&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;--db_password&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_password&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database password&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--pg_path&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;pg_path&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the pg executable path&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db_host&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_host&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database host&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db_port&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_port&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database port&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db_sslmode&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_sslmode&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;choice&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;prefer&#39;</span><span class="p">,</span>
+                         <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;disable&#39;</span><span class="p">,</span> <span class="s1">&#39;allow&#39;</span><span class="p">,</span> <span class="s1">&#39;prefer&#39;</span><span class="p">,</span> <span class="s1">&#39;require&#39;</span><span class="p">,</span> <span class="s1">&#39;verify-ca&#39;</span><span class="p">,</span> <span class="s1">&#39;verify-full&#39;</span><span class="p">],</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the database ssl connection mode (see PostgreSQL documentation)&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db_maxconn&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_maxconn&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the maximum number of physical connections to PostgreSQL&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db_maxconn_gevent&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_maxconn_gevent&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the maximum number of physical connections to PostgreSQL specifically for the gevent worker&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--db-template&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;db_template&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s2">&quot;template0&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify a custom database template to create a new database&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Internationalisation options&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Use these options to translate Odoo to another language. &quot;</span>
+            <span class="s2">&quot;See i18n section of the user manual. Option &#39;-d&#39; is mandatory. &quot;</span>
+            <span class="s2">&quot;Option &#39;-l&#39; is mandatory in case of importation&quot;</span>
+            <span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--load-language&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;load_language&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specifies the languages for the translations you want to be loaded&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;-l&#39;</span><span class="p">,</span> <span class="s2">&quot;--language&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;language&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify the language of the translation file. Use it with --i18n-export or --i18n-import&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--i18n-export&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;translate_out&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;export all sentences to be translated to a CSV file, a PO file or a TGZ archive and exit&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--i18n-import&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;translate_in&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;import a CSV or a PO file with translations and exit. The &#39;-l&#39; option is required.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--i18n-overwrite&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;overwrite_existing_translations&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;overwrites existing translation terms on updating a module or importing a CSV or a PO file.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--modules&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;translate_modules&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;specify modules to export. Use in combination with --i18n-export&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="n">security</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s1">&#39;Security-related options&#39;</span><span class="p">)</span>
+        <span class="n">security</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--no-database-list&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_false&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;list_db&#39;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                            <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Disable the ability to obtain or view the list of databases. &quot;</span>
+                                 <span class="s2">&quot;Also disable access to the database manager and selector, &quot;</span>
+                                 <span class="s2">&quot;so be sure to set a proper --database parameter first&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">security</span><span class="p">)</span>
+
+        <span class="c1"># Advanced options</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Advanced options&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--dev&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;dev_mode&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Enable developer mode. Param: List of options separated by comma. &quot;</span>
+                              <span class="s2">&quot;Options : all, reload, qweb, xml&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s1">&#39;--shell-interface&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;shell_interface&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify a preferred REPL to use in shell mode. Supported REPLs are: &quot;</span>
+                              <span class="s2">&quot;[ipython|ptpython|bpython|python]&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--stop-after-init&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;stop_after_init&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s2">&quot;stop the server after its initialization&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--osv-memory-count-limit&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;osv_memory_count_limit&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Force a limit on the maximum number of records kept in the virtual &quot;</span>
+                              <span class="s2">&quot;osv_memory tables. By default there is no limit.&quot;</span><span class="p">,</span>
+                         <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--transient-age-limit&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;transient_age_limit&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Time limit (decimal value in hours) records created with a &quot;</span>
+                              <span class="s2">&quot;TransientModel (mostly wizard) are kept in the database. Default to 1 hour.&quot;</span><span class="p">,</span>
+                         <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;float&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--max-cron-threads&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;max_cron_threads&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum number of threads processing concurrently cron jobs (default 2).&quot;</span><span class="p">,</span>
+                         <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--unaccent&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;unaccent&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Try to enable the unaccent extension when creating new databases.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--geoip-city-db&quot;</span><span class="p">,</span> <span class="s2">&quot;--geoip-db&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;geoip_city_db&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;/usr/share/GeoIP/GeoLite2-City.mmdb&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Absolute path to the GeoIP City database file.&quot;</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--geoip-country-db&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;geoip_country_db&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="s1">&#39;/usr/share/GeoIP/GeoLite2-Country.mmdb&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Absolute path to the GeoIP Country database file.&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+            <span class="n">group</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionGroup</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">&quot;Multiprocessing options&quot;</span><span class="p">)</span>
+            <span class="c1"># TODO sensible default for the three following limits.</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--workers&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;workers&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify the number of workers, 0 disable prefork mode.&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-memory-soft&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_memory_soft&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">2048</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum allowed virtual memory per worker (in bytes), when reached the worker be &quot;</span>
+                             <span class="s2">&quot;reset after the current request (default 2048MiB).&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-memory-hard&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_memory_hard&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">2560</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum allowed virtual memory per worker (in bytes), when reached, any memory &quot;</span>
+                             <span class="s2">&quot;allocation will fail (default 2560MiB).&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-time-cpu&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_time_cpu&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum allowed CPU time per request (default 60).&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-time-real&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_time_real&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum allowed Real time per request (default 120).&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-time-real-cron&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_time_real_cron&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum allowed Real time per cron job. (default: --limit-time-real). &quot;</span>
+                                  <span class="s2">&quot;Set to 0 for no limit. &quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s2">&quot;--limit-request&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;limit_request&quot;</span><span class="p">,</span> <span class="n">my_default</span><span class="o">=</span><span class="mi">2</span><span class="o">**</span><span class="mi">16</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum number of request to be processed per worker (default 65536).&quot;</span><span class="p">,</span>
+                             <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">add_option_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="c1"># Copy all optparse options (i.e. MyOption) into self.options.</span>
+        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">parser</span><span class="o">.</span><span class="n">option_groups</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">option_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">option</span><span class="o">.</span><span class="n">dest</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">option</span><span class="o">.</span><span class="n">dest</span><span class="p">]</span> <span class="o">=</span> <span class="n">option</span><span class="o">.</span><span class="n">my_default</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">option</span><span class="o">.</span><span class="n">dest</span><span class="p">]</span> <span class="o">=</span> <span class="n">option</span>
+
+        <span class="c1"># generate default config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parse_config</span><span class="p">()</span>
+
+<div class="viewcode-block" id="configmanager.parse_config">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.parse_config">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Parse the configuration file (if any) and the command-line</span>
+<span class="sd">        arguments.</span>
+
+<span class="sd">        This method initializes odoo.tools.config and openerp.conf (the</span>
+<span class="sd">        former should be removed in the future) with library-wide</span>
+<span class="sd">        configuration values.</span>
+
+<span class="sd">        This method must be called before proper usage of this library can be</span>
+<span class="sd">        made.</span>
+
+<span class="sd">        Typical usage of this method:</span>
+
+<span class="sd">            odoo.tools.config.parse_config(sys.argv[1:])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">opt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_config</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">netsvc</span><span class="o">.</span><span class="n">init_logger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_warn_deprecated_options</span><span class="p">()</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">initialize_sys_path</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">opt</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_parse_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">opt</span><span class="p">,</span> <span class="n">args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">die</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">cond</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Ensures no illegitimate argument is silently discarded (avoids insidious &quot;hyphen to dash&quot; problem)</span>
+        <span class="n">die</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;unrecognized parameters: &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="p">))</span>
+
+        <span class="n">die</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">syslog</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">logfile</span><span class="p">),</span>
+            <span class="s2">&quot;the syslog and logfile options are exclusive&quot;</span><span class="p">)</span>
+
+        <span class="n">die</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">translate_in</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">opt</span><span class="o">.</span><span class="n">language</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">opt</span><span class="o">.</span><span class="n">db_name</span><span class="p">),</span>
+            <span class="s2">&quot;the i18n-import option cannot be used without the language (-l) and the database (-d) options&quot;</span><span class="p">)</span>
+
+        <span class="n">die</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">overwrite_existing_translations</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">translate_in</span> <span class="ow">or</span> <span class="n">opt</span><span class="o">.</span><span class="n">update</span><span class="p">),</span>
+            <span class="s2">&quot;the i18n-overwrite option cannot be used without the i18n-import option or without the update option&quot;</span><span class="p">)</span>
+
+        <span class="n">die</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">translate_out</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">opt</span><span class="o">.</span><span class="n">db_name</span><span class="p">),</span>
+            <span class="s2">&quot;the i18n-export option cannot be used without the database (-d) option&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check if the config file exists (-c used, but not -s)</span>
+        <span class="n">die</span><span class="p">(</span><span class="ow">not</span> <span class="n">opt</span><span class="o">.</span><span class="n">save</span> <span class="ow">and</span> <span class="n">opt</span><span class="o">.</span><span class="n">config</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">),</span>
+            <span class="s2">&quot;The config file &#39;</span><span class="si">%s</span><span class="s2">&#39; selected with -c/--config doesn&#39;t exist or is not readable, &quot;</span>\
+            <span class="s2">&quot;use -s/--save if you want to generate it&quot;</span><span class="o">%</span> <span class="n">opt</span><span class="o">.</span><span class="n">config</span><span class="p">)</span>
+
+        <span class="c1"># place/search the config file on Win32 near the server installation</span>
+        <span class="c1"># (../etc from the server)</span>
+        <span class="c1"># if the server is run by an unprivileged user, he has to specify location of a config file where he has the rights to write,</span>
+        <span class="c1"># else he won&#39;t be able to save the configurations, or even to start the server...</span>
+        <span class="c1"># TODO use appdirs</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span><span class="p">:</span>
+            <span class="n">rcfilepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])),</span> <span class="s1">&#39;odoo.conf&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rcfilepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;~/.odoorc&#39;</span><span class="p">)</span>
+            <span class="n">old_rcfilepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;~/.openerp_serverrc&#39;</span><span class="p">)</span>
+
+            <span class="n">die</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">rcfilepath</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">old_rcfilepath</span><span class="p">),</span>
+                <span class="s2">&quot;Found &#39;.odoorc&#39; and &#39;.openerp_serverrc&#39; in your path. Please keep only one of &quot;</span>\
+                <span class="s2">&quot;them, preferably &#39;.odoorc&#39;.&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">rcfilepath</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">old_rcfilepath</span><span class="p">):</span>
+                <span class="n">rcfilepath</span> <span class="o">=</span> <span class="n">old_rcfilepath</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">config_file</span> <span class="ow">or</span> <span class="n">opt</span><span class="o">.</span><span class="n">config</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ODOO_RC&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;OPENERP_SERVER&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">rcfilepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+
+        <span class="c1"># Verify that we want to log or not, if not the output will go to stdout</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;logfile&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;None&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;logfile&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># the same for the pidfile</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;None&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;pidfile&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># the same for the test_tags</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;test_tags&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;None&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;test_tags&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># and the server_wide_modules</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;server_wide_modules&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;None&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;server_wide_modules&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;base,web&#39;</span>
+
+        <span class="c1"># if defined do not take the configfile value even if the defined value is None</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;gevent_port&#39;</span><span class="p">,</span> <span class="s1">&#39;http_interface&#39;</span><span class="p">,</span> <span class="s1">&#39;http_port&#39;</span><span class="p">,</span> <span class="s1">&#39;longpolling_port&#39;</span><span class="p">,</span> <span class="s1">&#39;http_enable&#39;</span><span class="p">,</span> <span class="s1">&#39;x_sendfile&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;db_name&#39;</span><span class="p">,</span> <span class="s1">&#39;db_user&#39;</span><span class="p">,</span> <span class="s1">&#39;db_password&#39;</span><span class="p">,</span> <span class="s1">&#39;db_host&#39;</span><span class="p">,</span> <span class="s1">&#39;db_sslmode&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;db_port&#39;</span><span class="p">,</span> <span class="s1">&#39;db_template&#39;</span><span class="p">,</span> <span class="s1">&#39;logfile&#39;</span><span class="p">,</span> <span class="s1">&#39;pidfile&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_port&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email_from&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_server&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_user&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_password&#39;</span><span class="p">,</span> <span class="s1">&#39;from_filter&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;smtp_ssl_certificate_filename&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_ssl_private_key_filename&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;db_maxconn&#39;</span><span class="p">,</span> <span class="s1">&#39;db_maxconn_gevent&#39;</span><span class="p">,</span> <span class="s1">&#39;import_partial&#39;</span><span class="p">,</span> <span class="s1">&#39;addons_path&#39;</span><span class="p">,</span> <span class="s1">&#39;upgrade_path&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;syslog&#39;</span><span class="p">,</span> <span class="s1">&#39;without_demo&#39;</span><span class="p">,</span> <span class="s1">&#39;screencasts&#39;</span><span class="p">,</span> <span class="s1">&#39;screenshots&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;dbfilter&#39;</span><span class="p">,</span> <span class="s1">&#39;log_level&#39;</span><span class="p">,</span> <span class="s1">&#39;log_db&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;log_db_level&#39;</span><span class="p">,</span> <span class="s1">&#39;geoip_city_db&#39;</span><span class="p">,</span> <span class="s1">&#39;geoip_country_db&#39;</span><span class="p">,</span> <span class="s1">&#39;dev_mode&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;shell_interface&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="c1"># Copy the command-line argument (except the special case for log_handler, due to</span>
+            <span class="c1"># action=append requiring a real default, so we cannot use the my_default workaround)</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span>
+            <span class="c1"># ... or keep, but cast, the config file value.</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">](</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">],</span> <span class="n">arg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;log_handler&#39;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;log_handler&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;log_handler&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;log_handler&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">log_handler</span><span class="p">)</span>
+
+        <span class="c1"># if defined but None take the configfile value</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;language&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_out&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_in&#39;</span><span class="p">,</span> <span class="s1">&#39;overwrite_existing_translations&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;dev_mode&#39;</span><span class="p">,</span> <span class="s1">&#39;shell_interface&#39;</span><span class="p">,</span> <span class="s1">&#39;smtp_ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;load_language&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;stop_after_init&#39;</span><span class="p">,</span> <span class="s1">&#39;without_demo&#39;</span><span class="p">,</span> <span class="s1">&#39;http_enable&#39;</span><span class="p">,</span> <span class="s1">&#39;syslog&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;list_db&#39;</span><span class="p">,</span> <span class="s1">&#39;proxy_mode&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;test_file&#39;</span><span class="p">,</span> <span class="s1">&#39;test_tags&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;osv_memory_count_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;transient_age_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;max_cron_threads&#39;</span><span class="p">,</span> <span class="s1">&#39;unaccent&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;data_dir&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;server_wide_modules&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="n">posix_keys</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;workers&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;limit_memory_hard&#39;</span><span class="p">,</span> <span class="s1">&#39;limit_memory_soft&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;limit_time_cpu&#39;</span><span class="p">,</span> <span class="s1">&#39;limit_time_real&#39;</span><span class="p">,</span> <span class="s1">&#39;limit_request&#39;</span><span class="p">,</span> <span class="s1">&#39;limit_time_real_cron&#39;</span>
+        <span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+            <span class="n">keys</span> <span class="o">+=</span> <span class="n">posix_keys</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">posix_keys</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+
+        <span class="c1"># Copy the command-line arguments...</span>
+        <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span>
+            <span class="c1"># ... or keep, but cast, the config file value.</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">](</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">arg</span><span class="p">],</span> <span class="n">arg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">arg</span><span class="p">])</span>
+
+        <span class="n">ismultidb</span> <span class="o">=</span> <span class="s1">&#39;,&#39;</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;db_name&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">die</span><span class="p">(</span><span class="n">ismultidb</span> <span class="ow">and</span> <span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">init</span> <span class="ow">or</span> <span class="n">opt</span><span class="o">.</span><span class="n">update</span><span class="p">),</span> <span class="s2">&quot;Cannot use -i/--init or -u/--update with multiple databases in the -d/--database/db_name&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;root_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;..&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;None&#39;</span><span class="p">:</span>
+            <span class="n">default_addons</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">base_addons</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;root_path&#39;</span><span class="p">],</span> <span class="s1">&#39;addons&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">base_addons</span><span class="p">):</span>
+                <span class="n">default_addons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base_addons</span><span class="p">)</span>
+            <span class="n">main_addons</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;root_path&#39;</span><span class="p">],</span> <span class="s1">&#39;../addons&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">main_addons</span><span class="p">):</span>
+                <span class="n">default_addons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">main_addons</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">default_addons</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;upgrade_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;upgrade_path&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;upgrade_path&#39;</span><span class="p">]</span>
+            <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">init</span> <span class="ow">and</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;demo&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;init&#39;</span><span class="p">])</span>
+                                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;without_demo&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">update</span> <span class="ow">and</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">update</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;translate_modules&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">translate_modules</span> <span class="ow">and</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">opt</span><span class="o">.</span><span class="n">translate_modules</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span> <span class="ow">or</span> <span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;translate_modules&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+        <span class="n">dev_split</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">opt</span><span class="o">.</span><span class="n">dev_mode</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span> <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">dev_mode</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;dev_mode&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dev_split</span> <span class="o">+</span> <span class="p">([</span><span class="s1">&#39;reload&#39;</span><span class="p">,</span> <span class="s1">&#39;qweb&#39;</span><span class="p">,</span> <span class="s1">&#39;xml&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="s1">&#39;all&#39;</span> <span class="ow">in</span> <span class="n">dev_split</span> <span class="k">else</span> <span class="p">[])</span>
+
+        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">pg_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;pg_path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">pg_path</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;test_enable&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;test_tags&#39;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">save</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="c1"># normalize path options</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">,</span> <span class="s1">&#39;logfile&#39;</span><span class="p">,</span> <span class="s1">&#39;pidfile&#39;</span><span class="p">,</span> <span class="s1">&#39;test_file&#39;</span><span class="p">,</span> <span class="s1">&#39;screencasts&#39;</span><span class="p">,</span> <span class="s1">&#39;screenshots&#39;</span><span class="p">,</span> <span class="s1">&#39;pg_path&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_out&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_in&#39;</span><span class="p">,</span> <span class="s1">&#39;geoip_city_db&#39;</span><span class="p">,</span> <span class="s1">&#39;geoip_country_db&#39;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="n">conf</span><span class="o">.</span><span class="n">addons_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;addons_path&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+
+        <span class="n">conf</span><span class="o">.</span><span class="n">server_wide_modules</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;server_wide_modules&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">opt</span>
+
+    <span class="k">def</span> <span class="nf">_warn_deprecated_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">longpolling_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;longpolling_port&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">longpolling_port</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;The longpolling-port is a deprecated alias to &quot;</span>
+                <span class="s2">&quot;the gevent-port option, please use the latter.&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;gevent_port&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">longpolling_port</span>
+
+        <span class="k">for</span> <span class="n">old_option_name</span><span class="p">,</span> <span class="n">new_option_name</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;geoip_database&#39;</span><span class="p">,</span> <span class="s1">&#39;geoip_city_db&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;osv_memory_age_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;transient_age_limit&#39;</span><span class="p">)</span>
+        <span class="p">]:</span>
+            <span class="n">deprecated_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">old_option_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">deprecated_value</span><span class="p">:</span>
+                <span class="n">default_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">new_option_name</span><span class="p">]</span><span class="o">.</span><span class="n">my_default</span>
+                <span class="n">current_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">new_option_name</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">deprecated_value</span> <span class="ow">in</span> <span class="p">(</span><span class="n">current_value</span><span class="p">,</span> <span class="n">default_value</span><span class="p">):</span>
+                    <span class="c1"># Surely this is from a --save that was run in a</span>
+                    <span class="c1"># prior version. There is no point in emitting a</span>
+                    <span class="c1"># warning because: (1) it holds the same value as</span>
+                    <span class="c1"># the correct option, and (2) it is going to be</span>
+                    <span class="c1"># automatically removed on the next --save anyway.</span>
+                    <span class="k">pass</span>
+                <span class="k">elif</span> <span class="n">current_value</span> <span class="o">==</span> <span class="n">default_value</span><span class="p">:</span>
+                    <span class="c1"># deprecated_value != current_value == default_value</span>
+                    <span class="c1"># assume the new option was not set</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">new_option_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">deprecated_value</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">old_option_name</span><span class="si">!r}</span><span class="s2"> option found in the &quot;</span>
+                        <span class="s2">&quot;configuration file is a deprecated alias to &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">new_option_name</span><span class="si">!r}</span><span class="s2">, please use the latter.&quot;</span><span class="p">,</span>
+                        <span class="ne">DeprecationWarning</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># deprecated_value != current_value != default_value</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;The two options </span><span class="si">{</span><span class="n">old_option_name</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+                        <span class="s2">&quot;(found in the configuration file but &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;deprecated) and </span><span class="si">{</span><span class="n">new_option_name</span><span class="si">!r}</span><span class="s2"> are set &quot;</span>
+                        <span class="s2">&quot;to different values. Please remove the first &quot;</span>
+                        <span class="s2">&quot;one and make sure the second is correct.&quot;</span>
+                    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_is_addons_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">odoo.modules.module</span> <span class="kn">import</span> <span class="n">MANIFEST_NAMES</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">modpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">modpath</span><span class="p">):</span>
+                <span class="k">def</span> <span class="nf">hasfile</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">modpath</span><span class="p">,</span> <span class="n">filename</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">hasfile</span><span class="p">(</span><span class="s1">&#39;__init__.py&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">hasfile</span><span class="p">(</span><span class="n">mname</span><span class="p">)</span> <span class="k">for</span> <span class="n">mname</span> <span class="ow">in</span> <span class="n">MANIFEST_NAMES</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_check_addons_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">parser</span><span class="p">):</span>
+        <span class="n">ad_paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">res</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionValueError</span><span class="p">(</span><span class="s2">&quot;option </span><span class="si">%s</span><span class="s2">: no such directory: </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">res</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_addons_path</span><span class="p">(</span><span class="n">res</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionValueError</span><span class="p">(</span><span class="s2">&quot;option </span><span class="si">%s</span><span class="s2">: the path </span><span class="si">%r</span><span class="s2"> is not a valid addons directory&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+            <span class="n">ad_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ad_paths</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_check_upgrade_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">parser</span><span class="p">):</span>
+        <span class="n">upgrade_path</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">res</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionValueError</span><span class="p">(</span><span class="s2">&quot;option </span><span class="si">%s</span><span class="s2">: no such directory: </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_upgrades_path</span><span class="p">(</span><span class="n">res</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionValueError</span><span class="p">(</span><span class="s2">&quot;option </span><span class="si">%s</span><span class="s2">: the path </span><span class="si">%r</span><span class="s2"> is not a valid upgrade directory&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">res</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">upgrade_path</span><span class="p">:</span>
+                <span class="n">upgrade_path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">upgrade_path</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_is_upgrades_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">res</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;*/*/</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">-*.py&quot;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;pre&quot;</span><span class="p">,</span> <span class="s2">&quot;post&quot;</span><span class="p">,</span> <span class="s2">&quot;end&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_test_enable_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">parser</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">parser</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">test_tags</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">test_tags</span> <span class="o">=</span> <span class="s2">&quot;+standard&quot;</span>
+
+<div class="viewcode-block" id="configmanager.load">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.load">[docs]</a>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">outdated_options_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;xmlrpc_port&#39;</span><span class="p">:</span> <span class="s1">&#39;http_port&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;xmlrpc_interface&#39;</span><span class="p">:</span> <span class="s1">&#39;http_interface&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;xmlrpc&#39;</span><span class="p">:</span> <span class="s1">&#39;http_enable&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="o">.</span><span class="n">RawConfigParser</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">])</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span><span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">items</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">):</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">outdated_options_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;True&#39;</span> <span class="ow">or</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;true&#39;</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">if</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;False&#39;</span> <span class="ow">or</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;false&#39;</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="c1">#parse the other sections, as well</span>
+            <span class="k">for</span> <span class="n">sec</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">sections</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">sec</span> <span class="o">==</span> <span class="s1">&#39;options&#39;</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">sec</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">items</span><span class="p">(</span><span class="n">sec</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;True&#39;</span> <span class="ow">or</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;true&#39;</span><span class="p">:</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">if</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;False&#39;</span> <span class="ow">or</span> <span class="n">value</span><span class="o">==</span><span class="s1">&#39;false&#39;</span><span class="p">:</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">except</span> <span class="n">ConfigParser</span><span class="o">.</span><span class="n">NoSectionError</span><span class="p">:</span>
+            <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="configmanager.save">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.save">[docs]</a>
+    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="o">.</span><span class="n">RawConfigParser</span><span class="p">()</span>
+        <span class="n">loglevelnames</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_LOGLEVELS</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_LOGLEVELS</span><span class="p">))</span>
+        <span class="n">rc_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rc_exists</span> <span class="ow">and</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">has_section</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">):</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">add_section</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">keys</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">opt</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">opt</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;version&#39;</span><span class="p">,</span> <span class="s1">&#39;language&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_out&#39;</span><span class="p">,</span> <span class="s1">&#39;translate_in&#39;</span><span class="p">,</span> <span class="s1">&#39;overwrite_existing_translations&#39;</span><span class="p">,</span> <span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">opt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">blacklist_for_save</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">opt</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;log_level&#39;</span><span class="p">,):</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">loglevelnames</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">opt</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">opt</span><span class="p">]))</span>
+            <span class="k">elif</span> <span class="n">opt</span> <span class="o">==</span> <span class="s1">&#39;log_handler&#39;</span><span class="p">:</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_deduplicate_loggers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">opt</span><span class="p">])))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">opt</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="p">):</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">add_section</span><span class="p">(</span><span class="n">sec</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="p">[</span><span class="n">sec</span><span class="p">]):</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">sec</span><span class="p">,</span><span class="n">opt</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">opt</span><span class="p">])</span>
+
+        <span class="c1"># try to create the directories and write the file</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rc_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">)):</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">))</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">))</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">rc_exists</span><span class="p">:</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">chmod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfile</span><span class="p">,</span> <span class="mo">0o600</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;ERROR: couldn&#39;t write the config file</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="c1"># what to do if impossible?</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;ERROR: couldn&#39;t create the config directory</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="configmanager.get">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.get">[docs]</a>
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="configmanager.pop">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.pop">[docs]</a>
+    <span class="k">def</span> <span class="nf">pop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="configmanager.get_misc">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.get_misc">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_misc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sect</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sect</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> \
+                <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">casts</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">Option</span><span class="o">.</span><span class="n">TYPE_CHECKER</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">](</span><span class="bp">self</span><span class="o">.</span><span class="n">casts</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">addons_data_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">add_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">],</span> <span class="s1">&#39;addons&#39;</span><span class="p">)</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">add_dir</span><span class="p">,</span> <span class="n">release</span><span class="o">.</span><span class="n">series</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># bootstrap parent dir +rwx</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">add_dir</span><span class="p">):</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">add_dir</span><span class="p">,</span> <span class="mo">0o700</span><span class="p">)</span>
+                <span class="c1"># try to make +rx placeholder dir, will need manual +w to activate it</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="mo">0o500</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Failed to create addons data dir </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">d</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">session_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">],</span> <span class="s1">&#39;sessions&#39;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="mo">0o700</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">e</span><span class="o">.</span><span class="n">errno</span> <span class="o">!=</span> <span class="n">errno</span><span class="o">.</span><span class="n">EEXIST</span><span class="p">:</span>
+                <span class="k">raise</span>
+            <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">W_OK</span><span class="p">),</span> \
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: directory is not writable&quot;</span> <span class="o">%</span> <span class="n">d</span>
+        <span class="k">return</span> <span class="n">d</span>
+
+<div class="viewcode-block" id="configmanager.filestore">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.filestore">[docs]</a>
+    <span class="k">def</span> <span class="nf">filestore</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dbname</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">],</span> <span class="s1">&#39;filestore&#39;</span><span class="p">,</span> <span class="n">dbname</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="configmanager.set_admin_password">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.set_admin_password">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_admin_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_password</span><span class="p">):</span>
+        <span class="n">hash_password</span> <span class="o">=</span> <span class="n">crypt_context</span><span class="o">.</span><span class="n">hash</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">crypt_context</span><span class="p">,</span> <span class="s1">&#39;hash&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">crypt_context</span><span class="o">.</span><span class="n">encrypt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;admin_passwd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hash_password</span><span class="p">(</span><span class="n">new_password</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="configmanager.verify_admin_password">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.config.configmanager.verify_admin_password">[docs]</a>
+    <span class="k">def</span> <span class="nf">verify_admin_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Verifies the super-admin password, possibly updating the stored hash if needed&quot;&quot;&quot;</span>
+        <span class="n">stored_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;admin_passwd&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">stored_hash</span><span class="p">:</span>
+            <span class="c1"># empty password/hash =&gt; authentication forbidden</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">result</span><span class="p">,</span> <span class="n">updated_hash</span> <span class="o">=</span> <span class="n">crypt_context</span><span class="o">.</span><span class="n">verify_and_update</span><span class="p">(</span><span class="n">password</span><span class="p">,</span> <span class="n">stored_hash</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">updated_hash</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s1">&#39;admin_passwd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">updated_hash</span>
+            <span class="k">return</span> <span class="kc">True</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">normcase</span><span class="p">(</span><span class="n">realpath</span><span class="p">(</span><span class="n">abspath</span><span class="p">(</span><span class="n">expanduser</span><span class="p">(</span><span class="n">expandvars</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">strip</span><span class="p">())))))</span></div>
+
+
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">configmanager</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

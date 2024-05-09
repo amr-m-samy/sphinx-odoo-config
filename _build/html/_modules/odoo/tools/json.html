@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.json &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.json</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.json</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="kn">import</span> <span class="nn">json</span> <span class="k">as</span> <span class="nn">json_</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">markupsafe</span>
+
+<span class="n">JSON_SCRIPTSAFE_MAPPER</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;&amp;&#39;</span><span class="p">:</span> <span class="sa">r</span><span class="s1">&#39;\u0026&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;&lt;&#39;</span><span class="p">:</span> <span class="sa">r</span><span class="s1">&#39;\u003c&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;&gt;&#39;</span><span class="p">:</span> <span class="sa">r</span><span class="s1">&#39;\u003e&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;</span><span class="se">\u2028</span><span class="s1">&#39;</span><span class="p">:</span> <span class="sa">r</span><span class="s1">&#39;\u2028&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;</span><span class="se">\u2029</span><span class="s1">&#39;</span><span class="p">:</span> <span class="sa">r</span><span class="s1">&#39;\u2029&#39;</span>
+<span class="p">}</span>
+<span class="k">class</span> <span class="nc">_ScriptSafe</span><span class="p">(</span><span class="nb">str</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__html__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># replacement can be done straight in the serialised JSON as the</span>
+        <span class="c1"># problematic characters are not JSON metacharacters (and can thus</span>
+        <span class="c1"># only occur in strings)</span>
+        <span class="k">return</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span>
+            <span class="sa">r</span><span class="s1">&#39;[&lt;&gt;&amp;\u2028\u2029]&#39;</span><span class="p">,</span>
+            <span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">JSON_SCRIPTSAFE_MAPPER</span><span class="p">[</span><span class="n">m</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+            <span class="bp">self</span><span class="p">,</span>
+        <span class="p">))</span>
+<div class="viewcode-block" id="JSON">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.json.JSON">[docs]</a>
+<span class="k">class</span> <span class="nc">JSON</span><span class="p">:</span>
+<div class="viewcode-block" id="JSON.loads">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.json.JSON.loads">[docs]</a>
+    <span class="k">def</span> <span class="nf">loads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">json_</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="JSON.dumps">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.json.JSON.dumps">[docs]</a>
+    <span class="k">def</span> <span class="nf">dumps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; JSON used as JS in HTML (script tags) is problematic: &lt;script&gt;</span>
+<span class="sd">        tags are a special context which only waits for &lt;/script&gt; but doesn&#39;t</span>
+<span class="sd">        interpret anything else, this means standard htmlescaping does not</span>
+<span class="sd">        work (it breaks double quotes, and e.g. `&lt;` will become `&amp;lt;` *in</span>
+<span class="sd">        the resulting JSON/JS* not just inside the page).</span>
+
+<span class="sd">        However, failing to escape embedded json means the json strings could</span>
+<span class="sd">        contains `&lt;/script&gt;` and thus become XSS vector.</span>
+
+<span class="sd">        The solution turns out to be very simple: use JSON-level unicode</span>
+<span class="sd">        escapes for HTML-unsafe characters (e.g. &quot;&lt;&quot; -&gt; &quot;\u003C&quot;. This removes</span>
+<span class="sd">        the XSS issue without breaking the json, and there is no difference to</span>
+<span class="sd">        the end result once it&#39;s been parsed back from JSON. So it will work</span>
+<span class="sd">        properly even for HTML attributes or raw text.</span>
+
+<span class="sd">        Also handle U+2028 and U+2029 the same way just in case as these are</span>
+<span class="sd">        interpreted as newlines in javascript but not in JSON, which could</span>
+<span class="sd">        lead to oddities and issues.</span>
+
+<span class="sd">        .. warning::</span>
+
+<span class="sd">            except inside &lt;script&gt; elements, this should be escaped following</span>
+<span class="sd">            the normal rules of the containing format</span>
+
+<span class="sd">        Cf https://code.djangoproject.com/ticket/17419#comment:27</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">_ScriptSafe</span><span class="p">(</span><span class="n">json_</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span></div>
+</div>
+
+<span class="n">scriptsafe</span> <span class="o">=</span> <span class="n">JSON</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

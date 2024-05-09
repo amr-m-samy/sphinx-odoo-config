@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.test_performance.tests.test_performance &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.addons.test_performance.tests.test_performance</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.test_performance.tests.test_performance</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">odoo.addons.base.tests.common</span> <span class="kn">import</span> <span class="n">SavepointCaseWithUserDemo</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">users</span><span class="p">,</span> <span class="n">warmup</span><span class="p">,</span> <span class="n">tagged</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span><span class="p">,</span> <span class="n">sql</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">Command</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TestPerformance">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance">[docs]</a>
+<span class="k">class</span> <span class="nc">TestPerformance</span><span class="p">(</span><span class="n">SavepointCaseWithUserDemo</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestPerformance.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TestPerformance</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_load_partners_set</span><span class="p">()</span>
+
+        <span class="n">partner3</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;AnalytIQ&#39;</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">partner4</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;Urban Trends&#39;</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">partner10</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;Ctrl-Alt-Fix&#39;</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">partner12</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;Ignitive Labs&#39;</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Object 0&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner3</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">},</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Object 1&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner3</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">},</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Object 2&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner4</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">},</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Object 3&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner10</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">},</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Object 4&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="n">partner12</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">}])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_read_base">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_read_base">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_read_base</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Read records. &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="c1"># without cache</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># with cache</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">country_id</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># value_pc must have been prefetched, too</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">value_pc</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_read_base_one2many">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_read_base_one2many">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_read_base_one2many</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="c1"># add one line on each record</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({})]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">line_ids</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_reversed_read_base">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_reversed_read_base">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_reversed_read_base</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># without cache</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">records</span><span class="p">):</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># without cache</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">records</span><span class="p">):</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">value_ctx</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_read_base_depends_context">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_read_base_depends_context">[docs]</a>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_read_base_depends_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Compute in batch even when in cache in another context. &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">value_ctx</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">value_ctx</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">value_ctx</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_fetch">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_fetch">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Fetch only when necessary. &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># not in cache yet</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;partner_id&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># already in cache</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;partner_id&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># this one shouldn&#39;t have been fetched</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># &#39;name&#39; and &#39;value&#39; are already in cache</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># &#39;id&#39; should not be fetched</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;partner_id&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># &#39;display_name&#39; depends on name that should already be fetched</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;display_name&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># touch the field display_name, they are now in cache</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;display_name&#39;</span><span class="p">)</span>
+
+            <span class="c1"># remove the dependencies of display_name (only name)</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">([</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+
+            <span class="c1"># &#39;display_name&#39; is in cache, so we should not load its dependencies</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;display_name&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># &#39;indirect_computed_value&#39; depends &#39;computed_value&#39;, which depends</span>
+            <span class="c1">#  on &#39;value&#39;, and the latter is in cache</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;indirect_computed_value&#39;</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">([</span><span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="s1">&#39;computed_value&#39;</span><span class="p">,</span> <span class="s1">&#39;indirect_computed_value&#39;</span><span class="p">])</span>
+
+            <span class="c1"># &#39;indirect_computed_value&#39; depends &#39;computed_value&#39;, which depends</span>
+            <span class="c1">#  on &#39;value&#39;, and none of them are in cache</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;indirect_computed_value&#39;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_search_fetch">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_search_fetch">[docs]</a>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_search_fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Search and fetch all at once. &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">search</span><span class="p">([]):</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="c1"># search() can do everything in a single query!</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">search_fetch</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">]):</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="c1"># the case where you don&#39;t fetch the right field</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">search_fetch</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;value_pc&#39;</span><span class="p">]):</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">partner_id</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_search_read">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_search_read">[docs]</a>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_search_read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Search and fetch all at once. &quot;&quot;&quot;</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="c1"># one query for search and read, one query for display_name</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value_pc&#39;</span><span class="p">])</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">Model</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value_pc&#39;</span><span class="p">]),</span>
+                <span class="n">expected</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="c1"># one query for search and read</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">read</span><span class="p">([</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value_pc&#39;</span><span class="p">],</span> <span class="n">load</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">Model</span><span class="o">.</span><span class="n">search_read</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value_pc&#39;</span><span class="p">],</span> <span class="n">load</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                <span class="n">expected</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_name_search">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_name_search">[docs]</a>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_name_search</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that `name` is fetch in the same query than the search</span>
+<span class="sd">        to compute `display_name` without any additional query &quot;&quot;&quot;</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;blablu&#39;</span><span class="p">})</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">Model</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="s1">&#39;blablu&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_write_base">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_write_base">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_write_base</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Write records (no recomputation). &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_write_base_with_recomputation">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_write_base_with_recomputation">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_write_base_with_recomputation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Write records (with recomputation). &quot;&quot;&quot;</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">42</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_write_base_one2many">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_write_base_one2many">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_write_base_one2many</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Write on one2many field. &quot;&quot;&quot;</span>
+        <span class="n">rec1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span>
+
+        <span class="c1"># create N lines on rec1: O(N) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">12</span><span class="p">)</span>
+
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span>
+
+        <span class="c1"># update N lines: O(N) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">42</span><span class="p">})</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">25</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">42</span> <span class="o">+</span> <span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">})</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="c1"># delete N lines: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">11</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">lines</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">)]})</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span>
+
+        <span class="c1"># unlink N lines: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">11</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">lines</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">)]})</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span>
+        <span class="n">rec2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span>
+
+        <span class="c1"># link N lines from rec1 to rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="c1"># empty N lines in rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">clear</span><span class="p">()]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">clear</span><span class="p">()]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+
+        <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">)]})</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span>
+
+        <span class="c1"># set N lines in rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">6</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">lines</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">line_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">lines</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">line_ids</span><span class="p">,</span> <span class="n">lines</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_write_base_one2many_with_constraint">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_write_base_one2many_with_constraint">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_write_base_one2many_with_constraint</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Write on one2many field with lines being deleted and created. &quot;&quot;&quot;</span>
+        <span class="n">rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Y&#39;</span><span class="p">})</span>
+        <span class="n">rec</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">)]})</span>
+
+        <span class="c1"># This write() will raise because of the unique index if the unlink() is</span>
+        <span class="c1"># not performed before the create()</span>
+        <span class="n">rec</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">clear</span><span class="p">()]</span> <span class="o">+</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">6</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">line_ids</span><span class="p">),</span> <span class="mi">6</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_write_base_many2many">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_write_base_many2many">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.models.unlink&#39;</span><span class="p">)</span>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_write_base_many2many</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Write on many2many field. &quot;&quot;&quot;</span>
+        <span class="n">rec1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span>
+
+        <span class="c1"># create N tags on rec1: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">),</span> <span class="mi">12</span><span class="p">)</span>
+
+        <span class="n">tags</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span>
+
+        <span class="c1"># update N tags: O(N) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="c1"># delete N tags: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">8</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">8</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">)]})</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span>
+
+        <span class="c1"># unlink N tags: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec1</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec1</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="n">rec2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span>
+
+        <span class="c1"># link N tags from rec1 to rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="c1"># empty N tags in rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">clear</span><span class="p">()]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">clear</span><span class="p">()]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">)</span>
+
+        <span class="c1"># set N tags in rec2: O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="p">[:</span><span class="mi">8</span><span class="p">]</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">[:</span><span class="mi">8</span><span class="p">])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="mi">4</span><span class="p">:])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">rec2</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">ids</span><span class="p">)]})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">rec2</span><span class="o">.</span><span class="n">tag_ids</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_create_base">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_create_base">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_create_base</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create records. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_create_base_with_lines">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_create_base_with_lines">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_create_base_with_lines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create records with one2many lines. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)],</span>
+            <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_create_base_with_tags">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_create_base_with_tags">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_create_base_with_tags</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create records with many2many tags. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">})</span>
+
+        <span class="c1"># create N tags: add O(1) queries</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">})</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)],</span>
+            <span class="p">})</span>
+
+        <span class="c1"># link N tags: add O(1) queries</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.tag&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">val</span><span class="p">}</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)])</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">tag</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">],</span>
+            <span class="p">})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([])],</span>
+            <span class="p">})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;tag_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">tags</span><span class="o">.</span><span class="n">ids</span><span class="p">)],</span>
+            <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_several_prefetch">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_several_prefetch">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="nd">@warmup</span>
+    <span class="k">def</span> <span class="nf">test_several_prefetch</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">initial_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">initial_records</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s1">&#39;insert into test_performance_base(value) select value from test_performance_base&#39;</span>
+            <span class="p">)</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span> <span class="mi">1280</span><span class="p">)</span>
+
+        <span class="c1"># should only cause 2 queries thanks to prefetching</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">([</span><span class="s1">&#39;value&#39;</span><span class="p">])</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">invalidate_model</span><span class="p">([</span><span class="s1">&#39;value&#39;</span><span class="p">])</span>
+            <span class="n">new_recs</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">records</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">origin</span><span class="o">=</span><span class="n">record</span><span class="p">)</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+            <span class="n">new_recs</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+
+        <span class="c1"># clean up after each pass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s1">&#39;delete from test_performance_base where id not in </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">initial_records</span><span class="o">.</span><span class="n">ids</span><span class="p">),)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_prefetch_compute">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_prefetch_compute">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_prefetch_compute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">i</span><span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="c1"># prepare an update, and mark a field to compute</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueries</span><span class="p">([],</span> <span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">records</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">42</span>
+
+        <span class="c1"># fetching &#39;name&#39; prefetches all fields on all records</span>
+        <span class="n">queries</span> <span class="o">=</span> <span class="p">[</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39; SELECT &quot;test_performance_base&quot;.&quot;id&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;name&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;value&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;value_pc&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;partner_id&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;total&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;create_uid&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;create_date&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;write_uid&quot;,</span>
+<span class="sd">                       &quot;test_performance_base&quot;.&quot;write_date&quot;</span>
+<span class="sd">                FROM &quot;test_performance_base&quot;</span>
+<span class="sd">                WHERE (&quot;test_performance_base&quot;.&quot;id&quot; IN %s)</span>
+<span class="sd">            &#39;&#39;&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueries</span><span class="p">(</span><span class="n">queries</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">result_name</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueries</span><span class="p">([],</span> <span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">result_value</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueries</span><span class="p">([],</span> <span class="n">flush</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">result_value_pc</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">value_pc</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">]</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">result_name</span><span class="p">,</span> <span class="n">result_value</span><span class="p">,</span> <span class="n">result_value_pc</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="p">[(</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;2&#39;</span><span class="p">,</span> <span class="mi">42</span><span class="p">,</span> <span class="mf">0.42</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;3&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">)])</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.expected_read_group">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.expected_read_group">[docs]</a>
+    <span class="k">def</span> <span class="nf">expected_read_group</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">all_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">all_records</span><span class="p">:</span>
+            <span class="n">groups</span><span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">all_records</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;partner_id&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">ids</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="p">[{</span>
+            <span class="s1">&#39;__domain&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">)],</span>
+            <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="p">(</span><span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">partner</span><span class="o">.</span><span class="n">display_name</span><span class="p">),</span>
+            <span class="s1">&#39;partner_id_count&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">groups</span><span class="p">[</span><span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">]),</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">groups</span><span class="p">[</span><span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">]),</span>
+        <span class="p">}</span> <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">partners</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="TestPerformance.test_read_group_with_display_name">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestPerformance.test_read_group_with_display_name">[docs]</a>
+    <span class="nd">@users</span><span class="p">(</span><span class="s1">&#39;__system__&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_read_group_with_display_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_read_group</span><span class="p">()</span>
+        <span class="c1"># use read_group and check the expected result</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="n">__system__</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">demo</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">read_group</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span>
+
+        <span class="c1"># Modify the data so that each record has the same partner,</span>
+        <span class="c1"># and test that the _compute_display_name is called once with the correct recordset.</span>
+        <span class="n">all_records</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="n">all_records</span><span class="o">.</span><span class="n">partner_id</span> <span class="o">=</span> <span class="n">all_records</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">partner_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="n">old_compute_display_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_compute_display_name</span>
+
+        <span class="k">with</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">],</span> <span class="s1">&#39;_compute_display_name&#39;</span><span class="p">,</span> <span class="n">side_effect</span><span class="o">=</span><span class="n">old_compute_display_name</span><span class="p">,</span> <span class="n">autospec</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">compute_display_name_spy</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">read_group</span><span class="p">([],</span> <span class="p">[</span><span class="s1">&#39;__count&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;partner_id&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">],</span> <span class="n">lazy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">compute_display_name_spy</span><span class="o">.</span><span class="n">assert_called_once</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">compute_display_name_spy</span><span class="o">.</span><span class="n">call_args</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">all_records</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestIrPropertyOptimizations">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIrPropertyOptimizations">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;bacon_and_eggs&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestIrPropertyOptimizations</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestIrPropertyOptimizations.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIrPropertyOptimizations.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.bacon&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Eggs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.eggs&#39;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="TestIrPropertyOptimizations.test_with_falsy_default">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIrPropertyOptimizations.test_with_falsy_default">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_with_falsy_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">,</span> <span class="s1">&#39;test_performance.bacon&#39;</span><span class="p">))</span>
+
+        <span class="c1"># warmup</span>
+        <span class="n">eggs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Eggs</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+
+        <span class="c1"># create with default value</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_property_eggs</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+
+        <span class="c1"># create with another value</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_property_eggs</span><span class="o">=</span><span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="TestIrPropertyOptimizations.test_with_truthy_default">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIrPropertyOptimizations.test_with_truthy_default">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_with_truthy_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">eggs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Eggs</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;property_eggs&quot;</span><span class="p">,</span> <span class="s2">&quot;test_performance.bacon&quot;</span><span class="p">,</span> <span class="n">eggs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">eggs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.property&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">,</span> <span class="s1">&#39;test_performance.bacon&#39;</span><span class="p">))</span>
+
+        <span class="c1"># warmup</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="c1"># create with default value</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_property_eggs</span><span class="o">=</span><span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+
+        <span class="c1"># create with another value</span>
+        <span class="n">eggs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Eggs</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_property_eggs</span><span class="o">=</span><span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="n">eggs</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">default_property_eggs</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({})</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Bacon</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;property_eggs&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestMapped">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestMapped">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mapped_perf&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestMapped</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestMapped.test_relational_mapped">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestMapped.test_relational_mapped">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_relational_mapped</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># create 1000 records with one line each</span>
+        <span class="n">recs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;foo</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="s1">&#39;line_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">index</span><span class="p">})]}</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+        <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="c1"># expected same performance as recs.line_ids.mapped(&#39;value&#39;)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">recs</span><span class="p">:</span>
+                <span class="n">rec</span><span class="o">.</span><span class="n">line_ids</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestIncrementFieldsSkipLock">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIncrementFieldsSkipLock">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;increment_perf&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestIncrementFieldsSkipLock</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test the behavior of the function `increment_fields_skiplock`.</span>
+
+<span class="sd">    Note that, per-design, the function will not always update the requested</span>
+<span class="sd">    records in case of a (table/row-level) lock. This is reflected in these</span>
+<span class="sd">    tests as we make sure to check the integrity of the results whether</span>
+<span class="sd">    any record was updated or not.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TestIncrementFieldsSkipLock.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIncrementFieldsSkipLock.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">record</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.mozzarella&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s1">&#39;value_plus_one&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="p">}])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">other_record</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;test_performance.mozzarella&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([{</span>
+            <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="s1">&#39;value_plus_one&#39;</span><span class="p">:</span> <span class="mi">11</span><span class="p">,</span>
+        <span class="p">}])</span></div>
+
+
+<div class="viewcode-block" id="TestIncrementFieldsSkipLock.test_increment_fields_skiplock_one_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIncrementFieldsSkipLock.test_increment_fields_skiplock_one_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_increment_fields_skiplock_one_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that we can increment the value of a single field of a record</span>
+<span class="sd">        with `increment_fields_skiplock` and that it doesn&#39;t trigger _compute</span>
+<span class="sd">        methods of fields depending on it.</span>
+
+<span class="sd">        If the test fails because of changes making that _compute **are**</span>
+<span class="sd">        triggered, be sure to also check `increment_fields_skiplock` uses on the</span>
+<span class="sd">        codebase when updating this test class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">did_update</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">increment_fields_skiplock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;increment_fields_skiplock did </span><span class="si">%s</span><span class="s1">update the field&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">did_update</span> <span class="k">else</span> <span class="s1">&#39;not &#39;</span><span class="p">)</span>
+
+        <span class="c1"># increment_fields_skiplock does not invalidate the cache</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>  <span class="c1"># Read</span>
+            <span class="k">if</span> <span class="n">did_update</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock&#39;s output, this number should have been incremented.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Making sure the test random locks do not break the test; but updated and the values must be consistent</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock output&#39;s, this number should NOT have been incremented.&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value_plus_one</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;This value should not have been incremented, irrespective of the presence of a lock or not.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">other_record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;other_record should not have been updated.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">other_record</span><span class="o">.</span><span class="n">value_plus_one</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s2">&quot;other_record should not have been updated.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIncrementFieldsSkipLock.test_increment_fields_skiplock_multiple_fields">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIncrementFieldsSkipLock.test_increment_fields_skiplock_multiple_fields">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_increment_fields_skiplock_multiple_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test that we can update several fields on the same rows with one request.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">did_update</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">increment_fields_skiplock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="s1">&#39;value_plus_one&#39;</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;increment_fields_skiplock did </span><span class="si">%s</span><span class="s1">update the fields&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">did_update</span> <span class="k">else</span> <span class="s1">&#39;not &#39;</span><span class="p">)</span>
+
+        <span class="c1"># increment_fields_skiplock does not invalidate the cache</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>  <span class="c1"># Read</span>
+            <span class="k">if</span> <span class="n">did_update</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock&#39;s output, this number should have been incremented.&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value_plus_one</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock&#39;s output, this number should have been incremented.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># Making sure the test random locks do not break the test; but updated and the values must be consistent</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock output&#39;s, this number should NOT have been incremented.&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value_plus_one</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;according to increment_fields_skiplock&#39;s output, this number should NOT have been incremented.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">other_record</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;other_record should not have been updated.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">other_record</span><span class="o">.</span><span class="n">value_plus_one</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="s2">&quot;other_record should not have been updated.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIncrementFieldsSkipLock.test_increment_fields_skiplock_null_field">
+<a class="viewcode-back" href="../../../../../odoo.addons.test_performance.tests.html#odoo.addons.test_performance.tests.test_performance.TestIncrementFieldsSkipLock.test_increment_fields_skiplock_null_field">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_increment_fields_skiplock_null_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Test that incrementing a field with a NULL value in database works.</span>
+<span class="sd">        When an integer is NULL in database, the ORM automatically converts it to 0.</span>
+<span class="sd">        However, increment_fields_skiplock is a special tool using raw sql and by-passing the ORM&quot;&quot;&quot;</span>
+        <span class="c1"># First, ensure our value is NULL in database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT value_null_by_default FROM test_performance_mozzarella WHERE id = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,))</span>
+        <span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsNone</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value_null_by_default</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Then, increment its count.</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertQueryCount</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">sql</span><span class="o">.</span><span class="n">increment_fields_skiplock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="p">,</span> <span class="s1">&#39;value_null_by_default&#39;</span><span class="p">)</span>
+        <span class="c1"># Invalidate the cache regarding the value of `value_null_by_default` for our record to force fetching from database</span>
+        <span class="c1"># as `increment_fields_skiplock` only does raw SQL and doesn&#39;t assign the new value in the cache</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">([</span><span class="s1">&#39;value_null_by_default&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">record</span><span class="o">.</span><span class="n">value_null_by_default</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

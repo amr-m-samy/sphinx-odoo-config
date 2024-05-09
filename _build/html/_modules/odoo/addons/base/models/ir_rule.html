@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_rule &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_rule</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_rule</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span><span class="p">,</span> <span class="n">ValidationError</span>
+<span class="kn">from</span> <span class="nn">odoo.osv</span> <span class="kn">import</span> <span class="n">expression</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">config</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.safe_eval</span> <span class="kn">import</span> <span class="n">safe_eval</span><span class="p">,</span> <span class="n">time</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<div class="viewcode-block" id="IrRule">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_rule.IrRule">[docs]</a>
+<span class="k">class</span> <span class="nc">IrRule</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.rule&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Record Rule&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;model_id DESC,id&#39;</span>
+    <span class="n">_MODES</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="s1">&#39;write&#39;</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="s1">&#39;unlink&#39;</span><span class="p">]</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If you uncheck the active field, it will disable the record rule without deleting it (if you delete a native record rule, it may be re-created when you reload the module).&quot;</span><span class="p">)</span>
+    <span class="n">model_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;ir.model&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Model&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ondelete</span><span class="o">=</span><span class="s2">&quot;cascade&quot;</span><span class="p">)</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2many</span><span class="p">(</span><span class="s1">&#39;res.groups&#39;</span><span class="p">,</span> <span class="s1">&#39;rule_group_rel&#39;</span><span class="p">,</span> <span class="s1">&#39;rule_group_id&#39;</span><span class="p">,</span> <span class="s1">&#39;group_id&#39;</span><span class="p">,</span> <span class="n">ondelete</span><span class="o">=</span><span class="s1">&#39;restrict&#39;</span><span class="p">)</span>
+    <span class="n">domain_force</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Domain&#39;</span><span class="p">)</span>
+    <span class="n">perm_read</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Read&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">perm_write</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Write&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">perm_create</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Create&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">perm_unlink</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Delete&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">_sql_constraints</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s1">&#39;no_access_rights&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;CHECK (perm_read!=False or perm_write!=False or perm_create!=False or perm_unlink!=False)&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;Rule must have at least one checked access right!&#39;</span><span class="p">),</span>
+    <span class="p">]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_eval_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dictionary to use as evaluation context for</span>
+<span class="sd">           ir.rule domains.</span>
+<span class="sd">           Note: company_ids contains the ids of the activated companies</span>
+<span class="sd">           by the user with the switch company menu. These companies are</span>
+<span class="sd">           filtered and trusted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># use an empty context for &#39;user&#39; to make the domain evaluation</span>
+        <span class="c1"># independent from the context</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;user&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">with_context</span><span class="p">({}),</span>
+            <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">time</span><span class="p">,</span>
+            <span class="s1">&#39;company_ids&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">companies</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+            <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;groups&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_global</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">rule</span><span class="p">[</span><span class="s1">&#39;global&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">rule</span><span class="o">.</span><span class="n">groups</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;model_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_model_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Don&#39;t allow rules on rules records (this model).</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">model_id</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Rules can not be applied on the Record Rules model.&#39;</span><span class="p">))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">,</span> <span class="s1">&#39;domain_force&#39;</span><span class="p">,</span> <span class="s1">&#39;model_id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eval_context</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">active</span> <span class="ow">and</span> <span class="n">rule</span><span class="o">.</span><span class="n">domain_force</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">domain</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">domain_force</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">)</span>
+                    <span class="n">expression</span><span class="o">.</span><span class="n">expression</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">rule</span><span class="o">.</span><span class="n">model_id</span><span class="o">.</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">())</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Invalid domain: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_compute_domain_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the list of context keys to use for caching ``_compute_domain``. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s1">&#39;allowed_company_ids&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_failing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">for_records</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;read&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns the rules for the mode for the current user which fail on</span>
+<span class="sd">        the specified records.</span>
+
+<span class="sd">        Can return any global rule and/or all local rules (since local rules</span>
+<span class="sd">        are OR-ed together, the entire group succeeds or fails, while global</span>
+<span class="sd">        rules get AND-ed and can each fail)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Model</span> <span class="o">=</span> <span class="n">for_records</span><span class="o">.</span><span class="n">browse</span><span class="p">(())</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eval_context</span><span class="p">()</span>
+
+        <span class="n">all_rules</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rules</span><span class="p">(</span><span class="n">Model</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+
+        <span class="c1"># first check if the group rules fail for any record (aka if</span>
+        <span class="c1"># searching on (records, group_rules) filters out some of the records)</span>
+        <span class="n">group_rules</span> <span class="o">=</span> <span class="n">all_rules</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">groups</span> <span class="ow">and</span> <span class="n">r</span><span class="o">.</span><span class="n">groups</span> <span class="o">&amp;</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">groups_id</span><span class="p">)</span>
+        <span class="n">group_domains</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">OR</span><span class="p">([</span>
+            <span class="n">safe_eval</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">domain_force</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">)</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">domain_force</span> <span class="k">else</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">group_rules</span>
+        <span class="p">])</span>
+        <span class="c1"># if all records get returned, the group rules are not failing</span>
+        <span class="k">if</span> <span class="n">Model</span><span class="o">.</span><span class="n">search_count</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">([[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">for_records</span><span class="o">.</span><span class="n">ids</span><span class="p">)],</span> <span class="n">group_domains</span><span class="p">]))</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">for_records</span><span class="p">):</span>
+            <span class="n">group_rules</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(())</span>
+
+        <span class="c1"># failing rules are previously selected group rules or any failing global rule</span>
+        <span class="k">def</span> <span class="nf">is_failing</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">ids</span><span class="o">=</span><span class="n">for_records</span><span class="o">.</span><span class="n">ids</span><span class="p">):</span>
+            <span class="n">dom</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">domain_force</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">)</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">domain_force</span> <span class="k">else</span> <span class="p">[]</span>
+            <span class="k">return</span> <span class="n">Model</span><span class="o">.</span><span class="n">search_count</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">([</span>
+                <span class="p">[(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">ids</span><span class="p">)],</span>
+                <span class="n">expression</span><span class="o">.</span><span class="n">normalize_domain</span><span class="p">(</span><span class="n">dom</span><span class="p">)</span>
+            <span class="p">]))</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">all_rules</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">group_rules</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">r</span><span class="o">.</span><span class="n">groups</span> <span class="ow">and</span> <span class="n">is_failing</span><span class="p">(</span><span class="n">r</span><span class="p">)))</span><span class="o">.</span><span class="n">with_user</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_rules</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;read&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns all the rules matching the model for the mode for the</span>
+<span class="sd">        current user.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_MODES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid mode: </span><span class="si">%r</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">mode</span><span class="p">,))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">su</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(())</span>
+
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot; SELECT r.id FROM ir_rule r JOIN ir_model m ON (r.model_id=m.id)</span>
+<span class="s2">                    WHERE m.model=</span><span class="si">%s</span><span class="s2"> AND r.active AND r.perm_</span><span class="si">{mode}</span>
+<span class="s2">                    AND (r.id IN (SELECT rule_group_id FROM rule_group_rel rg</span>
+<span class="s2">                                  JOIN res_groups_users_rel gu ON (rg.group_id=gu.gid)</span>
+<span class="s2">                                  WHERE gu.uid=</span><span class="si">%s</span><span class="s2">)</span>
+<span class="s2">                         OR r.global)</span>
+<span class="s2">                    ORDER BY r.id</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uid</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">conditional</span><span class="p">(</span>
+        <span class="s1">&#39;xml&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dev_mode&#39;</span><span class="p">],</span>
+        <span class="n">tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;self.env.uid&#39;</span><span class="p">,</span> <span class="s1">&#39;self.env.su&#39;</span><span class="p">,</span> <span class="s1">&#39;model_name&#39;</span><span class="p">,</span> <span class="s1">&#39;mode&#39;</span><span class="p">,</span>
+                       <span class="s1">&#39;tuple(self._compute_domain_context_values())&#39;</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;read&quot;</span><span class="p">):</span>
+        <span class="n">global_domains</span> <span class="o">=</span> <span class="p">[]</span>                     <span class="c1"># list of domains</span>
+
+        <span class="c1"># add rules for parent models</span>
+        <span class="k">for</span> <span class="n">parent_model_name</span><span class="p">,</span> <span class="n">parent_field_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span><span class="o">.</span><span class="n">_inherits</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">domain</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_domain</span><span class="p">(</span><span class="n">parent_model_name</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+                <span class="n">global_domains</span><span class="o">.</span><span class="n">append</span><span class="p">([(</span><span class="n">parent_field_name</span><span class="p">,</span> <span class="s1">&#39;any&#39;</span><span class="p">,</span> <span class="n">domain</span><span class="p">)])</span>
+
+        <span class="n">rules</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rules</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">rules</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">(</span><span class="n">global_domains</span><span class="p">)</span> <span class="k">if</span> <span class="n">global_domains</span> <span class="k">else</span> <span class="p">[]</span>
+
+        <span class="c1"># browse user and rules with sudo to avoid access errors!</span>
+        <span class="n">eval_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eval_context</span><span class="p">()</span>
+        <span class="n">user_groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">groups_id</span>
+        <span class="n">group_domains</span> <span class="o">=</span> <span class="p">[]</span>                      <span class="c1"># list of domains</span>
+        <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">rules</span><span class="o">.</span><span class="n">sudo</span><span class="p">():</span>
+            <span class="c1"># evaluate the domain for the current user</span>
+            <span class="n">dom</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">domain_force</span><span class="p">,</span> <span class="n">eval_context</span><span class="p">)</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">domain_force</span> <span class="k">else</span> <span class="p">[]</span>
+            <span class="n">dom</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">normalize_domain</span><span class="p">(</span><span class="n">dom</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rule</span><span class="o">.</span><span class="n">groups</span><span class="p">:</span>
+                <span class="n">global_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dom</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">rule</span><span class="o">.</span><span class="n">groups</span> <span class="o">&amp;</span> <span class="n">user_groups</span><span class="p">:</span>
+                <span class="n">group_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dom</span><span class="p">)</span>
+
+        <span class="c1"># combine global domains and group domains</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">group_domains</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">(</span><span class="n">global_domains</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">(</span><span class="n">global_domains</span> <span class="o">+</span> <span class="p">[</span><span class="n">expression</span><span class="o">.</span><span class="n">OR</span><span class="p">(</span><span class="n">group_domains</span><span class="p">)])</span>
+
+    <span class="k">def</span> <span class="nf">_compute_domain_context_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_domain_keys</span><span class="p">():</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="c1"># currently this could be a frozenset (to avoid depending on</span>
+                <span class="c1"># the order of allowed_company_ids) but it seems safer if</span>
+                <span class="c1"># possibly slightly more miss-y to use a tuple</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">v</span>
+
+<div class="viewcode-block" id="IrRule.unlink">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_rule.IrRule.unlink">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrRule</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="IrRule.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_rule.IrRule.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrRule</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span>
+        <span class="c1"># DLE P33: tests</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="IrRule.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_rule.IrRule.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrRule</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="c1"># DLE P33: tests</span>
+        <span class="c1"># - odoo/addons/test_access_rights/tests/test_feedback.py</span>
+        <span class="c1"># - odoo/addons/test_access_rights/tests/test_ir_rules.py</span>
+        <span class="c1"># - odoo/addons/base/tests/test_orm.py (/home/dle/src/odoo/master-nochange-fp/odoo/addons/base/tests/test_orm.py)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_make_access_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">operation</span><span class="p">,</span> <span class="n">records</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Access Denied by record rules for operation: </span><span class="si">%s</span><span class="s1"> on record ids: </span><span class="si">%r</span><span class="s1">, uid: </span><span class="si">%s</span><span class="s1">, model: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">operation</span><span class="p">,</span> <span class="n">records</span><span class="o">.</span><span class="n">ids</span><span class="p">[:</span><span class="mi">6</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uid</span><span class="p">,</span> <span class="n">records</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+        <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">context_get</span><span class="p">())</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">records</span><span class="o">.</span><span class="n">_name</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="n">model</span>
+        <span class="n">operations</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;read&#39;</span><span class="p">:</span>  <span class="n">_</span><span class="p">(</span><span class="s2">&quot;read&quot;</span><span class="p">),</span>
+            <span class="s1">&#39;write&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;write&quot;</span><span class="p">),</span>
+            <span class="s1">&#39;create&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;create&quot;</span><span class="p">),</span>
+            <span class="s1">&#39;unlink&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;unlink&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="n">user_description</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> (id=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="n">operation_error</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Uh-oh! Looks like you have stumbled upon some top-secret records.</span><span class="se">\n\n</span><span class="s2">&quot;</span> \
+            <span class="s2">&quot;Sorry, </span><span class="si">%s</span><span class="s2"> doesn&#39;t have &#39;</span><span class="si">%s</span><span class="s2">&#39; access to:&quot;</span><span class="p">,</span> <span class="n">user_description</span><span class="p">,</span> <span class="n">operations</span><span class="p">[</span><span class="n">operation</span><span class="p">])</span>
+        <span class="n">failing_model</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;- </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+
+        <span class="n">resolution_info</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;If you really, really need access, perhaps you can win over your friendly administrator with a batch of freshly baked cookies.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_has_groups</span><span class="p">(</span><span class="s1">&#39;base.group_no_one&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">has_group</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">AccessError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">operation_error</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">failing_model</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">resolution_info</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># This extended AccessError is only displayed in debug mode.</span>
+        <span class="c1"># Note that by default, public and portal users do not have</span>
+        <span class="c1"># the group &quot;base.group_no_one&quot;, even if debug mode is enabled,</span>
+        <span class="c1"># so it is relatively safe here to include the list of rules and record names.</span>
+        <span class="n">rules</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_failing</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">operation</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+
+        <span class="n">records_sudo</span> <span class="o">=</span> <span class="n">records</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="n">company_related</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="s1">&#39;company_id&#39;</span> <span class="ow">in</span> <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">domain_force</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rules</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">get_record_description</span><span class="p">(</span><span class="n">rec</span><span class="p">):</span>
+            <span class="c1"># If the user has access to the company of the record, add this</span>
+            <span class="c1"># information in the description to help them to change company</span>
+            <span class="k">if</span> <span class="n">company_related</span> <span class="ow">and</span> <span class="s1">&#39;company_id&#39;</span> <span class="ow">in</span> <span class="n">rec</span> <span class="ow">and</span> <span class="n">rec</span><span class="o">.</span><span class="n">company_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">company_ids</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">rec</span><span class="o">.</span><span class="n">display_name</span><span class="si">}</span><span class="s1"> (</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s1">, company=</span><span class="si">{</span><span class="n">rec</span><span class="o">.</span><span class="n">company_id</span><span class="o">.</span><span class="n">display_name</span><span class="si">}</span><span class="s1">)&#39;</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">rec</span><span class="o">.</span><span class="n">display_name</span><span class="si">}</span><span class="s1"> (</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s1">)&#39;</span>
+
+        <span class="n">failing_records</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1"> &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;- </span><span class="si">{</span><span class="n">get_record_description</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">records_sudo</span><span class="p">)</span>
+
+        <span class="n">rules_description</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;- </span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">rules</span><span class="p">)</span>
+        <span class="n">failing_rules</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Blame the following rules:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rules_description</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">company_related</span><span class="p">:</span>
+            <span class="n">failing_rules</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Note: this might be a multi-company issue. Switching company may help - in Odoo, not in real life!&#39;</span><span class="p">)</span>
+
+        <span class="c1"># clean up the cache of records prefetched with display_name above</span>
+        <span class="n">records_sudo</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">operation_error</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">failing_records</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">failing_rules</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">resolution_info</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+
+
+<span class="c1">#</span>
+<span class="c1"># Hack for field &#39;global&#39;: this field cannot be defined like others, because</span>
+<span class="c1"># &#39;global&#39; is a Python keyword. Therefore, we add it to the class by assignment.</span>
+<span class="c1"># Note that the attribute &#39;_module&#39; is normally added by the class&#39; metaclass.</span>
+<span class="c1">#</span>
+<span class="n">global_</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_global&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If no group is specified the rule is global and applied to everyone&quot;</span><span class="p">)</span>
+<span class="nb">setattr</span><span class="p">(</span><span class="n">IrRule</span><span class="p">,</span> <span class="s1">&#39;global&#39;</span><span class="p">,</span> <span class="n">global_</span><span class="p">)</span>
+<span class="n">global_</span><span class="o">.</span><span class="n">__set_name__</span><span class="p">(</span><span class="n">IrRule</span><span class="p">,</span> <span class="s1">&#39;global&#39;</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

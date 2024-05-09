@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.num2words_patch &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.num2words_patch</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.num2words_patch</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">decimal</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">ROUND_HALF_UP</span><span class="p">,</span> <span class="n">Decimal</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">floor</span>
+
+<span class="c1"># The following section of the code is used to monkey patch</span>
+<span class="c1"># the Arabic class of num2words package as there are some problems</span>
+<span class="c1"># upgrading the package to the newer version that fixed the bugs</span>
+<span class="c1"># so a temporary fix was to patch the old version with the code</span>
+<span class="c1"># from the new version manually.</span>
+<span class="c1"># The code is taken from num2words package: https://github.com/savoirfairelinux/num2words</span>
+
+
+<span class="n">CURRENCY_SR</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;ريال&quot;</span><span class="p">,</span> <span class="s2">&quot;ريالان&quot;</span><span class="p">,</span> <span class="s2">&quot;ريالات&quot;</span><span class="p">,</span> <span class="s2">&quot;ريالاً&quot;</span><span class="p">),</span>
+               <span class="p">(</span><span class="s2">&quot;هللة&quot;</span><span class="p">,</span> <span class="s2">&quot;هللتان&quot;</span><span class="p">,</span> <span class="s2">&quot;هللات&quot;</span><span class="p">,</span> <span class="s2">&quot;هللة&quot;</span><span class="p">)]</span>
+<span class="n">CURRENCY_EGP</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;جنيه&quot;</span><span class="p">,</span> <span class="s2">&quot;جنيهان&quot;</span><span class="p">,</span> <span class="s2">&quot;جنيهات&quot;</span><span class="p">,</span> <span class="s2">&quot;جنيهاً&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">&quot;قرش&quot;</span><span class="p">,</span> <span class="s2">&quot;قرشان&quot;</span><span class="p">,</span> <span class="s2">&quot;قروش&quot;</span><span class="p">,</span> <span class="s2">&quot;قرش&quot;</span><span class="p">)]</span>
+<span class="n">CURRENCY_KWD</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;دينار&quot;</span><span class="p">,</span> <span class="s2">&quot;ديناران&quot;</span><span class="p">,</span> <span class="s2">&quot;دينارات&quot;</span><span class="p">,</span> <span class="s2">&quot;ديناراً&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">&quot;فلس&quot;</span><span class="p">,</span> <span class="s2">&quot;فلسان&quot;</span><span class="p">,</span> <span class="s2">&quot;فلس&quot;</span><span class="p">,</span> <span class="s2">&quot;فلس&quot;</span><span class="p">)]</span>
+
+<span class="n">ARABIC_ONES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;واحد&quot;</span><span class="p">,</span> <span class="s2">&quot;اثنان&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاثة&quot;</span><span class="p">,</span> <span class="s2">&quot;أربعة&quot;</span><span class="p">,</span> <span class="s2">&quot;خمسة&quot;</span><span class="p">,</span> <span class="s2">&quot;ستة&quot;</span><span class="p">,</span> <span class="s2">&quot;سبعة&quot;</span><span class="p">,</span> <span class="s2">&quot;ثمانية&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;تسعة&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;أحد عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;اثنا عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاثة عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;أربعة عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;خمسة عشر&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ستة عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;سبعة عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;ثمانية عشر&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;تسعة عشر&quot;</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="Num2Word_Base">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base">[docs]</a>
+<span class="k">class</span> <span class="nc">Num2Word_Base</span><span class="p">:</span>
+    <span class="n">CURRENCY_FORMS</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">CURRENCY_ADJECTIVES</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_title</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exclude_title</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">negword</span> <span class="o">=</span> <span class="s2">&quot;(-) &quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pointword</span> <span class="o">=</span> <span class="s2">&quot;(.)&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errmsg_nonnum</span> <span class="o">=</span> <span class="s2">&quot;type: </span><span class="si">%s</span><span class="s2"> not in [long, int, float]&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errmsg_floatord</span> <span class="o">=</span> <span class="s2">&quot;Cannot treat float </span><span class="si">%s</span><span class="s2"> as ordinal.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errmsg_negord</span> <span class="o">=</span> <span class="s2">&quot;Cannot treat negative num </span><span class="si">%s</span><span class="s2"> as ordinal.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errmsg_toobig</span> <span class="o">=</span> <span class="s2">&quot;abs(</span><span class="si">%s</span><span class="s2">) must be less than </span><span class="si">%s</span><span class="s2">.&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="p">()</span>
+
+        <span class="c1"># uses cards</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span>
+               <span class="p">[</span><span class="s1">&#39;high_numwords&#39;</span><span class="p">,</span> <span class="s1">&#39;mid_numwords&#39;</span><span class="p">,</span> <span class="s1">&#39;low_numwords&#39;</span><span class="p">]):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cards</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_numwords</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">MAXVAL</span> <span class="o">=</span> <span class="mi">1000</span> <span class="o">*</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+<div class="viewcode-block" id="Num2Word_Base.set_numwords">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.set_numwords">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_numwords</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_high_numwords</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">high_numwords</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_mid_numwords</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mid_numwords</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_low_numwords</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">low_numwords</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.set_high_numwords">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.set_high_numwords">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_high_numwords</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.set_mid_numwords">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.set_mid_numwords">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_mid_numwords</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">mid</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.set_low_numwords">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.set_low_numwords">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_low_numwords</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">numwords</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">word</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">numwords</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">numwords</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">word</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.splitnum">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.splitnum">[docs]</a>
+    <span class="k">def</span> <span class="nf">splitnum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">elem</span> <span class="o">&gt;</span> <span class="n">value</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">div</span><span class="p">,</span> <span class="n">mod</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">div</span><span class="p">,</span> <span class="n">mod</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">elem</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">div</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">div</span> <span class="o">==</span> <span class="n">value</span><span class="p">:</span>  <span class="c1"># The system tallies, eg Roman Numerals</span>
+                    <span class="k">return</span> <span class="p">[(</span><span class="n">div</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">[</span><span class="n">elem</span><span class="p">],</span> <span class="n">div</span> <span class="o">*</span> <span class="n">elem</span><span class="p">)]</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">splitnum</span><span class="p">(</span><span class="n">div</span><span class="p">))</span>
+
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">cards</span><span class="p">[</span><span class="n">elem</span><span class="p">],</span> <span class="n">elem</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">mod</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">splitnum</span><span class="p">(</span><span class="n">mod</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">out</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.parse_minus">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.parse_minus">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_minus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Detach minus and return it as symbol with new num_str.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">num_str</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">):</span>
+            <span class="c1"># Extra spacing to compensate if there is no minus.</span>
+            <span class="k">return</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> &#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">negword</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">num_str</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">num_str</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.str_to_number">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.str_to_number">[docs]</a>
+    <span class="k">def</span> <span class="nf">str_to_number</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Decimal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.to_cardinal">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_cardinal">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_cardinal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">value</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">AssertionError</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal_float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> &quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">negword</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAXVAL</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">OverflowError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errmsg_toobig</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAXVAL</span><span class="p">))</span>
+
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">splitnum</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">words</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">clean</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">out</span> <span class="o">+</span> <span class="n">words</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.float2tuple">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.float2tuple">[docs]</a>
+    <span class="k">def</span> <span class="nf">float2tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">pre</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="c1"># Simple way of finding decimal places to update the precision</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span><span class="o">.</span><span class="n">as_tuple</span><span class="p">()</span><span class="o">.</span><span class="n">exponent</span><span class="p">)</span>
+
+        <span class="n">post</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span> <span class="o">-</span> <span class="n">pre</span><span class="p">)</span> <span class="o">*</span> <span class="mi">10</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">post</span><span class="p">)</span> <span class="o">-</span> <span class="n">post</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">:</span>
+            <span class="c1"># We generally floor all values beyond our precision (rather than</span>
+            <span class="c1"># rounding), but in cases where we have something like 1.239999999,</span>
+            <span class="c1"># which is probably due to python&#39;s handling of floats, we actually</span>
+            <span class="c1"># want to consider it as 1.24 instead of 1.23</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">post</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">post</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">pre</span><span class="p">,</span> <span class="n">post</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.to_cardinal_float">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_cardinal_float">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_cardinal_float</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">value</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errmsg_nonnum</span> <span class="o">%</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="n">pre</span><span class="p">,</span> <span class="n">post</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">float2tuple</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+        <span class="n">post</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">post</span><span class="p">)</span>
+        <span class="n">post</span> <span class="o">=</span> <span class="s1">&#39;0&#39;</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">post</span><span class="p">))</span> <span class="o">+</span> <span class="n">post</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">pre</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pointword</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">):</span>
+            <span class="n">curr</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">post</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to_s</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">curr</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.merge">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.merge">[docs]</a>
+    <span class="k">def</span> <span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.clean">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.clean">[docs]</a>
+    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">val</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">val</span><span class="p">[</span><span class="mi">2</span><span class="p">:]:</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">elem</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">elem</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clean</span><span class="p">(</span><span class="n">elem</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">elem</span><span class="p">)</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">out</span>
+        <span class="k">return</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.title">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.title">[docs]</a>
+    <span class="k">def</span> <span class="nf">title</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_title</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">word</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">exclude_title</span><span class="p">:</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">word</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">+</span> <span class="n">word</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.verify_ordinal">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.verify_ordinal">[docs]</a>
+    <span class="k">def</span> <span class="nf">verify_ordinal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span> <span class="o">==</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errmsg_floatord</span> <span class="o">%</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errmsg_negord</span> <span class="o">%</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.to_ordinal">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_ordinal">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_ordinal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.to_ordinal_num">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_ordinal_num">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_ordinal_num</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+
+    <span class="c1"># Trivial version</span>
+<div class="viewcode-block" id="Num2Word_Base.inflect">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.inflect">[docs]</a>
+    <span class="k">def</span> <span class="nf">inflect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">text</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">text</span><span class="p">)</span></div>
+
+
+    <span class="c1"># //CHECK: generalise? Any others like pounds/shillings/pence?</span>
+<div class="viewcode-block" id="Num2Word_Base.to_splitnum">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_splitnum">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_splitnum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">hightxt</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">lowtxt</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">jointxt</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+                    <span class="n">divisor</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">longval</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cents</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+            <span class="n">high</span><span class="p">,</span> <span class="n">low</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">float2tuple</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">high</span><span class="p">,</span> <span class="n">low</span> <span class="o">=</span> <span class="n">val</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="n">high</span><span class="p">,</span> <span class="n">low</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">divisor</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">high</span><span class="p">:</span>
+            <span class="n">hightxt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inflect</span><span class="p">(</span><span class="n">high</span><span class="p">,</span> <span class="n">hightxt</span><span class="p">))</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">high</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">low</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">longval</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">hightxt</span><span class="p">:</span>
+                        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hightxt</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">jointxt</span><span class="p">:</span>
+                        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">jointxt</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">hightxt</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hightxt</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">low</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cents</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">low</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%02d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">low</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">lowtxt</span> <span class="ow">and</span> <span class="n">longval</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inflect</span><span class="p">(</span><span class="n">low</span><span class="p">,</span> <span class="n">lowtxt</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.to_year">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_year">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_year</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.pluralize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.pluralize">[docs]</a>
+    <span class="k">def</span> <span class="nf">pluralize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">forms</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Should resolve gettext form:</span>
+<span class="sd">        http://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_money_verbose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">currency</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">number</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_cents_verbose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">currency</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">number</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_cents_terse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">currency</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%02d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">number</span>
+
+<div class="viewcode-block" id="Num2Word_Base.to_currency">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.to_currency">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_currency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">currency</span><span class="o">=</span><span class="s1">&#39;EUR&#39;</span><span class="p">,</span> <span class="n">cents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">,</span>
+                    <span class="n">adjective</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            val: Numeric value</span>
+<span class="sd">            currency (str): Currency code</span>
+<span class="sd">            cents (bool): Verbose cents</span>
+<span class="sd">            separator (str): Cent separator</span>
+<span class="sd">            adjective (bool): Prefix currency name with adjective</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Formatted string</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">is_negative</span> <span class="o">=</span> <span class="n">parse_currency_parts</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cr1</span><span class="p">,</span> <span class="n">cr2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">CURRENCY_FORMS</span><span class="p">[</span><span class="n">currency</span><span class="p">]</span>
+
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="s1">&#39;Currency code &quot;</span><span class="si">%s</span><span class="s1">&quot; not implemented for &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span> <span class="o">%</span>
+                <span class="p">(</span><span class="n">currency</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">adjective</span> <span class="ow">and</span> <span class="n">currency</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">CURRENCY_ADJECTIVES</span><span class="p">:</span>
+            <span class="n">cr1</span> <span class="o">=</span> <span class="n">prefix_currency</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">CURRENCY_ADJECTIVES</span><span class="p">[</span><span class="n">currency</span><span class="p">],</span> <span class="n">cr1</span><span class="p">)</span>
+
+        <span class="n">minus_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> &quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">negword</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">if</span> <span class="n">is_negative</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">money_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_money_verbose</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">currency</span><span class="p">)</span>
+        <span class="n">cents_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cents_verbose</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="n">currency</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="n">cents</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cents_terse</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="n">currency</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">%s%s</span><span class="s1"> </span><span class="si">%s%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">minus_str</span><span class="p">,</span>
+            <span class="n">money_str</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pluralize</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">cr1</span><span class="p">),</span>
+            <span class="n">separator</span><span class="p">,</span>
+            <span class="n">cents_str</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pluralize</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="n">cr2</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_Base.setup">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_Base.setup">[docs]</a>
+    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed">[docs]</a>
+<span class="k">class</span> <span class="nc">Num2Word_AR_Fixed</span><span class="p">(</span><span class="n">Num2Word_Base</span><span class="p">):</span>
+    <span class="n">errmsg_toobig</span> <span class="o">=</span> <span class="s2">&quot;abs(</span><span class="si">%s</span><span class="s2">) must be less than </span><span class="si">%s</span><span class="s2">.&quot;</span>
+    <span class="n">MAXVAL</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="mi">51</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">number</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">partPrecision</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="n">CURRENCY_SR</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="n">CURRENCY_SR</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyPartNameFeminine</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">separator</span> <span class="o">=</span> <span class="s1">&#39;و&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span> <span class="o">=</span> <span class="n">ARABIC_ONES</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicFeminineOnes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;إحدى&quot;</span><span class="p">,</span> <span class="s2">&quot;اثنتان&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاث&quot;</span><span class="p">,</span> <span class="s2">&quot;أربع&quot;</span><span class="p">,</span> <span class="s2">&quot;خمس&quot;</span><span class="p">,</span> <span class="s2">&quot;ست&quot;</span><span class="p">,</span> <span class="s2">&quot;سبع&quot;</span><span class="p">,</span> <span class="s2">&quot;ثمان&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تسع&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;إحدى عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;اثنتا عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاث عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;أربع عشرة&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;خمس عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;ست عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;سبع عشرة&quot;</span><span class="p">,</span> <span class="s2">&quot;ثماني عشرة&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تسع عشرة&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicOrdinal</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;اول&quot;</span><span class="p">,</span> <span class="s2">&quot;ثاني&quot;</span><span class="p">,</span> <span class="s2">&quot;ثالث&quot;</span><span class="p">,</span> <span class="s2">&quot;رابع&quot;</span><span class="p">,</span> <span class="s2">&quot;خامس&quot;</span><span class="p">,</span> <span class="s2">&quot;سادس&quot;</span><span class="p">,</span> <span class="s2">&quot;سابع&quot;</span><span class="p">,</span> <span class="s2">&quot;ثامن&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تاسع&quot;</span><span class="p">,</span> <span class="s2">&quot;عاشر&quot;</span><span class="p">,</span> <span class="s2">&quot;حادي عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;ثاني عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;ثالث عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;رابع عشر&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;خامس عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;سادس عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;سابع عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;ثامن عشر&quot;</span><span class="p">,</span> <span class="s2">&quot;تاسع عشر&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicTens</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;عشرون&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاثون&quot;</span><span class="p">,</span> <span class="s2">&quot;أربعون&quot;</span><span class="p">,</span> <span class="s2">&quot;خمسون&quot;</span><span class="p">,</span> <span class="s2">&quot;ستون&quot;</span><span class="p">,</span> <span class="s2">&quot;سبعون&quot;</span><span class="p">,</span> <span class="s2">&quot;ثمانون&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تسعون&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicHundreds</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;مائة&quot;</span><span class="p">,</span> <span class="s2">&quot;مئتان&quot;</span><span class="p">,</span> <span class="s2">&quot;ثلاثمائة&quot;</span><span class="p">,</span> <span class="s2">&quot;أربعمائة&quot;</span><span class="p">,</span> <span class="s2">&quot;خمسمائة&quot;</span><span class="p">,</span> <span class="s2">&quot;ستمائة&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;سبعمائة&quot;</span><span class="p">,</span> <span class="s2">&quot;ثمانمائة&quot;</span><span class="p">,</span> <span class="s2">&quot;تسعمائة&quot;</span>
+        <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedTwos</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;مئتا&quot;</span><span class="p">,</span> <span class="s2">&quot;ألفا&quot;</span><span class="p">,</span> <span class="s2">&quot;مليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;مليارا&quot;</span><span class="p">,</span> <span class="s2">&quot;تريليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريليونا&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوينتليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;سكستيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;سبتيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;أوكتيليونا &quot;</span><span class="p">,</span>
+            <span class="s2">&quot;نونيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;ديسيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;أندسيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;دوديسيليونا&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تريديسيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريسيليونا&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتينيليونا&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicTwos</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;مئتان&quot;</span><span class="p">,</span> <span class="s2">&quot;ألفان&quot;</span><span class="p">,</span> <span class="s2">&quot;مليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;ملياران&quot;</span><span class="p">,</span> <span class="s2">&quot;تريليونان&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوادريليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;سكستيليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;سبتيليونان&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;أوكتيليونان &quot;</span><span class="p">,</span> <span class="s2">&quot;نونيليونان &quot;</span><span class="p">,</span> <span class="s2">&quot;ديسيليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;أندسيليونان&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;دوديسيليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;تريديسيليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريسيليونان&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتينيليونان&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;مائة&quot;</span><span class="p">,</span> <span class="s2">&quot;ألف&quot;</span><span class="p">,</span> <span class="s2">&quot;مليون&quot;</span><span class="p">,</span> <span class="s2">&quot;مليار&quot;</span><span class="p">,</span> <span class="s2">&quot;تريليون&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريليون&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوينتليون&quot;</span><span class="p">,</span> <span class="s2">&quot;سكستيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;سبتيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;أوكتيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;نونيليون&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ديسيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;أندسيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;دوديسيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;تريديسيليون&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوادريسيليون&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتينيليون&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedGroup</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;ألفاً&quot;</span><span class="p">,</span> <span class="s2">&quot;مليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;ملياراً&quot;</span><span class="p">,</span> <span class="s2">&quot;تريليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريليوناً&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوينتليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;سكستيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;سبتيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;أوكتيليوناً&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;نونيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;ديسيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;أندسيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;دوديسيليوناً&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تريديسيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريسيليوناً&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتينيليوناً&quot;</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPluralGroups</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;آلاف&quot;</span><span class="p">,</span> <span class="s2">&quot;ملايين&quot;</span><span class="p">,</span> <span class="s2">&quot;مليارات&quot;</span><span class="p">,</span> <span class="s2">&quot;تريليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريليونات&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;كوينتليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;سكستيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;سبتيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;أوكتيليونات&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;نونيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;ديسيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;أندسيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;دوديسيليونات&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;تريديسيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;كوادريسيليونات&quot;</span><span class="p">,</span> <span class="s2">&quot;كوينتينيليونات&quot;</span>
+        <span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedGroup</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicPluralGroups</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedTwos</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicTwos</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.number_to_arabic">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.number_to_arabic">[docs]</a>
+    <span class="k">def</span> <span class="nf">number_to_arabic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arabic_prefix_text</span><span class="p">,</span> <span class="n">arabic_suffix_text</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span> <span class="o">=</span> <span class="n">arabic_prefix_text</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span> <span class="o">=</span> <span class="n">arabic_suffix_text</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">extract_integer_and_decimal_parts</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.extract_integer_and_decimal_parts">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.extract_integer_and_decimal_parts">[docs]</a>
+    <span class="k">def</span> <span class="nf">extract_integer_and_decimal_parts</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">splits</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">.&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">number</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">splits</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decimal_value</span><span class="p">(</span><span class="n">splits</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.decimal_value">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.decimal_value">[docs]</a>
+    <span class="k">def</span> <span class="nf">decimal_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">decimal_part</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">partPrecision</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">decimal_part</span><span class="p">):</span>
+            <span class="n">decimal_part_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">decimal_part</span><span class="p">)</span>
+
+            <span class="n">decimal_part_builder</span> <span class="o">=</span> <span class="n">decimal_part</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">partPrecision</span> <span class="o">-</span> <span class="n">decimal_part_length</span><span class="p">):</span>
+                <span class="n">decimal_part_builder</span> <span class="o">+=</span> <span class="s1">&#39;0&#39;</span>
+            <span class="n">decimal_part</span> <span class="o">=</span> <span class="n">decimal_part_builder</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">decimal_part</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">partPrecision</span><span class="p">:</span>
+                <span class="n">dec</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">decimal_part</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">dec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">partPrecision</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">decimal_part</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span> <span class="n">dec</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">decimal_part</span>
+
+        <span class="c1"># The following is useless (never happens)</span>
+        <span class="c1"># for i in range(len(result), self.partPrecision):</span>
+        <span class="c1">#     result += &#39;0&#39;</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.digit_feminine_status">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.digit_feminine_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">digit_feminine_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digit</span><span class="p">,</span> <span class="n">group_level</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">group_level</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyPartNameFeminine</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicFeminineOnes</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">digit</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Note: this never happens</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">digit</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="n">group_level</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicFeminineOnes</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">digit</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">digit</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">digit</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.process_arabic_group">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.process_arabic_group">[docs]</a>
+    <span class="k">def</span> <span class="nf">process_arabic_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_number</span><span class="p">,</span> <span class="n">group_level</span><span class="p">,</span>
+                             <span class="n">remaining_number</span><span class="p">):</span>
+        <span class="n">tens</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="n">group_number</span><span class="p">)</span> <span class="o">%</span> <span class="n">Decimal</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">hundreds</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="n">group_number</span><span class="p">)</span> <span class="o">/</span> <span class="n">Decimal</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">ret_val</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">hundreds</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tens</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">hundreds</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedTwos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicHundreds</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">hundreds</span><span class="p">)]</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="n">ret_val</span> <span class="ow">and</span> <span class="n">tens</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">ret_val</span> <span class="o">+=</span> <span class="s2">&quot; و &quot;</span>
+
+        <span class="k">if</span> <span class="n">tens</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tens</span> <span class="o">&lt;</span> <span class="mi">20</span><span class="p">:</span>
+                <span class="c1"># if int(group_level) &gt;= len(self.arabicTwos):</span>
+                <span class="c1">#     raise OverflowError(self.errmsg_toobig %</span>
+                <span class="c1">#                         (self.number, self.MAXVAL))</span>
+                <span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">group_level</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicTwos</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">tens</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">hundreds</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">group_level</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">power</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">&gt;</span> <span class="mi">10</span> <span class="ow">and</span> <span class="n">power</span> <span class="o">%</span> <span class="mi">3</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> \
+                            <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">==</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">10</span> <span class="o">**</span> <span class="n">power</span><span class="p">):</span>
+                        <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedTwos</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">group_level</span><span class="p">)]</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicTwos</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">group_level</span><span class="p">)]</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">tens</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">group_level</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">hundreds</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="c1"># Note: this never happens</span>
+                        <span class="c1"># (hundreds == 0 only if group_number is 0)</span>
+                        <span class="n">ret_val</span> <span class="o">+=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">elif</span> <span class="p">(</span><span class="n">tens</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">tens</span> <span class="o">==</span> <span class="mi">2</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span>
+                            <span class="n">group_level</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">group_level</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> \
+                            <span class="n">hundreds</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">remaining_number</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="c1"># Note: this never happens (idem)</span>
+                        <span class="n">ret_val</span> <span class="o">+=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">elif</span> <span class="n">tens</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">group_level</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">ret_val</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">group_level</span><span class="p">)]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ret_val</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">digit_feminine_status</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">tens</span><span class="p">),</span>
+                                                              <span class="n">group_level</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ones</span> <span class="o">=</span> <span class="n">tens</span> <span class="o">%</span> <span class="mi">10</span>
+                <span class="n">tens</span> <span class="o">=</span> <span class="p">(</span><span class="n">tens</span> <span class="o">/</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span>
+                <span class="k">if</span> <span class="n">ones</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">ret_val</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">digit_feminine_status</span><span class="p">(</span><span class="n">ones</span><span class="p">,</span> <span class="n">group_level</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">ret_val</span> <span class="ow">and</span> <span class="n">ones</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">ret_val</span> <span class="o">+=</span> <span class="s2">&quot; و &quot;</span>
+
+                <span class="n">ret_val</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicTens</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">tens</span><span class="p">)]</span>
+
+        <span class="k">return</span> <span class="n">ret_val</span></div>
+
+
+    <span class="c1"># We use this instead of built-in `abs` function,</span>
+    <span class="c1"># because `abs` suffers from loss of precision for big numbers</span>
+<div class="viewcode-block" id="Num2Word_AR_Fixed.absolute">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.absolute">[docs]</a>
+    <span class="k">def</span> <span class="nf">absolute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">number</span> <span class="k">if</span> <span class="n">number</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="o">-</span><span class="n">number</span></div>
+
+
+    <span class="c1"># We use this instead of `&quot;{:09d}&quot;.format(number)`,</span>
+    <span class="c1"># because the string conversion suffers from loss of</span>
+    <span class="c1"># precision for big numbers</span>
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_str">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_str">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">):</span>
+        <span class="n">integer</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">number</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integer</span> <span class="o">==</span> <span class="n">number</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">integer</span><span class="p">)</span>
+        <span class="n">decimal</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">number</span> <span class="o">-</span> <span class="n">integer</span><span class="p">)</span> <span class="o">*</span> <span class="mi">10</span><span class="o">**</span><span class="mi">9</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">integer</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">decimal</span><span class="si">:</span><span class="s2">09d</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.convert">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.convert">[docs]</a>
+    <span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">number</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">number_to_arabic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert_to_arabic</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.convert_to_arabic">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.convert_to_arabic">[docs]</a>
+    <span class="k">def</span> <span class="nf">convert_to_arabic</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">temp_number</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">number</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">temp_number</span> <span class="o">==</span> <span class="n">Decimal</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s2">&quot;صفر&quot;</span>
+
+        <span class="n">decimal_string</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">process_arabic_group</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span><span class="p">,</span>
+                                                   <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                                                   <span class="n">Decimal</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">ret_val</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">while</span> <span class="n">temp_number</span> <span class="o">&gt;</span> <span class="n">Decimal</span><span class="p">(</span><span class="mi">0</span><span class="p">):</span>
+
+            <span class="n">temp_number_dec</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">temp_number</span><span class="p">))</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">number_to_process</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">temp_number_dec</span> <span class="o">%</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="mi">1000</span><span class="p">)))</span>
+            <span class="k">except</span> <span class="n">decimal</span><span class="o">.</span><span class="n">InvalidOperation</span><span class="p">:</span>
+                <span class="n">decimal</span><span class="o">.</span><span class="n">getcontext</span><span class="p">()</span><span class="o">.</span><span class="n">prec</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+                    <span class="n">temp_number_dec</span><span class="o">.</span><span class="n">as_tuple</span><span class="p">()</span><span class="o">.</span><span class="n">digits</span>
+                <span class="p">)</span>
+                <span class="n">number_to_process</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">temp_number_dec</span> <span class="o">%</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="mi">1000</span><span class="p">)))</span>
+
+            <span class="n">temp_number</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">temp_number_dec</span> <span class="o">/</span> <span class="n">Decimal</span><span class="p">(</span><span class="mi">1000</span><span class="p">))</span>
+
+            <span class="n">group_description</span> <span class="o">=</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">process_arabic_group</span><span class="p">(</span><span class="n">number_to_process</span><span class="p">,</span>
+                                          <span class="n">group</span><span class="p">,</span>
+                                          <span class="n">Decimal</span><span class="p">(</span><span class="n">floor</span><span class="p">(</span><span class="n">temp_number</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">group_description</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">group</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">ret_val</span><span class="p">:</span>
+                        <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;و </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="k">if</span> <span class="n">number_to_process</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">number_to_process</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="c1"># if group &gt;= len(self.arabicGroup):</span>
+                        <span class="c1">#     raise OverflowError(self.errmsg_toobig %</span>
+                        <span class="c1">#                         (self.number, self.MAXVAL)</span>
+                        <span class="c1">#     )</span>
+                        <span class="k">assert</span> <span class="n">group</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">number_to_process</span> <span class="o">%</span> <span class="mi">100</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="mi">3</span> <span class="o">&lt;=</span> <span class="n">number_to_process</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+                                <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicPluralGroups</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="n">ret_val</span><span class="p">:</span>
+                                    <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicAppendedGroup</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+                                <span class="k">else</span><span class="p">:</span>
+                                    <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicGroup</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+
+                <span class="n">ret_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">group_description</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ret_val</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">group</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">formatted_number</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span><span class="p">:</span>
+            <span class="n">formatted_number</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="n">formatted_number</span> <span class="o">+=</span> <span class="n">ret_val</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">remaining100</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">%</span> <span class="mi">100</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">integer_value</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="mi">3</span> <span class="o">&lt;=</span> <span class="n">remaining100</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="mi">11</span> <span class="o">&lt;=</span> <span class="n">remaining100</span> <span class="o">&lt;=</span> <span class="mi">99</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">formatted_number</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">separator</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="n">formatted_number</span> <span class="o">+=</span> <span class="n">decimal_string</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">formatted_number</span> <span class="o">+=</span> <span class="s2">&quot; &quot;</span>
+            <span class="n">remaining100</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_decimalValue</span> <span class="o">%</span> <span class="mi">100</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">remaining100</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="mi">3</span> <span class="o">&lt;=</span> <span class="n">remaining100</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="mi">11</span> <span class="o">&lt;=</span> <span class="n">remaining100</span> <span class="o">&lt;=</span> <span class="mi">99</span><span class="p">:</span>
+                <span class="n">formatted_number</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span><span class="p">:</span>
+            <span class="n">formatted_number</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">formatted_number</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.validate_number">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.validate_number">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_number</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">number</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAXVAL</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">OverflowError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errmsg_toobig</span> <span class="o">%</span> <span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAXVAL</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">number</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.set_currency_prefer">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.set_currency_prefer">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_currency_prefer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">currency</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">currency</span> <span class="o">==</span> <span class="s1">&#39;EGP&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="n">CURRENCY_EGP</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="n">CURRENCY_EGP</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">currency</span> <span class="o">==</span> <span class="s1">&#39;KWD&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="n">CURRENCY_KWD</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="n">CURRENCY_KWD</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="n">CURRENCY_SR</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="n">CURRENCY_SR</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_currency">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_currency">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_currency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">currency</span><span class="o">=</span><span class="s1">&#39;SR&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_currency_prefer</span><span class="p">(</span><span class="n">currency</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">separator</span> <span class="o">=</span> <span class="s2">&quot;و&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span> <span class="o">=</span> <span class="n">ARABIC_ONES</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span> <span class="o">=</span> <span class="n">prefix</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span> <span class="o">=</span> <span class="n">suffix</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_ordinal">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_ordinal">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_ordinal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">number</span> <span class="o">&lt;=</span> <span class="mi">19</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">arabicOrdinal</span><span class="p">[</span><span class="n">number</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">number</span> <span class="o">&lt;</span> <span class="mi">100</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span> <span class="o">=</span> <span class="n">prefix</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">absolute</span><span class="p">(</span><span class="n">number</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_year">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_year">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_year</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_number</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cardinal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_ordinal_num">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_ordinal_num">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_ordinal_num</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_ordinal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Num2Word_AR_Fixed.to_cardinal">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.Num2Word_AR_Fixed.to_cardinal">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_cardinal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">isCurrencyNameFeminine</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">number</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_number</span><span class="p">(</span><span class="n">number</span><span class="p">)</span>
+        <span class="n">minus</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">number</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">minus</span> <span class="o">=</span> <span class="s1">&#39;سالب &#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">separator</span> <span class="o">=</span> <span class="s1">&#39;,&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_subunit</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currency_unit</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicPrefixText</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicSuffixText</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arabicOnes</span> <span class="o">=</span> <span class="n">ARABIC_ONES</span>
+        <span class="k">return</span> <span class="n">minus</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">absolute</span><span class="p">(</span><span class="n">number</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="parse_currency_parts">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.parse_currency_parts">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_currency_parts</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">is_int_with_cents</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_int_with_cents</span><span class="p">:</span>
+            <span class="c1"># assume cents if value is integer</span>
+            <span class="n">negative</span> <span class="o">=</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">integer</span><span class="p">,</span> <span class="n">cents</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">negative</span> <span class="o">=</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span>
+            <span class="n">integer</span><span class="p">,</span> <span class="n">cents</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="mi">0</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span>
+            <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;.01&#39;</span><span class="p">),</span>
+            <span class="n">rounding</span><span class="o">=</span><span class="n">ROUND_HALF_UP</span>
+        <span class="p">)</span>
+        <span class="n">negative</span> <span class="o">=</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">integer</span><span class="p">,</span> <span class="n">fraction</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">integer</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">integer</span><span class="p">)</span>
+        <span class="n">cents</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">fraction</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">integer</span><span class="p">,</span> <span class="n">cents</span><span class="p">,</span> <span class="n">negative</span></div>
+
+
+
+<div class="viewcode-block" id="prefix_currency">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.prefix_currency">[docs]</a>
+<span class="k">def</span> <span class="nf">prefix_currency</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">base</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">base</span><span class="p">)</span></div>
+
+
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">strtype</span> <span class="o">=</span> <span class="n">basestring</span>
+<span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+    <span class="n">strtype</span> <span class="o">=</span> <span class="nb">str</span>
+
+
+<div class="viewcode-block" id="to_s">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.num2words_patch.to_s">[docs]</a>
+<span class="k">def</span> <span class="nf">to_s</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">unicode</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

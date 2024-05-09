@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.migration &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.migration</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.migration</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot; Modules migration handling. &quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">importlib.util</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span> <span class="k">as</span> <span class="n">opj</span>
+
+<span class="kn">import</span> <span class="nn">odoo.release</span> <span class="k">as</span> <span class="nn">release</span>
+<span class="kn">import</span> <span class="nn">odoo.upgrade</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.parse_version</span> <span class="kn">import</span> <span class="n">parse_version</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">file_path</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="n">VERSION_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;^</span>
+<span class="sd">        # Optional prefix with Odoo version</span>
+<span class="sd">        ((</span>
+<span class="sd">            6\.1|</span>
+
+<span class="sd">            # &quot;x.0&quot; version, with x &gt;= 6.</span>
+<span class="sd">            [6-9]\.0|</span>
+
+<span class="sd">            # multi digits &quot;x.0&quot; versions</span>
+<span class="sd">            [1-9]\d+\.0|</span>
+
+<span class="sd">            # x.saas~y, where x &gt;= 7 and x &lt;= 10</span>
+<span class="sd">            (7|8|9|10)\.saas~[1-9]\d*|</span>
+
+<span class="sd">            # saas~x.y, where x &gt;= 11 and y between 1 and 9</span>
+<span class="sd">            # FIXME handle version &gt;= saas~100 (expected in year 2106)</span>
+<span class="sd">            saas~(1[1-9]|[2-9]\d+)\.[1-9]</span>
+<span class="sd">        )\.)?</span>
+<span class="sd">        # After Odoo version we allow precisely 2 or 3 parts</span>
+<span class="sd">        # note this will also allow 0.0.0 which has a special meaning</span>
+<span class="sd">        \d+\.\d+(\.\d+)?</span>
+<span class="sd">    $&quot;&quot;&quot;</span><span class="p">,</span>
+    <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">ASCII</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="load_script">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.migration.load_script">[docs]</a>
+<span class="k">def</span> <span class="nf">load_script</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">module_name</span><span class="p">):</span>
+    <span class="n">full_path</span> <span class="o">=</span> <span class="n">file_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isabs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="n">path</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">spec_from_file_location</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">full_path</span><span class="p">)</span>
+    <span class="n">module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">module_from_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+    <span class="n">spec</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">exec_module</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">module</span></div>
+
+
+
+<div class="viewcode-block" id="MigrationManager">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.migration.MigrationManager">[docs]</a>
+<span class="k">class</span> <span class="nc">MigrationManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Manages the migration of modules.</span>
+
+<span class="sd">        Migrations files must be python files containing a ``migrate(cr, installed_version)``</span>
+<span class="sd">        function. These files must respect a directory tree structure: A &#39;migrations&#39; folder</span>
+<span class="sd">        which contains a folder by version. Version can be &#39;module&#39; version or &#39;server.module&#39;</span>
+<span class="sd">        version (in this case, the files will only be processed by this version of the server).</span>
+<span class="sd">        Python file names must start by ``pre-`` or ``post-`` and will be executed, respectively,</span>
+<span class="sd">        before and after the module initialisation. ``end-`` scripts are run after all modules have</span>
+<span class="sd">        been updated.</span>
+
+<span class="sd">        A special folder named ``0.0.0`` can contain scripts that will be run on any version change.</span>
+<span class="sd">        In `pre` stage, ``0.0.0`` scripts are run first, while in ``post`` and ``end``, they are run last.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &lt;moduledir&gt;</span>
+<span class="sd">            `-- migrations</span>
+<span class="sd">                |-- 1.0</span>
+<span class="sd">                |   |-- pre-update_table_x.py</span>
+<span class="sd">                |   |-- pre-update_table_y.py</span>
+<span class="sd">                |   |-- post-create_plop_records.py</span>
+<span class="sd">                |   |-- end-cleanup.py</span>
+<span class="sd">                |   `-- README.txt                      # not processed</span>
+<span class="sd">                |-- 9.0.1.1                             # processed only on a 9.0 server</span>
+<span class="sd">                |   |-- pre-delete_table_z.py</span>
+<span class="sd">                |   `-- post-clean-data.py</span>
+<span class="sd">                |-- 0.0.0</span>
+<span class="sd">                |   `-- end-invariants.py               # processed on all version update</span>
+<span class="sd">                `-- foo.py                              # not processed</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cr</span><span class="p">,</span> <span class="n">graph</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cr</span> <span class="o">=</span> <span class="n">cr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">migrations</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_get_files</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_get_files</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">_get_upgrade_path</span><span class="p">(</span><span class="n">pkg</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">upgrade</span><span class="o">.</span><span class="n">__path__</span><span class="p">:</span>
+                <span class="n">upgrade_path</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">pkg</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">upgrade_path</span><span class="p">):</span>
+                    <span class="k">yield</span> <span class="n">upgrade_path</span>
+
+        <span class="k">def</span> <span class="nf">_verify_upgrade_version</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">version</span><span class="p">):</span>
+            <span class="n">full_path</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">full_path</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="s2">&quot;tests&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">VERSION_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Invalid version for upgrade script </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">full_path</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">def</span> <span class="nf">get_scripts</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">{}</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="n">version</span><span class="p">:</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="s1">&#39;*.py&#39;</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">_verify_upgrade_version</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+            <span class="p">}</span>
+
+        <span class="k">def</span> <span class="nf">check_path</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">file_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">pkg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">pkg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to upgrade&#39;</span> <span class="ow">or</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="s1">&#39;load_state&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">migrations</span><span class="p">[</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;module&#39;</span><span class="p">:</span> <span class="n">get_scripts</span><span class="p">(</span><span class="n">check_path</span><span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s1">&#39;/migrations&#39;</span><span class="p">)),</span>
+                <span class="s1">&#39;module_upgrades&#39;</span><span class="p">:</span> <span class="n">get_scripts</span><span class="p">(</span><span class="n">check_path</span><span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s1">&#39;/upgrades&#39;</span><span class="p">)),</span>
+            <span class="p">}</span>
+
+            <span class="n">scripts</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">_get_upgrade_path</span><span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">get_scripts</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">scripts</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">migrations</span><span class="p">[</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;upgrade&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">scripts</span>
+
+<div class="viewcode-block" id="MigrationManager.migrate_module">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.migration.MigrationManager.migrate_module">[docs]</a>
+    <span class="k">def</span> <span class="nf">migrate_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pkg</span><span class="p">,</span> <span class="n">stage</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">stage</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;pre&#39;</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="p">,</span> <span class="s1">&#39;end&#39;</span><span class="p">)</span>
+        <span class="n">stageformat</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;pre&#39;</span><span class="p">:</span> <span class="s1">&#39;[&gt;</span><span class="si">%s</span><span class="s1">]&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;post&#39;</span><span class="p">:</span> <span class="s1">&#39;[</span><span class="si">%s</span><span class="s1">&gt;]&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;end&#39;</span><span class="p">:</span> <span class="s1">&#39;[$</span><span class="si">%s</span><span class="s1">]&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">pkg</span><span class="o">.</span><span class="n">state</span> <span class="k">if</span> <span class="n">stage</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;pre&#39;</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="s1">&#39;load_state&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;to install&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">def</span> <span class="nf">convert_version</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="s2">&quot;0.0.0&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">version</span>
+            <span class="k">if</span> <span class="n">version</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">version</span>  <span class="c1"># the version number already contains the server version, see VERSION_RE for details</span>
+            <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="o">.</span><span class="n">major_version</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">_get_migration_versions</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">stage</span><span class="p">):</span>
+            <span class="n">versions</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span>
+                <span class="n">ver</span>
+                <span class="k">for</span> <span class="n">lv</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">migrations</span><span class="p">[</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">ver</span><span class="p">,</span> <span class="n">lf</span> <span class="ow">in</span> <span class="n">lv</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">lf</span>
+            <span class="p">},</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">convert_version</span><span class="p">(</span><span class="n">k</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="s2">&quot;0.0.0&quot;</span> <span class="ow">in</span> <span class="n">versions</span><span class="p">:</span>
+                <span class="c1"># reorder versions</span>
+                <span class="n">versions</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;0.0.0&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">stage</span> <span class="o">==</span> <span class="s2">&quot;pre&quot;</span><span class="p">:</span>
+                    <span class="n">versions</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;0.0.0&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;0.0.0&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">versions</span>
+
+        <span class="k">def</span> <span class="nf">_get_migration_files</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">stage</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot; return a list of migration script files</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">migrations</span><span class="p">[</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="n">f</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">m</span>
+                    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">m</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="p">[])</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">-&quot;</span><span class="p">)</span>
+                <span class="p">),</span>
+                <span class="n">key</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">installed_version</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="s1">&#39;load_version&#39;</span><span class="p">,</span> <span class="n">pkg</span><span class="o">.</span><span class="n">installed_version</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">parsed_installed_version</span> <span class="o">=</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">installed_version</span><span class="p">)</span>
+        <span class="n">current_version</span> <span class="o">=</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">convert_version</span><span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;version&#39;</span><span class="p">]))</span>
+
+        <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="s2">&quot;0.0.0&quot;</span> <span class="ow">and</span> <span class="n">parsed_installed_version</span> <span class="o">&lt;</span> <span class="n">current_version</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="n">full_version</span> <span class="o">=</span> <span class="n">convert_version</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+            <span class="n">majorless_version</span> <span class="o">=</span> <span class="p">(</span><span class="n">version</span> <span class="o">!=</span> <span class="n">full_version</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">majorless_version</span><span class="p">:</span>
+                <span class="c1"># We should not re-execute major-less scripts when upgrading to new Odoo version</span>
+                <span class="c1"># a module in `9.0.2.0` should not re-execute a `2.0` script when upgrading to `10.0.2.0`.</span>
+                <span class="c1"># In which case we must compare just the module version</span>
+                <span class="k">return</span> <span class="n">parsed_installed_version</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span> <span class="o">&lt;</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">full_version</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span> <span class="o">&lt;=</span> <span class="n">current_version</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+
+            <span class="k">return</span> <span class="n">parsed_installed_version</span> <span class="o">&lt;</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">full_version</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">current_version</span>
+
+        <span class="n">versions</span> <span class="o">=</span> <span class="n">_get_migration_versions</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">stage</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">versions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">compare</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+                <span class="n">strfmt</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;addon&#39;</span><span class="p">:</span> <span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                          <span class="s1">&#39;stage&#39;</span><span class="p">:</span> <span class="n">stage</span><span class="p">,</span>
+                          <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="n">stageformat</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">%</span> <span class="n">version</span><span class="p">,</span>
+                          <span class="p">}</span>
+
+                <span class="k">for</span> <span class="n">pyfile</span> <span class="ow">in</span> <span class="n">_get_migration_files</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">stage</span><span class="p">):</span>
+                    <span class="n">name</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pyfile</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                    <span class="n">mod</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">mod</span> <span class="o">=</span> <span class="n">load_script</span><span class="p">(</span><span class="n">pyfile</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%(addon)s</span><span class="s1">: Running migration </span><span class="si">%(version)s</span><span class="s1"> </span><span class="si">%(name)s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">dict</span><span class="p">(</span><span class="n">strfmt</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">mod</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+                        <span class="n">migrate</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">migrate</span>
+                    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%(addon)s</span><span class="s1">: Unable to load </span><span class="si">%(stage)s</span><span class="s1">-migration file </span><span class="si">%(file)s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">dict</span><span class="p">(</span><span class="n">strfmt</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">pyfile</span><span class="p">))</span>
+                        <span class="k">raise</span>
+                    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;module </span><span class="si">%(addon)s</span><span class="s1">: Each </span><span class="si">%(stage)s</span><span class="s1">-migration file must have a &quot;migrate(cr, installed_version)&quot; function&#39;</span> <span class="o">%</span> <span class="n">strfmt</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">migrate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="n">installed_version</span><span class="p">)</span>
+                    <span class="k">finally</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">mod</span><span class="p">:</span>
+                            <span class="k">del</span> <span class="n">mod</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

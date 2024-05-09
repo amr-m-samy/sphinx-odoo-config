@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.js_transpiler &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.js_transpiler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.js_transpiler</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This code is what let us use ES6-style modules in odoo.</span>
+<span class="sd">Classic Odoo modules are composed of a top-level :samp:`odoo.define({name},{dependencies},{body_function})` call.</span>
+<span class="sd">This processor will take files starting with an `@odoo-module` annotation (in a comment) and convert them to classic modules.</span>
+<span class="sd">If any file has the ``/** odoo-module */`` on top of it, it will get processed by this class.</span>
+<span class="sd">It performs several operations to get from ES6 syntax to the usual odoo one with minimal changes.</span>
+<span class="sd">This is done on the fly, this not a pre-processing tool.</span>
+
+<span class="sd">Caveat: This is done without a full parser, only using regex. One can only expect to cover as much edge cases</span>
+<span class="sd">as possible with reasonable limitations. Also, this only changes imports and exports, so all JS features used in</span>
+<span class="sd">the original source need to be supported by the browsers.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">OrderedSet</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="transpile_javascript">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.transpile_javascript">[docs]</a>
+<span class="k">def</span> <span class="nf">transpile_javascript</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile the code from native JS modules to custom odoo modules.</span>
+
+<span class="sd">    :param content: The original source code</span>
+<span class="sd">    :param url: The url of the file in the project</span>
+<span class="sd">    :return: The transpiled source code</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">module_path</span> <span class="o">=</span> <span class="n">url_to_module_path</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">legacy_odoo_define</span> <span class="o">=</span> <span class="n">get_aliased_odoo_define_content</span><span class="p">(</span><span class="n">module_path</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+    <span class="n">dependencies</span> <span class="o">=</span> <span class="n">OrderedSet</span><span class="p">()</span>
+    <span class="c1"># The order of the operations does sometimes matter.</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">convert_legacy_default_import</span><span class="p">,</span>
+        <span class="n">convert_basic_import</span><span class="p">,</span>
+        <span class="n">convert_default_and_named_import</span><span class="p">,</span>
+        <span class="n">convert_default_and_star_import</span><span class="p">,</span>
+        <span class="n">convert_default_import</span><span class="p">,</span>
+        <span class="n">convert_star_import</span><span class="p">,</span>
+        <span class="n">convert_unnamed_relative_import</span><span class="p">,</span>
+        <span class="n">convert_from_export</span><span class="p">,</span>
+        <span class="n">convert_star_from_export</span><span class="p">,</span>
+        <span class="n">remove_index</span><span class="p">,</span>
+        <span class="n">partial</span><span class="p">(</span><span class="n">convert_relative_require</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">),</span>
+        <span class="n">convert_export_function</span><span class="p">,</span>
+        <span class="n">convert_export_class</span><span class="p">,</span>
+        <span class="n">convert_variable_export</span><span class="p">,</span>
+        <span class="n">convert_object_export</span><span class="p">,</span>
+        <span class="n">convert_default_export</span><span class="p">,</span>
+        <span class="n">partial</span><span class="p">(</span><span class="n">wrap_with_qunit_module</span><span class="p">,</span> <span class="n">url</span><span class="p">),</span>
+        <span class="n">partial</span><span class="p">(</span><span class="n">wrap_with_odoo_define</span><span class="p">,</span> <span class="n">module_path</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">steps</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">s</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">legacy_odoo_define</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">+=</span> <span class="n">legacy_odoo_define</span>
+    <span class="k">return</span> <span class="n">content</span></div>
+
+
+
+<span class="n">URL_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    /?(?P&lt;module&gt;\S+)    # /module name</span>
+<span class="s2">    /([\S/]*/)?static/   # ... /static/</span>
+<span class="s2">    (?P&lt;type&gt;src|tests|lib)  # src, test, or lib file</span>
+<span class="s2">    (?P&lt;url&gt;/[\S/]*)     # URL (/...)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="url_to_module_path">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.url_to_module_path">[docs]</a>
+<span class="k">def</span> <span class="nf">url_to_module_path</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Odoo modules each have a name. (odoo.define(&quot;&lt;the name&gt;&quot;, [&lt;dependencies&gt;], function (require) {...});</span>
+<span class="sd">    It is used in to be required later. (const { something } = require(&quot;&lt;the name&gt;&quot;).</span>
+<span class="sd">    The transpiler transforms the url of the file in the project to this name.</span>
+<span class="sd">    It takes the module name and add a @ on the start of it, and map it to be the source of the static/src (or</span>
+<span class="sd">    static/tests, or static/lib) folder in that module.</span>
+
+<span class="sd">    in: web/static/src/one/two/three.js</span>
+<span class="sd">    out: @web/one/two/three.js</span>
+<span class="sd">    The module would therefore be defined and required by this path.</span>
+
+<span class="sd">    :param url: an url in the project</span>
+<span class="sd">    :return: a special path starting with @&lt;module-name&gt;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">URL_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="n">match</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s1">&#39;/index.js&#39;</span><span class="p">,</span> <span class="s1">&#39;/index&#39;</span><span class="p">)):</span>
+            <span class="n">url</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.js&#39;</span><span class="p">):</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">url</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">match</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;src&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;@</span><span class="si">%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">match</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">],</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">match</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;lib&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;@</span><span class="si">%s</span><span class="s2">/../lib</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">match</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">],</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;@</span><span class="si">%s</span><span class="s2">/../tests</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">match</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">],</span> <span class="n">url</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The js file </span><span class="si">%r</span><span class="s2"> must be in the folder &#39;/static/src&#39; or &#39;/static/lib&#39; or &#39;/static/test&#39;&quot;</span> <span class="o">%</span> <span class="n">url</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="wrap_with_qunit_module">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.wrap_with_qunit_module">[docs]</a>
+<span class="k">def</span> <span class="nf">wrap_with_qunit_module</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wraps the test file content (source code) with the QUnit.module(&#39;module_name&#39;, function() {...}).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;tests&quot;</span> <span class="ow">in</span> <span class="n">url</span> <span class="ow">and</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;QUnit\.(test|debug|only)\(&#39;</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+        <span class="n">match</span> <span class="o">=</span> <span class="n">URL_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;QUnit.module(&quot;</span><span class="si">{</span><span class="n">match</span><span class="p">[</span><span class="s2">&quot;module&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;, function() </span><span class="se">{{</span><span class="si">{</span><span class="n">content</span><span class="si">}</span><span class="se">}}</span><span class="s2">);&quot;&quot;&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">content</span></div>
+
+
+<div class="viewcode-block" id="wrap_with_odoo_define">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.wrap_with_odoo_define">[docs]</a>
+<span class="k">def</span> <span class="nf">wrap_with_odoo_define</span><span class="p">(</span><span class="n">module_path</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wraps the current content (source code) with the odoo.define call.</span>
+<span class="sd">    It adds as a second argument the list of dependencies.</span>
+<span class="sd">    Should logically be called once all other operations have been performed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;odoo.define(</span><span class="si">{</span><span class="n">module_path</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">dependencies</span><span class="p">)</span><span class="si">}</span><span class="s2">, function (require) </span><span class="se">{{</span>
+<span class="s2">&#39;use strict&#39;;</span>
+<span class="s2">let __exports = </span><span class="se">{{}}</span><span class="s2">;</span>
+<span class="si">{</span><span class="n">content</span><span class="si">}</span>
+<span class="s2">return __exports;</span>
+<span class="se">}}</span><span class="s2">);</span>
+<span class="s2">&quot;&quot;&quot;</span></div>
+
+
+
+<span class="n">EXPORT_FCT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                          # space and empty line</span>
+<span class="s2">    export\s+                               # export</span>
+<span class="s2">    (?P&lt;type&gt;(async\s+)?function)\s+        # async function or function</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)                     # name the function</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_export_function">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_export_function">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_export_function</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile functions that are being exported.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export function name</span>
+<span class="sd">        // after</span>
+<span class="sd">       __exports.name = name; function name</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export async function name</span>
+<span class="sd">        // after</span>
+<span class="sd">        __exports.name = name; async function name</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\g&lt;space&gt;__exports.\g&lt;identifier&gt; = \g&lt;identifier&gt;; \g&lt;type&gt; \g&lt;identifier&gt;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_FCT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+<span class="n">EXPORT_CLASS_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                          # space and empty line</span>
+<span class="s2">    export\s+                               # export</span>
+<span class="s2">    (?P&lt;type&gt;class)\s+                      # class</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)                     # name of the class</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_export_class">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_export_class">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_export_class</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile classes that are being exported.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export class name</span>
+<span class="sd">        // after</span>
+<span class="sd">        const name = __exports.name = class name</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\g&lt;space&gt;const \g&lt;identifier&gt; = __exports.\g&lt;identifier&gt; = \g&lt;type&gt; \g&lt;identifier&gt;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_CLASS_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_FCT_DEFAULT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                          # space and empty line</span>
+<span class="s2">    export\s+default\s+                     # export default</span>
+<span class="s2">    (?P&lt;type&gt;(async\s+)?function)\s+        # async function or function</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)                     # name of the function</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_export_function_default">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_export_function_default">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_export_function_default</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile functions that are being exported as default value.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default function name</span>
+<span class="sd">        // after</span>
+<span class="sd">        __exports[Symbol.for(&quot;default&quot;)] = name; function name</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default async function name</span>
+<span class="sd">        // after</span>
+<span class="sd">        __exports[Symbol.for(&quot;default&quot;)] = name; async function name</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;__exports[Symbol.for(&quot;default&quot;)] = \g&lt;identifier&gt;; \g&lt;type&gt; \g&lt;identifier&gt;&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_FCT_DEFAULT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+<span class="n">EXPORT_CLASS_DEFAULT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                          # space and empty line</span>
+<span class="s2">    export\s+default\s+                     # export default</span>
+<span class="s2">    (?P&lt;type&gt;class)\s+                      # class</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)                     # name of the class or the function</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_export_class_default">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_export_class_default">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_export_class_default</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile classes that are being exported as default value.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default class name</span>
+<span class="sd">        // after</span>
+<span class="sd">        const name = __exports[Symbol.for(&quot;default&quot;)] = class name</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;const \g&lt;identifier&gt; = __exports[Symbol.for(&quot;default&quot;)] = \g&lt;type&gt; \g&lt;identifier&gt;&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_CLASS_DEFAULT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+<span class="n">EXPORT_VAR_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)              # space and empty line</span>
+<span class="s2">    export\s+                   # export</span>
+<span class="s2">    (?P&lt;type&gt;let|const|var)\s+  # let or cont or var</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)         # variable name</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_variable_export">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_variable_export">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_variable_export</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile variables that are being exported.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export let name</span>
+<span class="sd">        // after</span>
+<span class="sd">        let name = __exports.name</span>
+<span class="sd">        // (same with var and const)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\g&lt;space&gt;\g&lt;type&gt; \g&lt;identifier&gt; = __exports.\g&lt;identifier&gt;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_VAR_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_DEFAULT_VAR_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)              # space and empty line</span>
+<span class="s2">    export\s+default\s+         # export default</span>
+<span class="s2">    (?P&lt;type&gt;let|const|var)\s+  # let or const or var</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)\s*      # variable name</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_variable_export_default">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_variable_export_default">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_variable_export_default</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile the variables that are exported as default values.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default let name</span>
+<span class="sd">        // after</span>
+<span class="sd">        let name = __exports[Symbol.for(&quot;default&quot;)]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;\g&lt;type&gt; \g&lt;identifier&gt; = __exports[Symbol.for(&quot;default&quot;)]&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_DEFAULT_VAR_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_OBJECT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                      # space and empty line</span>
+<span class="s2">    export\s*                           # export</span>
+<span class="s2">    (?P&lt;object&gt;{[\w\s,]+})              # { a, b, c as x, ... }</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_object_export">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_object_export">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_object_export</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile exports of multiple elements</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export { a, b, c as x }</span>
+<span class="sd">        // after</span>
+<span class="sd">        Object.assign(__exports, { a, b, x: c })</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">repl</span><span class="p">(</span><span class="n">matchobj</span><span class="p">):</span>
+        <span class="n">object_process</span> <span class="o">=</span> <span class="s2">&quot;{&quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">convert_as</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)])</span> <span class="o">+</span> <span class="s2">&quot;}&quot;</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;space&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">space</span><span class="si">}</span><span class="s2">Object.assign(__exports, </span><span class="si">{</span><span class="n">object_process</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_OBJECT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_FROM_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                      # space and empty line</span>
+<span class="s2">    export\s*                           # export</span>
+<span class="s2">    (?P&lt;object&gt;{[\w\s,]+})\s*           # { a, b, c as x, ... }</span>
+<span class="s2">    from\s*                             # from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]+)(?P=quote))   # &quot;file path&quot; (&quot;some/path.js&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_from_export">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_from_export">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_from_export</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile exports coming from another source</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export { a, b, c as x } from &quot;some/path.js&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        { a, b, c } = {require(&quot;some/path.js&quot;); Object.assign(__exports, { a, b, x: c });}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">repl</span><span class="p">(</span><span class="n">matchobj</span><span class="p">):</span>
+        <span class="n">object_clean</span> <span class="o">=</span> <span class="s2">&quot;{&quot;</span> <span class="o">+</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">remove_as</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)])</span> <span class="o">+</span> <span class="s2">&quot;}&quot;</span>
+        <span class="n">object_process</span> <span class="o">=</span> <span class="s2">&quot;{&quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">convert_as</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)])</span> <span class="o">+</span> <span class="s2">&quot;}&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%(space)s</span><span class="s2">{const </span><span class="si">%(object_clean)s</span><span class="s2"> = require(</span><span class="si">%(path)s</span><span class="s2">);Object.assign(__exports, </span><span class="si">%(object_process)s</span><span class="s2">)}&quot;</span> <span class="o">%</span> <span class="p">{</span>
+            <span class="s1">&#39;object_clean&#39;</span><span class="p">:</span> <span class="n">object_clean</span><span class="p">,</span>
+            <span class="s1">&#39;object_process&#39;</span><span class="p">:</span> <span class="n">object_process</span><span class="p">,</span>
+            <span class="s1">&#39;space&#39;</span><span class="p">:</span> <span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;space&#39;</span><span class="p">],</span>
+            <span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">],</span>
+        <span class="p">}</span>
+    <span class="k">return</span> <span class="n">EXPORT_FROM_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_STAR_FROM_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                      # space and empty line</span>
+<span class="s2">    export\s*\*\s*from\s*               # export * from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]+)(?P=quote))   # &quot;file path&quot; (&quot;some/path.js&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_star_from_export">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_star_from_export">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_star_from_export</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile exports star coming from another source</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export * from &quot;some/path.js&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        Object.assign(__exports, require(&quot;some/path.js&quot;))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\g&lt;space&gt;Object.assign(__exports, require(\g&lt;path&gt;))&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_STAR_FROM_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">EXPORT_DEFAULT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)      # space and empty line</span>
+<span class="s2">    export\s+default    # export default</span>
+<span class="s2">    (\s+\w+\s*=)?       # something (optional)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_default_export">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_default_export">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_default_export</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function handles the default exports.</span>
+<span class="sd">    Either by calling another operation with a TRUE flag, and if any default is left, doing a simple replacement.</span>
+
+<span class="sd">    (see convert_export_function_or_class_default and convert_variable_export_default).</span>
+<span class="sd">    +</span>
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default</span>
+<span class="sd">        // after</span>
+<span class="sd">        __exports[Symbol.for(&quot;default&quot;)] =</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        export default something =</span>
+<span class="sd">        // after</span>
+<span class="sd">        __exports[Symbol.for(&quot;default&quot;)] =</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_content</span> <span class="o">=</span> <span class="n">convert_export_function_default</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+    <span class="n">new_content</span> <span class="o">=</span> <span class="n">convert_export_class_default</span><span class="p">(</span><span class="n">new_content</span><span class="p">)</span>
+    <span class="n">new_content</span> <span class="o">=</span> <span class="n">convert_variable_export_default</span><span class="p">(</span><span class="n">new_content</span><span class="p">)</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;__exports[Symbol.for(&quot;default&quot;)] =&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">EXPORT_DEFAULT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">new_content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IMPORT_BASIC_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                      # space and empty line</span>
+<span class="s2">    import\s+                           # import</span>
+<span class="s2">    (?P&lt;object&gt;{[\s\w,]+})\s*           # { a, b, c as x, ... }</span>
+<span class="s2">    from\s*                             # from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]+)(?P=quote))   # &quot;file path&quot; (&quot;some/path&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_basic_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_basic_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_basic_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile the simpler import call.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import { a, b, c as x } from &quot;some/path&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const {a, b, c: x} = require(&quot;some/path&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">repl</span><span class="p">(</span><span class="n">matchobj</span><span class="p">):</span>
+        <span class="n">new_object</span> <span class="o">=</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; as &quot;</span><span class="p">,</span> <span class="s2">&quot;: &quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;space&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">const </span><span class="si">{</span><span class="n">new_object</span><span class="si">}</span><span class="s2"> = require(</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_BASIC_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IMPORT_LEGACY_DEFAULT_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                                      # space and empty line</span>
+<span class="s2">    import\s+                                           # import</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)\s*                              # default variable name</span>
+<span class="s2">    from\s*                                             # from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^@\.&quot;&#39;`][^&quot;&#39;`]*)(?P=quote))  # legacy alias file (&quot;addon_name.module_name&quot; or &quot;some/path&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_legacy_default_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_legacy_default_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_legacy_default_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile legacy imports (that were used as they were default import).</span>
+<span class="sd">    Legacy imports means that their name is not a path but a &lt;addon_name&gt;.&lt;module_name&gt;.</span>
+<span class="sd">    It requires slightly different processing.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import module_name from &quot;addon.module_name&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const module_name = require(&quot;addon.module_name&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;const \g&lt;identifier&gt; = require(\g&lt;path&gt;)&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_LEGACY_DEFAULT_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IMPORT_DEFAULT</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                      # space and empty line</span>
+<span class="s2">    import\s+                           # import</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)\s*              # default variable name</span>
+<span class="s2">    from\s*                             # from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]+)(?P=quote))   # &quot;file path&quot; (&quot;some/path&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_default_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_default_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_default_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile the default import call.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import something from &quot;some/path&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const something = require(&quot;some/path&quot;)[Symbol.for(&quot;default&quot;)]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;const \g&lt;identifier&gt; = require(\g&lt;path&gt;)[Symbol.for(&quot;default&quot;)]&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_DEFAULT</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IS_PATH_LEGACY_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;(?P&lt;quote&gt;[&quot;&#39;`])([^@\.&quot;&#39;`][^&quot;&#39;`]*)(?P=quote)&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="n">IMPORT_DEFAULT_AND_NAMED_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^</span>
+<span class="s2">    (?P&lt;space&gt;\s*)                                  # space and empty line</span>
+<span class="s2">    import\s+                                       # import</span>
+<span class="s2">    (?P&lt;default_export&gt;\w+)\s*,\s*                  # default variable name,</span>
+<span class="s2">    (?P&lt;named_exports&gt;{[\s\w,]+})\s*                # { a, b, c as x, ... }</span>
+<span class="s2">    from\s*                                         # from</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]+)(?P=quote))   # &quot;file path&quot; (&quot;some/path&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_default_and_named_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_default_and_named_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_default_and_named_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile default and named import on one line.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import something, { a } from &quot;some/path&quot;;</span>
+<span class="sd">        import somethingElse, { b } from &quot;legacy.module&quot;;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const { [Symbol.for(&quot;default&quot;)]: something, a } = require(&quot;some/path&quot;);</span>
+<span class="sd">        const somethingElse = require(&quot;legacy.module&quot;);</span>
+<span class="sd">        const { b } = somethingElse;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">repl</span><span class="p">(</span><span class="n">matchobj</span><span class="p">):</span>
+        <span class="n">is_legacy</span> <span class="o">=</span> <span class="n">IS_PATH_LEGACY_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">])</span>
+        <span class="n">new_object</span> <span class="o">=</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;named_exports&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; as &quot;</span><span class="p">,</span> <span class="s2">&quot;: &quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_legacy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;space&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">const </span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;default_export&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> = require(</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">);</span>
+<span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;space&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">const </span><span class="si">{</span><span class="n">new_object</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;default_export&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;&quot;&quot;</span>
+        <span class="n">new_object</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span><span class="se">{{</span><span class="s2"> [Symbol.for(&quot;default&quot;)]: </span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;default_export&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">new_object</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;space&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">const </span><span class="si">{</span><span class="n">new_object</span><span class="si">}</span><span class="s2"> = require(</span><span class="si">{</span><span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_DEFAULT_AND_NAMED_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">RELATIVE_REQUIRE_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^[^/*\n]*require\((?P&lt;quote&gt;[\&quot;&#39;`])([^\&quot;&#39;`]+)(?P=quote)\) # require(&quot;some/path&quot;)</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_relative_require">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_relative_require">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_relative_require</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert the relative path contained in a &#39;require()&#39;</span>
+<span class="sd">    to the new path system (@module/path).</span>
+<span class="sd">    Adds all modules path to dependencies.</span>
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // Relative path:</span>
+<span class="sd">        // before</span>
+<span class="sd">        require(&quot;./path&quot;)</span>
+<span class="sd">        // after</span>
+<span class="sd">        require(&quot;@module/path&quot;)</span>
+
+<span class="sd">        // Not a relative path:</span>
+<span class="sd">        // before</span>
+<span class="sd">        require(&quot;other_alias&quot;)</span>
+<span class="sd">        // after</span>
+<span class="sd">        require(&quot;other_alias&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_content</span> <span class="o">=</span> <span class="n">content</span>
+    <span class="k">for</span> <span class="n">quote</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">RELATIVE_REQUIRE_RE</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">new_content</span><span class="p">):</span>
+        <span class="n">module_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;/&quot;</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+            <span class="n">pattern</span> <span class="o">=</span> <span class="sa">rf</span><span class="s2">&quot;require\(</span><span class="si">{</span><span class="n">quote</span><span class="si">}{</span><span class="n">path</span><span class="si">}{</span><span class="n">quote</span><span class="si">}</span><span class="s2">\)&quot;</span>
+            <span class="n">module_path</span> <span class="o">=</span> <span class="n">relative_path_to_module_path</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">repl</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;require(&quot;</span><span class="si">{</span><span class="n">module_path</span><span class="si">}</span><span class="s1">&quot;)&#39;</span>
+            <span class="n">new_content</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">repl</span><span class="p">,</span> <span class="n">new_content</span><span class="p">)</span>
+        <span class="n">dependencies</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">module_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_content</span></div>
+
+
+
+<span class="n">IMPORT_STAR</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^(?P&lt;space&gt;\s*)       # indentation</span>
+<span class="s2">    import\s+\*\s+as\s+   # import * as</span>
+<span class="s2">    (?P&lt;identifier&gt;\w+)   # alias</span>
+<span class="s2">    \s*from\s*            # from</span>
+<span class="s2">    (?P&lt;path&gt;[^;\n]+)     # path</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_star_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_star_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_star_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile import star.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import * as name from &quot;some/path&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const name = require(&quot;some/path&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\g&lt;space&gt;const \g&lt;identifier&gt; = require(\g&lt;path&gt;)&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_STAR</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IMPORT_DEFAULT_AND_STAR</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^(?P&lt;space&gt;\s*)                 # indentation</span>
+<span class="s2">    import\s+                       # import</span>
+<span class="s2">    (?P&lt;default_export&gt;\w+)\s*,\s*  # default export name,</span>
+<span class="s2">    \*\s+as\s+                      # * as</span>
+<span class="s2">    (?P&lt;named_exports_alias&gt;\w+)    # alias</span>
+<span class="s2">    \s*from\s*                      # from</span>
+<span class="s2">    (?P&lt;path&gt;[^;\n]+)               # path</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_default_and_star_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_default_and_star_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_default_and_star_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile import star.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import something, * as name from &quot;some/path&quot;;</span>
+<span class="sd">        // after</span>
+<span class="sd">        const name = require(&quot;some/path&quot;);</span>
+<span class="sd">        const something = name[Symbol.for(&quot;default&quot;)];</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;\g&lt;space&gt;const \g&lt;named_exports_alias&gt; = require(\g&lt;path&gt;);</span>
+<span class="s2">\g&lt;space&gt;const \g&lt;default_export&gt; = \g&lt;named_exports_alias&gt;[Symbol.for(&quot;default&quot;)]&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_DEFAULT_AND_STAR</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">IMPORT_UNNAMED_RELATIVE_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    ^(?P&lt;space&gt;\s*)     # indentation</span>
+<span class="s2">    import\s+           # import</span>
+<span class="s2">    (?P&lt;path&gt;[^;\n]+)   # relative path</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="convert_unnamed_relative_import">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_unnamed_relative_import">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_unnamed_relative_import</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpile relative &quot;direct&quot; imports. Direct meaning they are not store in a variable.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        import &quot;some/path&quot;</span>
+<span class="sd">        // after</span>
+<span class="sd">        require(&quot;some/path&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">repl</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;require(\g&lt;path&gt;)&quot;</span>
+    <span class="k">return</span> <span class="n">IMPORT_UNNAMED_RELATIVE_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<span class="n">URL_INDEX_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    require\s*                 # require</span>
+<span class="s2">    \(\s*                      # (</span>
+<span class="s2">    (?P&lt;path&gt;(?P&lt;quote&gt;[&quot;&#39;`])([^&quot;&#39;`]*/index/?)(?P=quote))  # path ended by /index or /index/</span>
+<span class="s2">    \s*\)                      # )</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="remove_index">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.remove_index">[docs]</a>
+<span class="k">def</span> <span class="nf">remove_index</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Remove in the paths the /index.js.</span>
+<span class="sd">    We want to be able to import a module just trough its directory name if it contains an index.js.</span>
+<span class="sd">    So we no longer need to specify the index.js in the paths.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">repl</span><span class="p">(</span><span class="n">matchobj</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">matchobj</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">]</span>
+        <span class="n">new_path</span> <span class="o">=</span> <span class="n">path</span><span class="p">[:</span> <span class="n">path</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;/index&quot;</span><span class="p">)]</span> <span class="o">+</span> <span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;require(</span><span class="si">{</span><span class="n">new_path</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="k">return</span> <span class="n">URL_INDEX_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">repl</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="relative_path_to_module_path">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.relative_path_to_module_path">[docs]</a>
+<span class="k">def</span> <span class="nf">relative_path_to_module_path</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">path_rel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the relative path into a module path, which is more generic and</span>
+<span class="sd">    fancy.</span>
+
+<span class="sd">    :param str url:</span>
+<span class="sd">    :param path_rel: a relative path to the current url.</span>
+<span class="sd">    :return: module path (@module/...)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">url_split</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+    <span class="n">path_rel_split</span> <span class="o">=</span> <span class="n">path_rel</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+    <span class="n">nb_back</span> <span class="o">=</span> <span class="nb">len</span><span class="p">([</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">path_rel_split</span> <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="s2">&quot;..&quot;</span><span class="p">])</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">url_split</span><span class="p">[:</span><span class="o">-</span><span class="n">nb_back</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">path_rel_split</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;..&quot;</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">]])</span>
+    <span class="k">return</span> <span class="n">url_to_module_path</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
+
+
+
+<span class="n">ODOO_MODULE_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    \s*                                       # some starting space</span>
+<span class="s2">    \/(\*|\/).*\s*                            # // or /*</span>
+<span class="s2">    @odoo-module                              # @odoo-module</span>
+<span class="s2">    (\s+alias=(?P&lt;alias&gt;[\w.]+))?             # alias=web.AbstractAction (optional)</span>
+<span class="s2">    (\s+default=(?P&lt;default&gt;False|false|0))?  # default=False or false or 0 (optional)</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="is_odoo_module">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.is_odoo_module">[docs]</a>
+<span class="k">def</span> <span class="nf">is_odoo_module</span><span class="p">(</span><span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Detect if the file is a native odoo module.</span>
+<span class="sd">    We look for a comment containing @odoo-module.</span>
+
+<span class="sd">    :param content: source code</span>
+<span class="sd">    :return: is this a odoo module that need transpilation ?</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">ODOO_MODULE_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_aliased_odoo_define_content">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.get_aliased_odoo_define_content">[docs]</a>
+<span class="k">def</span> <span class="nf">get_aliased_odoo_define_content</span><span class="p">(</span><span class="n">module_path</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    To allow smooth transition between the new system and the legacy one, we have the possibility to</span>
+<span class="sd">    defined an alternative module name (an alias) that will act as proxy between legacy require calls and</span>
+<span class="sd">    new modules.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    If we have a require call somewhere in the odoo source base being:</span>
+<span class="sd">    &gt; vat AbstractAction require(&quot;web.AbstractAction&quot;)</span>
+<span class="sd">    we have a problem when we will have converted to module to ES6: its new name will be more like</span>
+<span class="sd">    &quot;web/chrome/abstract_action&quot;. So the require would fail !</span>
+<span class="sd">    So we add a second small modules, an alias, as such:</span>
+<span class="sd">    &gt; odoo.define(&quot;web/chrome/abstract_action&quot;, [&#39;web.AbstractAction&#39;], function (require) {</span>
+<span class="sd">    &gt;  return require(&#39;web.AbstractAction&#39;)[Symbol.for(&quot;default&quot;)];</span>
+<span class="sd">    &gt; });</span>
+
+<span class="sd">    To generate this, change your comment on the top of the file.</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        /** @odoo-module */</span>
+<span class="sd">        // after</span>
+<span class="sd">        /** @odoo-module alias=web.AbstractAction */</span>
+
+<span class="sd">    Notice that often, the legacy system acted like they it did defaukt imports. That&#39;s why we have the</span>
+<span class="sd">    &quot;[Symbol.for(&quot;default&quot;)];&quot; bit. If your use case does not need this default import, just do:</span>
+
+<span class="sd">    .. code-block:: javascript</span>
+
+<span class="sd">        // before</span>
+<span class="sd">        /** @odoo-module */</span>
+<span class="sd">        // after</span>
+<span class="sd">        /** @odoo-module alias=web.AbstractAction default=false */</span>
+
+<span class="sd">    :return: the alias content to append to the source code.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matchobj</span> <span class="o">=</span> <span class="n">ODOO_MODULE_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">matchobj</span><span class="p">:</span>
+        <span class="n">alias</span> <span class="o">=</span> <span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;alias&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">alias</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">matchobj</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]:</span>
+                <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span><span class="se">\n</span><span class="s2">odoo.define(`</span><span class="si">%s</span><span class="s2">`, [&#39;</span><span class="si">%s</span><span class="s2">&#39;], function (require) {</span>
+<span class="s2">                        return require(&#39;</span><span class="si">%s</span><span class="s2">&#39;);</span>
+<span class="s2">                        });</span><span class="se">\n</span><span class="s2">&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">module_path</span><span class="p">,</span> <span class="n">module_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span><span class="se">\n</span><span class="s2">odoo.define(`</span><span class="si">%s</span><span class="s2">`, [&#39;</span><span class="si">%s</span><span class="s2">&#39;], function (require) {</span>
+<span class="s2">                        return require(&#39;</span><span class="si">%s</span><span class="s2">&#39;)[Symbol.for(&quot;default&quot;)];</span>
+<span class="s2">                        });</span><span class="se">\n</span><span class="s2">&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">module_path</span><span class="p">,</span> <span class="n">module_path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="convert_as">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.convert_as">[docs]</a>
+<span class="k">def</span> <span class="nf">convert_as</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; as &quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">val</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">parts</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="remove_as">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.js_transpiler.remove_as">[docs]</a>
+<span class="k">def</span> <span class="nf">remove_as</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; as &quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">val</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

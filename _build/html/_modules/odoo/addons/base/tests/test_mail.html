@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_mail &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_mail</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_mail</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">markupsafe</span> <span class="kn">import</span> <span class="n">Markup</span>
+
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">from</span> <span class="nn">odoo.addons.base.models.ir_mail_server</span> <span class="kn">import</span> <span class="n">extract_rfc2822_addresses</span>
+<span class="kn">from</span> <span class="nn">odoo.addons.base.models.ir_qweb_fields</span> <span class="kn">import</span> <span class="n">nl2br_enclose</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">tagged</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">BaseCase</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">is_html_empty</span><span class="p">,</span> <span class="n">html_to_inner_content</span><span class="p">,</span> <span class="n">html_sanitize</span><span class="p">,</span> <span class="n">append_content_to_html</span><span class="p">,</span> <span class="n">plaintext2html</span><span class="p">,</span>
+    <span class="n">email_domain_normalize</span><span class="p">,</span> <span class="n">email_normalize</span><span class="p">,</span> <span class="n">email_re</span><span class="p">,</span>
+    <span class="n">email_split</span><span class="p">,</span> <span class="n">email_split_and_format</span><span class="p">,</span> <span class="n">email_split_tuples</span><span class="p">,</span>
+    <span class="n">single_email_re</span><span class="p">,</span>
+    <span class="n">misc</span><span class="p">,</span> <span class="n">formataddr</span><span class="p">,</span>
+    <span class="n">prepend_html_content</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">test_mail_examples</span>
+
+
+<div class="viewcode-block" id="TestSanitizer">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mail_sanitize&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestSanitizer</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test the html sanitizer that filters html to remove unwanted attributes &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestSanitizer.test_abrupt_close">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_abrupt_close">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_abrupt_close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;!--&gt; &lt;script&gt; alert(1) &lt;/script&gt; --&gt;&quot;&quot;&quot;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span>
+
+        <span class="n">payload</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;!---&gt; &lt;script&gt; alert(1) &lt;/script&gt; --&gt;&quot;&quot;&quot;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_abrut_malformed">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_abrut_malformed">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_abrut_malformed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;!--!&gt; &lt;script&gt; alert(1) &lt;/script&gt; --&gt;&quot;&quot;&quot;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span>
+
+        <span class="n">payload</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;!---!&gt; &lt;script&gt; alert(1) &lt;/script&gt; --&gt;&quot;&quot;&quot;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_basic_sanitizer">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_basic_sanitizer">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_basic_sanitizer</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;yop&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;p&gt;yop&lt;/p&gt;&quot;</span><span class="p">),</span>  <span class="c1"># simple</span>
+            <span class="p">(</span><span class="s2">&quot;lala&lt;p&gt;yop&lt;/p&gt;xxx&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;p&gt;lala&lt;/p&gt;&lt;p&gt;yop&lt;/p&gt;xxx&quot;</span><span class="p">),</span>  <span class="c1"># trailing text</span>
+            <span class="p">(</span><span class="s2">&quot;Merci à l&#39;intérêt pour notre produit.nous vous contacterons bientôt. Merci&quot;</span><span class="p">,</span>
+                <span class="sa">u</span><span class="s2">&quot;&lt;p&gt;Merci à l&#39;intérêt pour notre produit.nous vous contacterons bientôt. Merci&lt;/p&gt;&quot;</span><span class="p">),</span>  <span class="c1"># unicode</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="s1">&#39;html_sanitize is broken&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_comment_malformed">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_comment_malformed">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_comment_malformed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;&lt;!-- malformed-close --!&gt; &lt;img src=&#39;x&#39; onerror=&#39;alert(1)&#39;&gt;&lt;/img&gt; --&gt; comment &lt;!-- normal comment --&gt; --&gt; out of context balise --!&gt;&#39;&#39;&#39;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">html</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_comment_multiline">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_comment_multiline">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_comment_multiline</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;div&gt; &lt;!--</span>
+<span class="s2">                multi line comment</span>
+<span class="s2">                --!&gt; &lt;/div&gt; &lt;script&gt; alert(1) &lt;/script&gt; --&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">html_result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;alert(1)&#39;</span><span class="p">,</span> <span class="n">html_result</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_evil_malicious_code">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_evil_malicious_code">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_evil_malicious_code</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># taken from https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#Tests</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=javascript:alert(&#39;XSS&#39;)&gt;&quot;</span><span class="p">),</span>  <span class="c1"># no quotes and semicolons</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=&amp;#106;&amp;#97;&amp;#118;&amp;#97;&amp;#115;&amp;#99;&amp;#114;&amp;#105;&amp;#112;&amp;#116;&amp;#58;&amp;#97;&amp;#108;&amp;#101;&amp;#114;&amp;#116;&amp;#40;&amp;#39;&amp;#88;&amp;#83;&amp;#83;&amp;#39;&amp;#41;&gt;&quot;</span><span class="p">),</span>  <span class="c1"># UTF-8 Unicode encoding</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=&amp;#x6A&amp;#x61&amp;#x76&amp;#x61&amp;#x73&amp;#x63&amp;#x72&amp;#x69&amp;#x70&amp;#x74&amp;#x3A&amp;#x61&amp;#x6C&amp;#x65&amp;#x72&amp;#x74&amp;#x28&amp;#x27&amp;#x58&amp;#x53&amp;#x53&amp;#x27&amp;#x29&gt;&quot;</span><span class="p">),</span>  <span class="c1"># hex encoding</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2">jav&amp;#x0D;ascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># embedded carriage return</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2">jav&amp;#x0A;ascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># embedded newline</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2">jav   ascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># embedded tab</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2">jav&amp;#x09;ascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># embedded encoded tab</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2"> &amp;#14;  javascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># spaces and meta-characters</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">),</span>  <span class="c1"># half-open html</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG </span><span class="se">\&quot;\&quot;\&quot;</span><span class="s2">&gt;&lt;SCRIPT&gt;alert(</span><span class="se">\&quot;</span><span class="s2">XSS</span><span class="se">\&quot;</span><span class="s2">)&lt;/SCRIPT&gt;</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># malformed tag</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;SCRIPT/XSS SRC=</span><span class="se">\&quot;</span><span class="s2">http://ha.ckers.org/xss.js</span><span class="se">\&quot;</span><span class="s2">&gt;&lt;/SCRIPT&gt;&quot;</span><span class="p">),</span>  <span class="c1"># non-alpha-non-digits</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;SCRIPT/SRC=</span><span class="se">\&quot;</span><span class="s2">http://ha.ckers.org/xss.js</span><span class="se">\&quot;</span><span class="s2">&gt;&lt;/SCRIPT&gt;&quot;</span><span class="p">),</span>  <span class="c1"># non-alpha-non-digits</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;&lt;SCRIPT&gt;alert(</span><span class="se">\&quot;</span><span class="s2">XSS</span><span class="se">\&quot;</span><span class="s2">);//&lt;&lt;/SCRIPT&gt;&quot;</span><span class="p">),</span>  <span class="c1"># extraneous open brackets</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;SCRIPT SRC=http://ha.ckers.org/xss.js?&lt; B &gt;&quot;</span><span class="p">),</span>  <span class="c1"># non-closing script tags</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;INPUT TYPE=</span><span class="se">\&quot;</span><span class="s2">IMAGE</span><span class="se">\&quot;</span><span class="s2"> SRC=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># input image</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;BODY BACKGROUND=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># body image</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG DYNSRC=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># img dynsrc</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG LOWSRC=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># img lowsrc</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;TABLE BACKGROUND=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># table</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;TABLE&gt;&lt;TD BACKGROUND=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;)</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># td</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;DIV STYLE=</span><span class="se">\&quot;</span><span class="s2">background-image: url(javascript:alert(&#39;XSS&#39;))</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># div background</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;DIV STYLE=</span><span class="se">\&quot;</span><span class="s2">background-image:</span><span class="se">\007</span><span class="s2">5</span><span class="se">\007</span><span class="s2">2</span><span class="se">\006</span><span class="s2">C</span><span class="se">\002</span><span class="s2">8&#39;</span><span class="se">\006</span><span class="s2">a</span><span class="se">\006</span><span class="s2">1</span><span class="se">\007</span><span class="s2">6</span><span class="se">\006</span><span class="s2">1</span><span class="se">\007</span><span class="s2">3</span><span class="se">\006</span><span class="s2">3</span><span class="se">\007</span><span class="s2">2</span><span class="se">\006</span><span class="s2">9</span><span class="se">\007</span><span class="s2">0</span><span class="se">\007</span><span class="s2">4</span><span class="se">\003</span><span class="s2">a</span><span class="se">\006</span><span class="s2">1</span><span class="se">\006</span><span class="s2">c</span><span class="se">\006</span><span class="s2">5</span><span class="se">\007</span><span class="s2">2</span><span class="se">\007</span><span class="s2">4</span><span class="se">\002</span><span class="s2">8.1027</span><span class="se">\005</span><span class="s2">8.1053</span><span class="se">\005</span><span class="s2">3</span><span class="se">\002</span><span class="s2">7</span><span class="se">\002</span><span class="s2">9&#39;</span><span class="se">\002</span><span class="s2">9</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># div background with unicoded exploit</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;DIV STYLE=</span><span class="se">\&quot;</span><span class="s2">background-image: url(&amp;#1;javascript:alert(&#39;XSS&#39;))</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># div background + extra characters</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG SRC=&#39;vbscript:msgbox(</span><span class="se">\&quot;</span><span class="s2">XSS</span><span class="se">\&quot;</span><span class="s2">)&#39;&gt;&quot;</span><span class="p">),</span>  <span class="c1"># VBscrip in an image</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;BODY ONLOAD=alert(&#39;XSS&#39;)&gt;&quot;</span><span class="p">),</span>  <span class="c1"># event handler</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;BR SIZE=</span><span class="se">\&quot;</span><span class="s2">&amp;{alert(&#39;XSS&#39;)}</span><span class="se">\\</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># &amp; javascript includes</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;LINK REL=</span><span class="se">\&quot;</span><span class="s2">stylesheet</span><span class="se">\&quot;</span><span class="s2"> HREF=</span><span class="se">\&quot;</span><span class="s2">javascript:alert(&#39;XSS&#39;);</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># style sheet</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;LINK REL=</span><span class="se">\&quot;</span><span class="s2">stylesheet</span><span class="se">\&quot;</span><span class="s2"> HREF=</span><span class="se">\&quot;</span><span class="s2">http://ha.ckers.org/xss.css</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># remote style sheet</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;STYLE&gt;@import&#39;http://ha.ckers.org/xss.css&#39;;&lt;/STYLE&gt;&quot;</span><span class="p">),</span>  <span class="c1"># remote style sheet 2</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;META HTTP-EQUIV=</span><span class="se">\&quot;</span><span class="s2">Link</span><span class="se">\&quot;</span><span class="s2"> Content=</span><span class="se">\&quot;</span><span class="s2">&lt;http://ha.ckers.org/xss.css&gt;; REL=stylesheet</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># remote style sheet 3</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;STYLE&gt;BODY{-moz-binding:url(</span><span class="se">\&quot;</span><span class="s2">http://ha.ckers.org/xssmoz.xml#xss</span><span class="se">\&quot;</span><span class="s2">)}&lt;/STYLE&gt;&quot;</span><span class="p">),</span>  <span class="c1"># remote style sheet 4</span>
+            <span class="p">(</span><span class="s2">&quot;&lt;IMG STYLE=</span><span class="se">\&quot;</span><span class="s2">xss:expr/*XSS*/ession(alert(&#39;XSS&#39;))</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">),</span>  <span class="c1"># style attribute using a comment to break up expression</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;javascript&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">,</span> <span class="s1">&#39;html_sanitize did not remove a malicious javascript&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="s1">&#39;ha.ckers.org&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">html</span> <span class="ow">or</span> <span class="s1">&#39;http://ha.ckers.org/xss.css&#39;</span> <span class="ow">in</span> <span class="n">html</span><span class="p">,</span> <span class="s1">&#39;html_sanitize did not remove a malicious code in </span><span class="si">%s</span><span class="s1"> (</span><span class="si">%s</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">html</span><span class="p">))</span>
+
+        <span class="n">content</span> <span class="o">=</span> <span class="s2">&quot;&lt;!--[if gte IE 4]&gt;&lt;SCRIPT&gt;alert(&#39;XSS&#39;);&lt;/SCRIPT&gt;&lt;![endif]--&gt;&quot;</span>  <span class="c1"># down-level hidden block</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">html_sanitize</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">silent</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sanitized_html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">MISC_HTML_SOURCE</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;&lt;div&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;b&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;i&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;u&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;strike&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;li&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;blockquote&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;a href&#39;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">tag</span><span class="p">,</span> <span class="n">sanitized_html</span><span class="p">,</span> <span class="s1">&#39;html_sanitize stripped too much of original html&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;javascript&#39;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">attr</span><span class="p">,</span> <span class="n">sanitized_html</span><span class="p">,</span> <span class="s1">&#39;html_sanitize did not remove enough unwanted attributes&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_outlook_mail_sanitize">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_outlook_mail_sanitize">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_outlook_mail_sanitize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;div class=&quot;WordSection1&quot;&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;Here is a test mail&lt;o:p&gt;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;o:p&gt;&amp;nbsp;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;With a break line&lt;o:p&gt;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;o:p&gt;&amp;nbsp;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;o:p&gt;&amp;nbsp;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;Then two&lt;o:p&gt;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;o:p&gt;&amp;nbsp;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;div&gt;</span>
+<span class="s2">&lt;div style=&quot;border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0in 0in 0in&quot;&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;b&gt;From:&lt;/b&gt; Mitchell Admin &amp;lt;dummy@example.com&amp;gt;</span>
+<span class="s2">&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;Sent:&lt;/b&gt; Monday, November 20, 2023 8:34 AM&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;To:&lt;/b&gt; test user &amp;lt;dummy@example.com&amp;gt;&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;Subject:&lt;/b&gt; test (#23)&lt;o:p&gt;&lt;/o:p&gt;&lt;/p&gt;</span>
+<span class="s2">&lt;/div&gt;</span>
+<span class="s2">&lt;/div&gt;&quot;&quot;&quot;</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;&lt;div class=&quot;WordSection1&quot;&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;Here is a test mail&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&amp;nbsp;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;With a break line&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&amp;nbsp;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&amp;nbsp;&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;Then two&lt;/p&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&amp;nbsp;&lt;/p&gt;</span>
+<span class="s2">&lt;div&gt;</span>
+<span class="s2">&lt;div style=&quot;border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0in 0in 0in&quot;&gt;</span>
+<span class="s2">&lt;p class=&quot;MsoNormal&quot;&gt;&lt;b&gt;From:&lt;/b&gt; Mitchell Admin &amp;lt;dummy@example.com&amp;gt;</span>
+<span class="s2">&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;Sent:&lt;/b&gt; Monday, November 20, 2023 8:34 AM&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;To:&lt;/b&gt; test user &amp;lt;dummy@example.com&amp;gt;&lt;br&gt;</span>
+<span class="s2">&lt;b&gt;Subject:&lt;/b&gt; test (#23)&lt;/p&gt;</span>
+<span class="s2">&lt;/div&gt;</span>
+<span class="s2">&lt;/div&gt;&lt;/div&gt;&quot;&quot;&quot;</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">case</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_sanitize_unescape_emails">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_sanitize_unescape_emails">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_sanitize_unescape_emails</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">not_emails</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;&lt;blockquote cite=&quot;mid:CAEJSRZvWvud8c6Qp=wfNG6O1+wK3i_jb33qVrF7XyrgPNjnyUA@mail.gmail.com&quot; type=&quot;cite&quot;&gt;cat&lt;/blockquote&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;img alt=&quot;@github-login&quot; class=&quot;avatar&quot; src=&quot;/web/image/pi&quot; height=&quot;36&quot; width=&quot;36&quot;&gt;&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">not_email</span> <span class="ow">in</span> <span class="n">not_emails</span><span class="p">:</span>
+            <span class="n">sanitized</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">not_email</span><span class="p">)</span>
+            <span class="n">left_part</span> <span class="o">=</span> <span class="n">not_email</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># take only left part, as the sanitizer could add data information on node</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">not_email</span><span class="p">),</span> <span class="n">sanitized</span><span class="p">,</span> <span class="s1">&#39;html_sanitize stripped emails of original html&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">left_part</span><span class="p">,</span> <span class="n">sanitized</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_style_parsing">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_style_parsing">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_style_parsing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">test_data</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;&lt;span style=&quot;position: fixed; top: 0px; left: 50px; width: 40%; height: 50%; background-color: red;&quot;&gt;Coin coin &lt;/span&gt;&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;background-color:red&#39;</span><span class="p">,</span> <span class="s1">&#39;Coin coin&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;position&#39;</span><span class="p">,</span> <span class="s1">&#39;top&#39;</span><span class="p">,</span> <span class="s1">&#39;left&#39;</span><span class="p">]</span>
+            <span class="p">),</span> <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;&lt;div style=&#39;before: &quot;Email Address; coincoin cheval: lapin&quot;;  </span>
+<span class="sd">   font-size: 30px; max-width: 100%; after: &quot;Not sure</span>
+<span class="sd">    </span>
+<span class="sd">          this; means: anything ?#ùµ&quot;</span>
+<span class="sd">    ; some-property: 2px; top: 3&#39;&gt;youplaboum&lt;/div&gt;&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;font-size:30px&#39;</span><span class="p">,</span> <span class="s1">&#39;youplaboum&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;some-property&#39;</span><span class="p">,</span> <span class="s1">&#39;top&#39;</span><span class="p">,</span> <span class="s1">&#39;cheval&#39;</span><span class="p">]</span>
+            <span class="p">),</span> <span class="p">(</span>
+                <span class="s1">&#39;&lt;span style=&quot;width&quot;&gt;Coincoin&lt;/span&gt;&#39;</span><span class="p">,</span>
+                <span class="p">[],</span>
+                <span class="p">[</span><span class="s1">&#39;width&#39;</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">test</span><span class="p">,</span> <span class="n">in_lst</span><span class="p">,</span> <span class="n">out_lst</span> <span class="ow">in</span> <span class="n">test_data</span><span class="p">:</span>
+            <span class="n">new_html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test</span><span class="p">,</span> <span class="n">sanitize_attributes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sanitize_style</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strip_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">in_lst</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">new_html</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">out_lst</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">new_html</span><span class="p">)</span>
+
+        <span class="c1"># style should not be sanitized if removed</span>
+        <span class="n">new_html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">sanitize_attributes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strip_style</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">new_html</span><span class="p">,</span> <span class="sa">u</span><span class="s1">&#39;&lt;span&gt;Coin coin &lt;/span&gt;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_style_class">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_style_class">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_style_class</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS</span><span class="p">,</span> <span class="n">sanitize_attributes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sanitize_style</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">,)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_style_class_only">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_style_class_only">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_style_class_only</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS</span><span class="p">,</span> <span class="n">sanitize_attributes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sanitize_style</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">REMOVE_CLASS_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">,)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_edi_source">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_edi_source">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_edi_source</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">EDI_LIKE_HTML_SOURCE</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span>
+            <span class="s1">&#39;font-family: </span><span class="se">\&#39;</span><span class="s1">Lucida Grande</span><span class="se">\&#39;</span><span class="s1">, Ubuntu, Arial, Verdana, sans-serif;&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">,</span>
+            <span class="s1">&#39;html_sanitize removed valid styling&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span>
+            <span class="s1">&#39;src=&quot;https://www.paypal.com/en_US/i/btn/btn_paynowCC_LG.gif&quot;&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">,</span>
+            <span class="s1">&#39;html_sanitize removed valid img&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;&lt;/body&gt;&lt;/html&gt;&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">,</span> <span class="s1">&#39;html_sanitize did not remove extra closing tags&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_blockquote">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_blockquote">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_blockquote</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_BLOCKQUOTE</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_BLOCKQUOTE_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_BLOCKQUOTE_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_thunderbird">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_thunderbird">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_thunderbird</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_1_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_1_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_hotmail_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_hotmail_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_hotmail_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_HOTMAIL_HTML</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_HOTMAIL_HTML_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_HOTMAIL_HTML_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">HOTMAIL_1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">HOTMAIL_1_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">HOTMAIL_1_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_outlook_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_outlook_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_outlook_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_OUTLOOK_HTML</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_OUTLOOK_HTML_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_OUTLOOK_HTML_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_thunderbird_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_thunderbird_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_thunderbird_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_HTML</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_HTML_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_THUNDERBIRD_HTML_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_yahoo_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_yahoo_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_yahoo_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_YAHOO_HTML</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_YAHOO_HTML_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">QUOTE_YAHOO_HTML_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_basic_text">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_basic_text">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_basic_text</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">test_data</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;This is Sparta!\n--\nAdministrator\n+9988776655&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;This is Sparta!&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">--</span><span class="se">\n</span><span class="s1">Administrator</span><span class="se">\n</span><span class="s1">+9988776655&#39;</span><span class="p">]</span>
+            <span class="p">),</span> <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;&lt;p&gt;This is Sparta!\n--\nAdministrator&lt;/p&gt;&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[],</span>
+                <span class="p">[</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">--</span><span class="se">\n</span><span class="s1">Administrator&#39;</span><span class="p">]</span>
+            <span class="p">),</span> <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;&lt;p&gt;This is Sparta!&lt;br/&gt;--&lt;br&gt;Administrator&lt;/p&gt;&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;This is Sparta!&#39;</span><span class="p">],</span>
+                <span class="p">[]</span>
+            <span class="p">),</span> <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;This is Sparta!\n&gt;Ah bon ?\nCertes\n&gt; Chouette !\nClair&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;This is Sparta!&#39;</span><span class="p">,</span> <span class="s1">&#39;Certes&#39;</span><span class="p">,</span> <span class="s1">&#39;Clair&#39;</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&gt;Ah bon ?&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&gt; Chouette !&#39;</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">test</span><span class="p">,</span> <span class="n">in_lst</span><span class="p">,</span> <span class="n">out_lst</span> <span class="ow">in</span> <span class="n">test_data</span><span class="p">:</span>
+            <span class="n">new_html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">in_lst</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">new_html</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">out_lst</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">text</span><span class="p">),</span> <span class="n">new_html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_signature">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_signature">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_signature</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">test_data</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;&lt;div&gt;Hello&lt;pre&gt;--&lt;br /&gt;Administrator&lt;/pre&gt;&lt;/div&gt;&quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s2">&quot;&lt;pre data-o-mail-quote=</span><span class="se">\&quot;</span><span class="s2">1</span><span class="se">\&quot;</span><span class="s2">&gt;--&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;br data-o-mail-quote=</span><span class="se">\&quot;</span><span class="s2">1</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">test</span><span class="p">,</span> <span class="n">in_lst</span> <span class="ow">in</span> <span class="n">test_data</span><span class="p">:</span>
+            <span class="n">new_html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">in_lst</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">new_html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_gmail">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_gmail">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_gmail</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">GMAIL_1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">GMAIL_1_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">GMAIL_1_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_text">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_text">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_text</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_1_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_1_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span>
+
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_2</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_2_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">TEXT_2_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_quote_bugs">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_quote_bugs">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_quote_bugs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">test_mail_examples</span><span class="o">.</span><span class="n">BUG1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">BUG_1_IN</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">test_mail_examples</span><span class="o">.</span><span class="n">BUG_1_OUT</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;span data-o-mail-quote=&quot;1&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/span&gt;&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ext</span><span class="p">),</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_misc">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_misc">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_misc</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># False / void should not crash</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># Message with xml and doctype tags don&#39;t crash</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;iso-8859-1&quot;?&gt;</span><span class="se">\n</span><span class="s1">&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Transitional//EN&quot;</span><span class="se">\n</span><span class="s1">         &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd&quot;&gt;</span><span class="se">\n</span><span class="s1">&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; xml:lang=&quot;en&quot; lang=&quot;en&quot;&gt;</span><span class="se">\n</span><span class="s1"> &lt;head&gt;</span><span class="se">\n</span><span class="s1">  &lt;title&gt;404 - Not Found&lt;/title&gt;</span><span class="se">\n</span><span class="s1"> &lt;/head&gt;</span><span class="se">\n</span><span class="s1"> &lt;body&gt;</span><span class="se">\n</span><span class="s1">  &lt;h1&gt;404 - Not Found&lt;/h1&gt;</span><span class="se">\n</span><span class="s1"> &lt;/body&gt;</span><span class="se">\n</span><span class="s1">&lt;/html&gt;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;encoding&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;&lt;title&gt;404 - Not Found&lt;/title&gt;&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;&lt;h1&gt;404 - Not Found&lt;/h1&gt;&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestSanitizer.test_cid_with_at">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestSanitizer.test_cid_with_at">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cid_with_at</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">img_tag</span> <span class="o">=</span> <span class="s1">&#39;&lt;img src=&quot;@&quot;&gt;&#39;</span>
+        <span class="n">sanitized</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">img_tag</span><span class="p">,</span> <span class="n">sanitize_tags</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">img_tag</span><span class="p">,</span> <span class="n">sanitized</span><span class="p">,</span> <span class="s2">&quot;img with can have cid containing @ and shouldn&#39;t be escaped&quot;</span><span class="p">)</span></div>
+</div>
+
+
+    <span class="c1"># ms office is currently not supported, have to find a way to support it</span>
+    <span class="c1"># def test_30_email_msoffice(self):</span>
+    <span class="c1">#     new_html = html_sanitize(test_mail_examples.MSOFFICE_1, remove=True)</span>
+    <span class="c1">#     for ext in test_mail_examples.MSOFFICE_1_IN:</span>
+    <span class="c1">#         self.assertIn(ext, new_html)</span>
+    <span class="c1">#     for ext in test_mail_examples.MSOFFICE_1_OUT:</span>
+    <span class="c1">#         self.assertNotIn(ext, new_html)</span>
+
+
+<div class="viewcode-block" id="TestHtmlTools">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mail_sanitize&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestHtmlTools</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test some of our generic utility functions about html &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestHtmlTools.test_plaintext2html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_plaintext2html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_plaintext2html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;First </span><span class="se">\n</span><span class="s2">Second </span><span class="se">\n</span><span class="s2">Third</span><span class="se">\n</span><span class="s2"> </span><span class="se">\n</span><span class="s2">Paragraph</span><span class="se">\n\r</span><span class="s2">--</span><span class="se">\n</span><span class="s2">Signature paragraph&quot;</span><span class="p">,</span> <span class="s1">&#39;div&#39;</span><span class="p">,</span>
+             <span class="s2">&quot;&lt;div&gt;&lt;p&gt;First &lt;br/&gt;Second &lt;br/&gt;Third&lt;/p&gt;&lt;p&gt;Paragraph&lt;/p&gt;&lt;p&gt;--&lt;br/&gt;Signature paragraph&lt;/p&gt;&lt;/div&gt;&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;First&lt;p&gt;It should be escaped&lt;/p&gt;</span><span class="se">\n</span><span class="s2">Signature&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s2">&quot;&lt;p&gt;First&amp;lt;p&amp;gt;It should be escaped&amp;lt;/p&amp;gt;&lt;br/&gt;Signature&lt;/p&gt;&quot;</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">=</span> <span class="n">plaintext2html</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="s1">&#39;plaintext2html is broken&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestHtmlTools.test_html_html_to_inner_content">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_html_html_to_inner_content">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_html_html_to_inner_content</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;div&gt;&lt;p&gt;First &lt;br/&gt;Second &lt;br/&gt;Third Paragraph&lt;/p&gt;&lt;p&gt;--&lt;br/&gt;Signature paragraph with a &lt;a href=&quot;./link&quot;&gt;link&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&#39;</span><span class="p">,</span>
+             <span class="s1">&#39;First Second Third Paragraph -- Signature paragraph with a link&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;p&gt;Now =&amp;gt; processing&amp;nbsp;entities&amp;#8203;and extra whitespace too.  &lt;/p&gt;&#39;</span><span class="p">,</span>
+             <span class="s1">&#39;Now =&gt; processing</span><span class="se">\xa0</span><span class="s1">entities</span><span class="se">\u200b</span><span class="s1">and extra whitespace too.&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;div&gt;Look what happens with &lt;p&gt;unmatched tags&lt;/div&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;Look what happens with unmatched tags&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;div&gt;Look what happens with &lt;p unclosed tags&lt;/div&gt; Are we good?&#39;</span><span class="p">,</span> <span class="s1">&#39;Look what happens with Are we good?&#39;</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">html_to_inner_content</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="s1">&#39;html_html_to_inner_content is broken&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestHtmlTools.test_append_to_html">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_append_to_html">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_append_to_html</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">test_samples</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;!DOCTYPE...&gt;&lt;HTML encoding=&quot;blah&quot;&gt;some &lt;b&gt;content&lt;/b&gt;&lt;/HtMl&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;--</span><span class="se">\n</span><span class="s1">Yours truly&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s1">&#39;&lt;!DOCTYPE...&gt;&lt;html encoding=&quot;blah&quot;&gt;some &lt;b&gt;content&lt;/b&gt;</span><span class="se">\n</span><span class="s1">&lt;pre&gt;--</span><span class="se">\n</span><span class="s1">Yours truly&lt;/pre&gt;</span><span class="se">\n</span><span class="s1">&lt;/html&gt;&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;!DOCTYPE...&gt;&lt;HTML encoding=&quot;blah&quot;&gt;some &lt;b&gt;content&lt;/b&gt;&lt;/HtMl&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;--</span><span class="se">\n</span><span class="s1">Yours truly&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s1">&#39;&lt;!DOCTYPE...&gt;&lt;html encoding=&quot;blah&quot;&gt;some &lt;b&gt;content&lt;/b&gt;</span><span class="se">\n</span><span class="s1">&lt;p&gt;--&lt;br/&gt;Yours truly&lt;/p&gt;</span><span class="se">\n</span><span class="s1">&lt;/html&gt;&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;html&gt;&lt;body&gt;some &lt;b&gt;content&lt;/b&gt;&lt;/body&gt;&lt;/html&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;--</span><span class="se">\n</span><span class="s1">Yours &amp; &lt;truly&gt;&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s1">&#39;&lt;html&gt;&lt;body&gt;some &lt;b&gt;content&lt;/b&gt;</span><span class="se">\n</span><span class="s1">&lt;pre&gt;--</span><span class="se">\n</span><span class="s1">Yours &amp;amp; &amp;lt;truly&amp;gt;&lt;/pre&gt;</span><span class="se">\n</span><span class="s1">&lt;/body&gt;&lt;/html&gt;&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;&lt;html&gt;&lt;body&gt;some &lt;b&gt;content&lt;/b&gt;&lt;/body&gt;&lt;/html&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;!DOCTYPE...&gt;</span><span class="se">\n</span><span class="s1">&lt;html&gt;&lt;body&gt;</span><span class="se">\n</span><span class="s1">&lt;p&gt;--&lt;/p&gt;</span><span class="se">\n</span><span class="s1">&lt;p&gt;Yours truly&lt;/p&gt;</span><span class="se">\n</span><span class="s1">&lt;/body&gt;</span><span class="se">\n</span><span class="s1">&lt;/html&gt;&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s1">&#39;&lt;html&gt;&lt;body&gt;some &lt;b&gt;content&lt;/b&gt;</span><span class="se">\n\n\n</span><span class="s1">&lt;p&gt;--&lt;/p&gt;</span><span class="se">\n</span><span class="s1">&lt;p&gt;Yours truly&lt;/p&gt;</span><span class="se">\n\n\n</span><span class="s1">&lt;/body&gt;&lt;/html&gt;&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">html</span><span class="p">,</span> <span class="n">content</span><span class="p">,</span> <span class="n">plaintext_flag</span><span class="p">,</span> <span class="n">preserve_flag</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">test_samples</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">append_content_to_html</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">content</span><span class="p">,</span> <span class="n">plaintext_flag</span><span class="p">,</span> <span class="n">preserve_flag</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">),</span> <span class="n">expected</span><span class="p">,</span> <span class="s1">&#39;append_content_to_html is broken&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestHtmlTools.test_is_html_empty">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_is_html_empty">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_is_html_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">void_strings_samples</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span> <span class="ow">in</span> <span class="n">void_strings_samples</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">is_html_empty</span><span class="p">(</span><span class="n">content</span><span class="p">))</span>
+
+        <span class="n">void_html_samples</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;&lt;section&gt;&lt;br /&gt; &lt;b&gt;&lt;i/&gt;&lt;/b&gt;&lt;/section&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;p&gt;&lt;br&gt; &lt;/p&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;p&gt;&lt;br /&gt;&lt;/p &gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p style=&quot;margin: 4px&quot;&gt;&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;div style=&quot;margin: 4px&quot;&gt;&lt;/div&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p class=&quot;oe_testing&quot;&gt;&lt;br&gt;&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;&lt;span style=&quot;font-weight: bolder;&quot;&gt;&lt;font style=&quot;color: rgb(255, 0, 0);&quot; class=&quot; &quot;&gt;&lt;/font&gt;&lt;/span&gt;&lt;br&gt;&lt;/p&gt;&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span> <span class="ow">in</span> <span class="n">void_html_samples</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">is_html_empty</span><span class="p">(</span><span class="n">content</span><span class="p">),</span> <span class="s1">&#39;Failed with </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">content</span><span class="p">)</span>
+
+        <span class="n">valid_html_samples</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;&lt;p&gt;&lt;br&gt;1&lt;/p&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;p&gt;1&lt;br &gt; &lt;/p&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;p style=&quot;margin: 4px&quot;&gt;Hello World&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;div style=&quot;margin: 4px&quot;&gt;&lt;p&gt;Hello World&lt;/p&gt;&lt;/div&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;&lt;span style=&quot;font-weight: bolder;&quot;&gt;&lt;font style=&quot;color: rgb(255, 0, 0);&quot; class=&quot; &quot;&gt;W&lt;/font&gt;&lt;/span&gt;&lt;br&gt;&lt;/p&gt;&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">content</span> <span class="ow">in</span> <span class="n">valid_html_samples</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">is_html_empty</span><span class="p">(</span><span class="n">content</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestHtmlTools.test_nl2br_enclose">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_nl2br_enclose">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_nl2br_enclose</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test formatting of nl2br when using Markup: consider new &lt;br&gt; tags</span>
+<span class="sd">        as trusted without validating the whole input content. &quot;&quot;&quot;</span>
+        <span class="n">source_all</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;coucou&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;coucou&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;coucou</span><span class="se">\n</span><span class="s1">coucou&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;coucou</span><span class="se">\n\n</span><span class="s1">coucou&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;coucou</span><span class="se">\n</span><span class="s1">coucou</span><span class="se">\n\n</span><span class="s1">zbouip&lt;/p&gt;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">expected_all</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;coucou&lt;/div&gt;&#39;</span><span class="p">),</span>
+            <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;&amp;lt;p&amp;gt;coucou&amp;lt;/p&amp;gt;&lt;/div&gt;&#39;</span><span class="p">),</span>
+            <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;coucou&lt;br&gt;</span><span class="se">\n</span><span class="s1">coucou&lt;/div&gt;&#39;</span><span class="p">),</span>
+            <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;coucou&lt;br&gt;</span><span class="se">\n</span><span class="s1">&lt;br&gt;</span><span class="se">\n</span><span class="s1">coucou&lt;/div&gt;&#39;</span><span class="p">),</span>
+            <span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;&amp;lt;p&amp;gt;coucou&lt;br&gt;</span><span class="se">\n</span><span class="s1">coucou&lt;br&gt;</span><span class="se">\n</span><span class="s1">&lt;br&gt;</span><span class="se">\n</span><span class="s1">zbouip&amp;lt;/p&amp;gt;&lt;br&gt;</span><span class="se">\n</span><span class="s1">&lt;/div&gt;&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">source_all</span><span class="p">,</span> <span class="n">expected_all</span><span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">expected</span><span class="o">=</span><span class="n">expected</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                    <span class="n">nl2br_enclose</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="s2">&quot;div&quot;</span><span class="p">),</span>
+                    <span class="n">expected</span><span class="p">,</span>
+                <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestHtmlTools.test_prepend_html_content">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestHtmlTools.test_prepend_html_content">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_prepend_html_content</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;html&gt;</span>
+<span class="s2">                &lt;body&gt;</span>
+<span class="s2">                    &lt;div&gt;test&lt;/div&gt;</span>
+<span class="s2">                &lt;/body&gt;</span>
+<span class="s2">            &lt;/html&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+        <span class="n">content</span> <span class="o">=</span> <span class="s2">&quot;&lt;span&gt;content&lt;/span&gt;&quot;</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">prepend_html_content</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[\s\t]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;&lt;html&gt;&lt;body&gt;&lt;span&gt;content&lt;/span&gt;&lt;div&gt;test&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;&quot;</span><span class="p">)</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="s2">&quot;&lt;div&gt;test&lt;/div&gt;&quot;</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="s2">&quot;&lt;span&gt;content&lt;/span&gt;&quot;</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">prepend_html_content</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[\s\t]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;&lt;span&gt;content&lt;/span&gt;&lt;div&gt;test&lt;/div&gt;&quot;</span><span class="p">)</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;body&gt;</span>
+<span class="s2">                &lt;div&gt;test&lt;/div&gt;</span>
+<span class="s2">            &lt;/body&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">prepend_html_content</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[\s\t]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;&lt;body&gt;&lt;span&gt;content&lt;/span&gt;&lt;div&gt;test&lt;/div&gt;&lt;/body&gt;&quot;</span><span class="p">)</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;html&gt;</span>
+<span class="s2">                &lt;body&gt;</span>
+<span class="s2">                    &lt;div&gt;test&lt;/div&gt;</span>
+<span class="s2">                &lt;/body&gt;</span>
+<span class="s2">            &lt;/html&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+        <span class="n">content</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;html&gt;</span>
+<span class="s2">                &lt;body&gt;</span>
+<span class="s2">                    &lt;div&gt;test&lt;/div&gt;</span>
+<span class="s2">                &lt;/body&gt;</span>
+<span class="s2">            &lt;/html&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">prepend_html_content</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[\s\t]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;&lt;html&gt;&lt;body&gt;&lt;div&gt;test&lt;/div&gt;&lt;div&gt;test&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestEmailTools">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;mail_tools&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestEmailTools</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test some of our generic utility functions for emails &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestEmailTools.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TestEmailTools</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">sources</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># single email</span>
+            <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39; alfred.astaire@test.example.com &#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Fredo The Great &lt;alfred.astaire@test.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Fredo The Great&quot; &lt;alfred.astaire@test.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Fredo &quot;The Great&quot; &lt;alfred.astaire@test.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="c1"># multiple emails</span>
+            <span class="s1">&#39;alfred.astaire@test.example.com, evelyne.gargouillis@test.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Fredo The Great &lt;alfred.astaire@test.example.com&gt;, Evelyne The Goat &lt;evelyne.gargouillis@test.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Fredo The Great&quot; &lt;alfred.astaire@test.example.com&gt;, evelyne.gargouillis@test.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Fredo The Great&quot; &lt;alfred.astaire@test.example.com&gt;, &lt;evelyne.gargouillis@test.example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="c1"># text containing email</span>
+            <span class="s1">&#39;Hello alfred.astaire@test.example.com how are you ?&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&lt;p&gt;Hello alfred.astaire@test.example.com&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="c1"># text containing emails</span>
+            <span class="s1">&#39;Hello &quot;Fredo&quot; &lt;alfred.astaire@test.example.com&gt;, evelyne.gargouillis@test.example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Hello &quot;Fredo&quot; &lt;alfred.astaire@test.example.com&gt; and evelyne.gargouillis@test.example.com&#39;</span><span class="p">,</span>
+            <span class="c1"># falsy</span>
+            <span class="s1">&#39;&lt;p&gt;Hello Fredo&lt;/p&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;j</span><span class="se">\&#39;</span><span class="s1">adore écrire des @gmail.com ou &quot;@gmail.com&quot; a bit randomly&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_domain_normalize">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_domain_normalize">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_domain_normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;Test.Com&quot;</span><span class="p">,</span> <span class="s2">&quot;test.com&quot;</span><span class="p">,</span> <span class="s2">&quot;Should have normalized domain&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;email@test.com&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Domain is not valid, should return False&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Domain is not valid, should retunr False&quot;</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">email_domain_normalize</span><span class="p">(</span><span class="n">source</span><span class="p">),</span> <span class="n">expected</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_normalize">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_normalize">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;email_normalize&#39;. Note that it is built on &#39;email_split&#39; so</span>
+<span class="sd">        some use cases are already managed in &#39;test_email_split(_and_format)&#39;</span>
+<span class="sd">        hence having more specific test cases here about normalization itself. &quot;&quot;&quot;</span>
+        <span class="n">format_name</span> <span class="o">=</span> <span class="s1">&#39;My Super Prénom&#39;</span>
+        <span class="n">format_name_ascii</span> <span class="o">=</span> <span class="s1">&#39;=?utf-8?b?TXkgU3VwZXIgUHLDqW5vbQ==?=&#39;</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># formatted</span>
+            <span class="s1">&#39;Déboulonneur deboulonneur@example.com&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting</span>
+            <span class="s1">&#39;deboulonneur@example.com Déboulonneur&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting (happens, alas)</span>
+            <span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;DEBOULONNEUR@example.com&gt;, &quot;Super Déboulonneur 2&quot; &lt;deboulonneur2@EXAMPLE.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># multi + case</span>
+            <span class="s1">&#39; Déboulonneur deboulonneur@example.com déboulonneur deboulonneur2@example.com&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting + wrong multi</span>
+            <span class="s1">&#39;&quot;Déboulonneur 😊&quot; &lt;deboulonneur.😊@example.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># unicode in name and email left-part</span>
+            <span class="s1">&#39;&quot;Déboulonneur&quot; &lt;déboulonneur@examplé.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># utf-8</span>
+            <span class="s1">&#39;&quot;Déboulonneur&quot; &lt;DéBoulonneur@Examplé.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># utf-8</span>
+        <span class="p">]</span>
+        <span class="n">expected_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;deboulonneur@example.comdéboulonneur&#39;</span><span class="p">,</span>
+            <span class="kc">False</span><span class="p">,</span>
+            <span class="kc">False</span><span class="p">,</span>  <span class="c1"># need fix over &#39;getadresses&#39;</span>
+            <span class="s1">&#39;deboulonneur.😊@example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;déboulonneur@examplé.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;DéBoulonneur@examplé.com&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">expected_fmt_utf8_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;deboulonneur@example.comdéboulonneur&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;@&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;@&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;deboulonneur.😊@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;déboulonneur@examplé.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">format_name</span><span class="si">}</span><span class="s1">&quot; &lt;DéBoulonneur@examplé.com&gt;&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">expected_fmt_ascii_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;deboulonneur@example.xn--comdboulonneur-ekb&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;@&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;@&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;deboulonneur.😊@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;déboulonneur@xn--exampl-gva.com&gt;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">format_name_ascii</span><span class="si">}</span><span class="s1"> &lt;DéBoulonneur@xn--exampl-gva.com&gt;&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="n">expected_utf8_fmt</span><span class="p">,</span> <span class="n">expected_ascii_fmt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">sources</span><span class="p">,</span> <span class="n">expected_list</span><span class="p">,</span> <span class="n">expected_fmt_utf8_list</span><span class="p">,</span> <span class="n">expected_fmt_ascii_list</span><span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">email_normalize</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="n">expected</span><span class="p">)</span>
+                <span class="c1"># standard usage of formataddr</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">formataddr</span><span class="p">((</span><span class="n">format_name</span><span class="p">,</span> <span class="p">(</span><span class="n">expected</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">),</span> <span class="n">expected_utf8_fmt</span><span class="p">)</span>
+                <span class="c1"># check using INDA at format time, using ascii charset as done when</span>
+                <span class="c1"># sending emails (see extract_rfc2822_addresses)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">formataddr</span><span class="p">((</span><span class="n">format_name</span><span class="p">,</span> <span class="p">(</span><span class="n">expected</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;ascii&#39;</span><span class="p">),</span> <span class="n">expected_ascii_fmt</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_re">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_re">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_re</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;email_re&#39;, finding emails in a given text &quot;&quot;&quot;</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># single email</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="c1"># multiple emails</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="c1"># text containing email</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="c1"># text containing emails</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">],</span>
+            <span class="c1"># falsy</span>
+            <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">src</span><span class="p">,</span> <span class="n">exp</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="p">,</span> <span class="n">expected</span><span class="p">):</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">email_re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">res</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span>
+                <span class="s1">&#39;Seems email_re is broken with </span><span class="si">%s</span><span class="s1"> (expected </span><span class="si">%r</span><span class="s1">, received </span><span class="si">%r</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_split">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_split">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_split</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;email_split&#39; &quot;&quot;&quot;</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;John &lt;12345@gmail.com&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;12345@gmail.com&#39;</span><span class="p">]),</span>  <span class="c1"># regular form</span>
+            <span class="p">(</span><span class="s2">&quot;d@x; 1@2&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;d@x&#39;</span><span class="p">,</span> <span class="s1">&#39;1@2&#39;</span><span class="p">]),</span>  <span class="c1"># semi-colon + extra space</span>
+            <span class="p">(</span><span class="s2">&quot;&#39;(ss)&#39; &lt;123@gmail.com&gt;, &#39;foo&#39; &lt;foo@bar&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;123@gmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;foo@bar&#39;</span><span class="p">]),</span>  <span class="c1"># comma + single-quoting</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;john@gmail.com&quot;&lt;johnny@gmail.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;johnny@gmail.com&#39;</span><span class="p">]),</span>  <span class="c1"># double-quoting</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;&lt;jg&gt;&quot; &lt;johnny@gmail.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;johnny@gmail.com&#39;</span><span class="p">]),</span>  <span class="c1"># double-quoting with brackets</span>
+            <span class="p">(</span><span class="s1">&#39;@gmail.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;@gmail.com&#39;</span><span class="p">]),</span>  <span class="c1"># no left-part</span>
+            <span class="c1"># &#39;@domain&#39; corner cases -- all those return a &#39;@gmail.com&#39; (or equivalent)</span>
+            <span class="c1"># email address when going through &#39;getaddresses&#39;</span>
+            <span class="c1"># - multi @</span>
+            <span class="p">(</span><span class="s1">&#39;fr@ncois.th@notgmail.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;fr@ncois.th&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;f@r@nc.gz,ois@notgmail.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;r@nc.gz&#39;</span><span class="p">,</span> <span class="s1">&#39;ois@notgmail.com&#39;</span><span class="p">]),</span>  <span class="c1"># still failing, but differently from &#39;getaddresses&#39; alone</span>
+            <span class="p">(</span><span class="s1">&#39;@notgmail.com esteban_gnole@coldmail.com@notgmail.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;esteban_gnole@coldmail.com&#39;</span><span class="p">]),</span>
+            <span class="c1"># - multi emails (with invalid)</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;Ivan@dezotos.com Cc iv.an@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;Ivan@dezotos.com&#39;</span><span class="p">,</span> <span class="s1">&#39;iv.an@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;ivan-dredi@coldmail.com ivan.dredi@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;ivan-dredi@coldmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan.dredi@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;@notgmail.com ivan@coincoin.com.ar jeanine@coincoin.com.ar&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;ivan@coincoin.com.ar&#39;</span><span class="p">,</span> <span class="s1">&#39;jeanine@coincoin.com.ar&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;@notgmail.com whoareyou@youhou.com.   ivan.dezotos@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;whoareyou@youhou.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan.dezotos@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;francois@nc.gz CC: ois@notgmail.com ivan@dezotos.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;francois@nc.gz&#39;</span><span class="p">,</span> <span class="s1">&#39;ois@notgmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan@dezotos.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;francois@nc.gz CC: ois@notgmail.com,ivan@dezotos.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;francois@nc.gzCC&#39;</span><span class="p">,</span> <span class="s1">&#39;ois@notgmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan@dezotos.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="c1"># - separated with &#39;/&#39;&#39;</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;ivan.plein@dezotos.com / ivan.plu@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;ivan.plein@dezotos.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan.plu@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;@notgmail.com ivan.parfois@notgmail.com/ ivan.souvent@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;ivan.parfois@notgmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan.souvent@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="c1"># - separated with &#39;-&#39;&#39;</span>
+            <span class="p">(</span><span class="s1">&#39;ivan@dezotos.com - ivan.dezotos@notgmail.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;ivan@dezotos.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ivan.dezotos@notgmail.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span>
+                <span class="s1">&#39;car.pool@notgmail.com - co (TAMBO) Registration car.warsh@notgmail.com&#39;</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;car.pool@notgmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;car.warsh@notgmail.com&#39;</span><span class="p">]</span>
+            <span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">email_split</span><span class="p">(</span><span class="n">source</span><span class="p">),</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_split_and_format">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_split_and_format">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_split_and_format</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;email_split_and_format&#39;, notably in case of multi encapsulation</span>
+<span class="sd">        or multi emails. &quot;&quot;&quot;</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># formatted</span>
+            <span class="c1"># wrong formatting</span>
+            <span class="s1">&#39;Déboulonneur &lt;deboulonneur@example.com&#39;</span><span class="p">,</span>  <span class="c1"># with a final typo</span>
+            <span class="s1">&#39;Déboulonneur deboulonneur@example.com&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting</span>
+            <span class="s1">&#39;deboulonneur@example.com Déboulonneur&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting (happens, alas)</span>
+            <span class="c1"># multi</span>
+            <span class="s1">&#39;Déboulonneur, deboulonneur@example.com&#39;</span><span class="p">,</span>  <span class="c1"># multi-like with errors</span>
+            <span class="s1">&#39;deboulonneur@example.com, deboulonneur2@example.com&#39;</span><span class="p">,</span>  <span class="c1"># multi</span>
+            <span class="s1">&#39; Déboulonneur deboulonneur@example.com déboulonneur deboulonneur2@example.com&#39;</span><span class="p">,</span>  <span class="c1"># wrong formatting + wrong multi</span>
+            <span class="c1"># format / misc</span>
+            <span class="s1">&#39;&quot;Déboulonneur&quot; &lt;&quot;Déboulonneur Encapsulated&quot; &lt;deboulonneur@example.com&gt;&gt;&#39;</span><span class="p">,</span>  <span class="c1"># double formatting</span>
+            <span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;, &quot;Super Déboulonneur 2&quot; &lt;deboulonneur2@example.com&gt;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;, wrong, &#39;</span><span class="p">,</span>
+            <span class="s1">&#39;&quot;Déboulonneur 😊&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># unicode in name</span>
+            <span class="s1">&#39;&quot;Déboulonneur 😊&quot; &lt;deboulonneur.😊@example.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># unicode in name and email left-part</span>
+            <span class="s1">&#39;&quot;Déboulonneur&quot; &lt;déboulonneur@examplé.com&gt;&#39;</span><span class="p">,</span>  <span class="c1"># utf-8</span>
+        <span class="p">]</span>
+        <span class="n">expected_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="c1"># wrong formatting</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">],</span>  <span class="c1"># extra part correctly considered as a name</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.comDéboulonneur&#39;</span><span class="p">],</span>  <span class="c1"># concatenated, not sure why</span>
+            <span class="c1"># multi</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;deboulonneur2@example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;deboulonneur2@example.com&#39;</span><span class="p">],</span>  <span class="c1"># need fix over &#39;getadresses&#39;</span>
+            <span class="c1"># format / misc</span>
+            <span class="p">[</span><span class="s1">&#39;deboulonneur@example.com&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;Super Déboulonneur 2&quot; &lt;deboulonneur2@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Super Déboulonneur&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Déboulonneur 😊&quot; &lt;deboulonneur@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Déboulonneur 😊&quot; &lt;deboulonneur.😊@example.com&gt;&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;&quot;Déboulonneur&quot; &lt;déboulonneur@examplé.com&gt;&#39;</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">sources</span><span class="p">,</span> <span class="n">expected_list</span><span class="p">):</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">email_split_and_format</span><span class="p">(</span><span class="n">source</span><span class="p">),</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_split_tuples">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_split_tuples">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_split_tuples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;email_split_and_format&#39; that returns (name, email) pairs</span>
+<span class="sd">        found in text input &quot;&quot;&quot;</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># single email</span>
+            <span class="p">[(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="c1"># multiple emails</span>
+            <span class="p">[(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Evelyne The Goat&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Fredo The Great&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="c1"># text containing email -&gt; fallback on parsing to extract text from email</span>
+            <span class="p">[(</span><span class="s1">&#39;Hello&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.comhowareyou?&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Hello&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Hello Fredo&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="p">[(</span><span class="s1">&#39;Hello Fredo&#39;</span><span class="p">,</span> <span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;and&#39;</span><span class="p">,</span> <span class="s1">&#39;evelyne.gargouillis@test.example.com&#39;</span><span class="p">)],</span>
+            <span class="c1"># falsy -&gt; probably not designed for that</span>
+            <span class="p">[],</span>
+            <span class="p">[(</span><span class="s1">&#39;j</span><span class="se">\&#39;</span><span class="s1">adore écrire&#39;</span><span class="p">,</span> <span class="s2">&quot;des@gmail.comou&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;@gmail.com&#39;</span><span class="p">)],</span> <span class="p">[],</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">src</span><span class="p">,</span> <span class="n">exp</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="p">,</span> <span class="n">expected</span><span class="p">):</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">email_split_tuples</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">res</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span>
+                <span class="s1">&#39;Seems email_split_tuples is broken with </span><span class="si">%s</span><span class="s1"> (expected </span><span class="si">%r</span><span class="s1">, received </span><span class="si">%r</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_email_formataddr">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_email_formataddr">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_email_formataddr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test custom &#39;formataddr&#39;, notably with IDNA support &quot;&quot;&quot;</span>
+        <span class="n">email_base</span> <span class="o">=</span> <span class="s1">&#39;joe@example.com&#39;</span>
+        <span class="n">email_idna</span> <span class="o">=</span> <span class="s1">&#39;joe@examplé.com&#39;</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># (name, address),          charsets            expected</span>
+            <span class="p">((</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>          <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">],</span> <span class="s1">&#39;joe@example.com&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joe&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>       <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">],</span> <span class="s1">&#39;&quot;joe&quot; &lt;joe@example.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joe doe&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>   <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">],</span> <span class="s1">&#39;&quot;joe doe&quot; &lt;joe@example.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joe&quot;doe&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>   <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">],</span> <span class="s1">&#39;&quot;joe</span><span class="se">\\</span><span class="s1">&quot;doe&quot; &lt;joe@example.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joé&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>       <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">],</span>          <span class="s1">&#39;=?utf-8?b?am/DqQ==?= &lt;joe@example.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joé&#39;</span><span class="p">,</span> <span class="n">email_base</span><span class="p">),</span>       <span class="p">[</span><span class="s1">&#39;utf-8&#39;</span><span class="p">],</span>          <span class="s1">&#39;&quot;joé&quot; &lt;joe@example.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">email_idna</span><span class="p">),</span>          <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">],</span>          <span class="s1">&#39;joe@xn--exampl-gva.com&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">email_idna</span><span class="p">),</span>          <span class="p">[</span><span class="s1">&#39;utf-8&#39;</span><span class="p">],</span>          <span class="s1">&#39;joe@examplé.com&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joé&#39;</span><span class="p">,</span> <span class="n">email_idna</span><span class="p">),</span>       <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">],</span>          <span class="s1">&#39;=?utf-8?b?am/DqQ==?= &lt;joe@xn--exampl-gva.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;joé&#39;</span><span class="p">,</span> <span class="n">email_idna</span><span class="p">),</span>       <span class="p">[</span><span class="s1">&#39;utf-8&#39;</span><span class="p">],</span>          <span class="s1">&#39;&quot;joé&quot; &lt;joe@examplé.com&gt;&#39;</span><span class="p">),</span>
+            <span class="p">((</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;joé@example.com&#39;</span><span class="p">),</span>   <span class="p">[</span><span class="s1">&#39;ascii&#39;</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">],</span> <span class="s1">&#39;joé@example.com&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">pair</span><span class="p">,</span> <span class="n">charsets</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">charset</span> <span class="ow">in</span> <span class="n">charsets</span><span class="p">:</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">pair</span><span class="o">=</span><span class="n">pair</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="n">charset</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">formataddr</span><span class="p">(</span><span class="n">pair</span><span class="p">,</span> <span class="n">charset</span><span class="p">),</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_extract_rfc2822_addresses">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_extract_rfc2822_addresses">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_extract_rfc2822_addresses</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;Admin&quot; &lt;admin@example.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@example.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;Admin&quot; &lt;admin@example.com&gt;, Demo &lt;demo@test.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;demo@test.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@example.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;Admin&quot; &lt;admin@example.com&gt;, Demo &lt;malformed email&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@example.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;admin@éxample.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@xn--xample-9ua.com&#39;</span><span class="p">]),</span>
+            <span class="c1"># formatted input containing email</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;admin@éxample.com&quot; &lt;admin@éxample.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;admin@xn--xample-9ua.com&#39;</span><span class="p">,</span> <span class="s1">&#39;admin@xn--xample-9ua.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;Robert Le Grand&quot; &lt;robert@notgmail.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;robert@notgmail.com&#39;</span><span class="p">]),</span>
+            <span class="p">(</span><span class="s1">&#39;&quot;robert@notgmail.com&quot; &lt;robert@notgmail.com&gt;&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;robert@notgmail.com&#39;</span><span class="p">,</span> <span class="s1">&#39;robert@notgmail.com&#39;</span><span class="p">]),</span>
+            <span class="c1"># accents</span>
+            <span class="p">(</span><span class="s1">&#39;DéBoulonneur@examplé.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;DéBoulonneur@xn--exampl-gva.com&#39;</span><span class="p">]),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">extract_rfc2822_addresses</span><span class="p">(</span><span class="n">source</span><span class="p">),</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestEmailTools.test_single_email_re">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_mail.TestEmailTools.test_single_email_re">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_single_email_re</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test &#39;single_email_re&#39;, matching text input containing only one email &quot;&quot;&quot;</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># single email</span>
+            <span class="p">[</span><span class="s1">&#39;alfred.astaire@test.example.com&#39;</span><span class="p">],</span>
+            <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="c1"># formatting issue for single email re</span>
+            <span class="c1"># multiple emails -&gt; couic</span>
+            <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span>
+            <span class="c1"># text containing email -&gt; couic</span>
+            <span class="p">[],</span> <span class="p">[],</span>
+            <span class="c1"># text containing emails -&gt; couic</span>
+            <span class="p">[],</span> <span class="p">[],</span>
+            <span class="c1"># falsy</span>
+            <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">src</span><span class="p">,</span> <span class="n">exp</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="p">,</span> <span class="n">expected</span><span class="p">):</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">single_email_re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+                <span class="n">res</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span>
+                <span class="s1">&#39;Seems single_email_re is broken with </span><span class="si">%s</span><span class="s1"> (expected </span><span class="si">%r</span><span class="s1">, received </span><span class="si">%r</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
+            <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

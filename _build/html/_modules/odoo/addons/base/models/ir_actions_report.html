@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_actions_report &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_actions_report</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_actions_report</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">from</span> <span class="nn">markupsafe</span> <span class="kn">import</span> <span class="n">Markup</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span><span class="p">,</span> <span class="n">AccessError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.safe_eval</span> <span class="kn">import</span> <span class="n">safe_eval</span><span class="p">,</span> <span class="n">time</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">find_in_path</span><span class="p">,</span> <span class="n">ustr</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">check_barcode_encoding</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">is_html_empty</span><span class="p">,</span> <span class="n">parse_version</span><span class="p">,</span> <span class="n">split_every</span>
+<span class="kn">from</span> <span class="nn">odoo.http</span> <span class="kn">import</span> <span class="n">request</span>
+<span class="kn">from</span> <span class="nn">odoo.osv.expression</span> <span class="kn">import</span> <span class="n">NEGATIVE_TERM_OPERATORS</span><span class="p">,</span> <span class="n">FALSE_DOMAIN</span>
+
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">lxml.html</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">json</span>
+
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">closing</span>
+<span class="kn">from</span> <span class="nn">reportlab.graphics.barcode</span> <span class="kn">import</span> <span class="n">createBarcodeDrawing</span>
+<span class="kn">from</span> <span class="nn">PyPDF2</span> <span class="kn">import</span> <span class="n">PdfFileWriter</span><span class="p">,</span> <span class="n">PdfFileReader</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Iterable</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageFile</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">islice</span>
+
+<span class="c1"># Allow truncated images</span>
+<span class="n">ImageFile</span><span class="o">.</span><span class="n">LOAD_TRUNCATED_IMAGES</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">PyPDF2.errors</span> <span class="kn">import</span> <span class="n">PdfReadError</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">PyPDF2.utils</span> <span class="kn">import</span> <span class="n">PdfReadError</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># A lock occurs when the user wants to print a report having multiple barcode while the server is</span>
+<span class="c1"># started in threaded-mode. The reason is that reportlab has to build a cache of the T1 fonts</span>
+<span class="c1"># before rendering a barcode (done in a C extension) and this part is not thread safe. We attempt</span>
+<span class="c1"># here to init the T1 fonts cache at the start-up of Odoo so that rendering of barcode in multiple</span>
+<span class="c1"># thread does not lock the server.</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">createBarcodeDrawing</span><span class="p">(</span><span class="s1">&#39;Code128&#39;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;png&#39;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">humanReadable</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">asString</span><span class="p">(</span><span class="s1">&#39;png&#39;</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">pass</span>
+
+
+<span class="k">def</span> <span class="nf">_get_wkhtmltopdf_bin</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">find_in_path</span><span class="p">(</span><span class="s1">&#39;wkhtmltopdf&#39;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_split_table</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">max_rows</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Walks through the etree and splits tables with more than max_rows rows into</span>
+<span class="sd">    multiple tables with max_rows rows.</span>
+
+<span class="sd">    This function is needed because wkhtmltopdf has a exponential processing</span>
+<span class="sd">    time growth when processing tables with many rows. This function is a</span>
+<span class="sd">    workaround for this problem.</span>
+
+<span class="sd">    :param tree: The etree to process</span>
+<span class="sd">    :param max_rows: The maximum number of rows per table</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">tree</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="s1">&#39;table&#39;</span><span class="p">)):</span>
+        <span class="n">prev</span> <span class="o">=</span> <span class="n">table</span>
+        <span class="k">for</span> <span class="n">rows</span> <span class="ow">in</span> <span class="n">islice</span><span class="p">(</span><span class="n">split_every</span><span class="p">(</span><span class="n">max_rows</span><span class="p">,</span> <span class="n">table</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">sibling</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s1">&#39;table&#39;</span><span class="p">,</span> <span class="n">attrib</span><span class="o">=</span><span class="n">table</span><span class="o">.</span><span class="n">attrib</span><span class="p">)</span>
+            <span class="n">sibling</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+            <span class="n">prev</span><span class="o">.</span><span class="n">addnext</span><span class="p">(</span><span class="n">sibling</span><span class="p">)</span>
+            <span class="n">prev</span> <span class="o">=</span> <span class="n">sibling</span>
+
+<span class="c1"># Check the presence of Wkhtmltopdf and return its version at Odoo start-up</span>
+<span class="n">wkhtmltopdf_state</span> <span class="o">=</span> <span class="s1">&#39;install&#39;</span>
+<span class="n">wkhtmltopdf_dpi_zoom_ratio</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">_get_wkhtmltopdf_bin</span><span class="p">(),</span> <span class="s1">&#39;--version&#39;</span><span class="p">],</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span>
+    <span class="p">)</span>
+<span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">):</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;You need Wkhtmltopdf to print a pdf version of the reports.&#39;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Will use the Wkhtmltopdf binary at </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">_get_wkhtmltopdf_bin</span><span class="p">())</span>
+    <span class="n">out</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;([0-9.]+)&#39;</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="n">version</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">version</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">parse_version</span><span class="p">(</span><span class="s1">&#39;0.12.0&#39;</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Upgrade Wkhtmltopdf to (at least) 0.12.0&#39;</span><span class="p">)</span>
+            <span class="n">wkhtmltopdf_state</span> <span class="o">=</span> <span class="s1">&#39;upgrade&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">wkhtmltopdf_state</span> <span class="o">=</span> <span class="s1">&#39;ok&#39;</span>
+        <span class="k">if</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">version</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">parse_version</span><span class="p">(</span><span class="s1">&#39;0.12.2&#39;</span><span class="p">):</span>
+            <span class="n">wkhtmltopdf_dpi_zoom_ratio</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;workers&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;You need to start Odoo with at least two workers to print a pdf version of the reports.&#39;</span><span class="p">)</span>
+            <span class="n">wkhtmltopdf_state</span> <span class="o">=</span> <span class="s1">&#39;workers&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Wkhtmltopdf seems to be broken.&#39;</span><span class="p">)</span>
+        <span class="n">wkhtmltopdf_state</span> <span class="o">=</span> <span class="s1">&#39;broken&#39;</span>
+
+
+<div class="viewcode-block" id="IrActionsReport">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport">[docs]</a>
+<span class="k">class</span> <span class="nc">IrActionsReport</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.actions.report&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Report Action&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;ir.actions.actions&#39;</span>
+    <span class="n">_table</span> <span class="o">=</span> <span class="s1">&#39;ir_act_report_xml&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;name, id&#39;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">)</span>
+    <span class="n">binding_type</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;report&#39;</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Model Name&#39;</span><span class="p">)</span>
+    <span class="n">model_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;ir.model&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Model&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_model_id&#39;</span><span class="p">,</span> <span class="n">search</span><span class="o">=</span><span class="s1">&#39;_search_model_id&#39;</span><span class="p">)</span>
+
+    <span class="n">report_type</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([</span>
+        <span class="p">(</span><span class="s1">&#39;qweb-html&#39;</span><span class="p">,</span> <span class="s1">&#39;HTML&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;qweb-pdf&#39;</span><span class="p">,</span> <span class="s1">&#39;PDF&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;qweb-text&#39;</span><span class="p">,</span> <span class="s1">&#39;Text&#39;</span><span class="p">),</span>
+    <span class="p">],</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;qweb-pdf&#39;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s1">&#39;The type of the report that will be rendered, each one having its own&#39;</span>
+        <span class="s1">&#39; rendering method. HTML means the report will be opened directly in your&#39;</span>
+        <span class="s1">&#39; browser PDF means the report will be rendered using Wkhtmltopdf and&#39;</span>
+        <span class="s1">&#39; downloaded by the user.&#39;</span><span class="p">)</span>
+    <span class="n">report_name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Template Name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">report_file</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Report File&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                              <span class="n">help</span><span class="o">=</span><span class="s2">&quot;The path to the main report file (depending on Report Type) or empty if the content is in another field&quot;</span><span class="p">)</span>
+    <span class="n">groups_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2many</span><span class="p">(</span><span class="s1">&#39;res.groups&#39;</span><span class="p">,</span> <span class="s1">&#39;res_groups_report_rel&#39;</span><span class="p">,</span> <span class="s1">&#39;uid&#39;</span><span class="p">,</span> <span class="s1">&#39;gid&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Groups&#39;</span><span class="p">)</span>
+    <span class="n">multi</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;On Multiple Doc.&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If set to true, the action will not be displayed on the right toolbar of a form view.&quot;</span><span class="p">)</span>
+
+    <span class="n">paperformat_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;report.paperformat&#39;</span><span class="p">,</span> <span class="s1">&#39;Paper Format&#39;</span><span class="p">)</span>
+    <span class="n">print_report_name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Printed Report Name&#39;</span><span class="p">,</span> <span class="n">translate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;This is the filename of the report going to download. Keep empty to not change the report filename. You can use a python expression with the &#39;object&#39; and &#39;time&#39; variables.&quot;</span><span class="p">)</span>
+    <span class="n">attachment_use</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Reload from Attachment&#39;</span><span class="p">,</span>
+                                    <span class="n">help</span><span class="o">=</span><span class="s1">&#39;If enabled, then the second time the user prints with same attachment name, it returns the previous report.&#39;</span><span class="p">)</span>
+    <span class="n">attachment</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Save as Attachment Prefix&#39;</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s1">&#39;This is the filename of the attachment used to store the printing result. Keep empty to not save the printed reports. You can use a python expression with the object and time variables.&#39;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_model_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">action</span><span class="o">.</span><span class="n">model_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+
+    <span class="k">def</span> <span class="nf">_search_model_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">ir_model_ids</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">name_search</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="n">operator</span><span class="p">)</span>
+            <span class="n">ir_model_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]</span>
+
+        <span class="k">elif</span> <span class="n">operator</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;any&#39;</span><span class="p">,</span> <span class="s1">&#39;not any&#39;</span><span class="p">):</span>
+            <span class="n">ir_model_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_search</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+            <span class="n">ir_model_ids</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="n">ir_model_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">ir_model_ids</span><span class="p">:</span>
+            <span class="n">operator</span> <span class="o">=</span> <span class="s1">&#39;not in&#39;</span> <span class="k">if</span> <span class="n">operator</span> <span class="ow">in</span> <span class="n">NEGATIVE_TERM_OPERATORS</span> <span class="k">else</span> <span class="s1">&#39;in&#39;</span>
+            <span class="n">ir_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">ir_model_ids</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">ir_model</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">))]</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FALSE_DOMAIN</span>
+
+    <span class="k">def</span> <span class="nf">_get_readable_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_readable_fields</span><span class="p">()</span> <span class="o">|</span> <span class="p">{</span>
+            <span class="s2">&quot;report_name&quot;</span><span class="p">,</span> <span class="s2">&quot;report_type&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">,</span>
+            <span class="c1"># these two are not real fields of ir.actions.report but are</span>
+            <span class="c1"># expected in the route /report/&lt;converter&gt;/&lt;reportname&gt; and must</span>
+            <span class="c1"># not be removed by clean_action</span>
+            <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span>
+            <span class="c1"># and this one is used by the frontend later on.</span>
+            <span class="s2">&quot;close_on_report_download&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="IrActionsReport.associated_view">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.associated_view">[docs]</a>
+    <span class="k">def</span> <span class="nf">associated_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Used in the ir.actions.report form view in order to search naively after the view(s)</span>
+<span class="sd">        used in the rendering.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="n">action_ref</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.action_ui_view&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">action_ref</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">report_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">action_data</span> <span class="o">=</span> <span class="n">action_ref</span><span class="o">.</span><span class="n">read</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">action_data</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]),</span> <span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;qweb&#39;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">action_data</span></div>
+
+
+<div class="viewcode-block" id="IrActionsReport.create_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.create_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create a contextual action for each report. &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+            <span class="n">report</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;binding_model_id&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;binding_type&#39;</span><span class="p">:</span> <span class="s1">&#39;report&#39;</span><span class="p">})</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="IrActionsReport.unlink_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.unlink_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Remove the contextual actions created for the reports. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">check_access_rights</span><span class="p">(</span><span class="s1">&#39;write&#39;</span><span class="p">,</span> <span class="n">raise_exception</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="s1">&#39;binding_model_id&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;binding_model_id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+    <span class="c1">#--------------------------------------------------------------------------</span>
+    <span class="c1"># Main report methods</span>
+    <span class="c1">#--------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="IrActionsReport.retrieve_attachment">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.retrieve_attachment">[docs]</a>
+    <span class="k">def</span> <span class="nf">retrieve_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Retrieve an attachment for a specific record.</span>
+
+<span class="sd">        :param record: The record owning of the attachment.</span>
+<span class="sd">        :return: A recordset of length &lt;=1 or None</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">attachment_name</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;object&#39;</span><span class="p">:</span> <span class="n">record</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">time</span><span class="p">})</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">attachment_name</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+                <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">attachment_name</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="p">],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrActionsReport.get_wkhtmltopdf_state">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.get_wkhtmltopdf_state">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_wkhtmltopdf_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Get the current state of wkhtmltopdf: install, ok, upgrade, workers or broken.</span>
+<span class="sd">        * install: Starting state.</span>
+<span class="sd">        * upgrade: The binary is an older version (&lt; 0.12.0).</span>
+<span class="sd">        * ok: A binary was found with a recent version (&gt;= 0.12.0).</span>
+<span class="sd">        * workers: Not enough workers found to perform the pdf rendering process (&lt; 2 workers).</span>
+<span class="sd">        * broken: A binary was found but not responding.</span>
+
+<span class="sd">        :return: wkhtmltopdf_state</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">wkhtmltopdf_state</span></div>
+
+
+<div class="viewcode-block" id="IrActionsReport.get_paperformat">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.get_paperformat">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_paperformat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">paperformat_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">paperformat_id</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_build_wkhtmltopdf_args</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">paperformat_id</span><span class="p">,</span>
+            <span class="n">landscape</span><span class="p">,</span>
+            <span class="n">specific_paperformat_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">set_viewport_size</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Build arguments understandable by wkhtmltopdf bin.</span>
+
+<span class="sd">        :param paperformat_id: A report.paperformat record.</span>
+<span class="sd">        :param landscape: Force the report orientation to be landscape.</span>
+<span class="sd">        :param specific_paperformat_args: A dictionary containing prioritized wkhtmltopdf arguments.</span>
+<span class="sd">        :param set_viewport_size: Enable a viewport sized &#39;1024x1280&#39; or &#39;1280x1024&#39; depending of landscape arg.</span>
+<span class="sd">        :return: A list of string representing the wkhtmltopdf process command args.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">landscape</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-landscape&#39;</span><span class="p">):</span>
+            <span class="n">landscape</span> <span class="o">=</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-landscape&#39;</span><span class="p">)</span>
+
+        <span class="n">command_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--disable-local-file-access&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">set_viewport_size</span><span class="p">:</span>
+            <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--viewport-size&#39;</span><span class="p">,</span> <span class="n">landscape</span> <span class="ow">and</span> <span class="s1">&#39;1024x1280&#39;</span> <span class="ow">or</span> <span class="s1">&#39;1280x1024&#39;</span><span class="p">])</span>
+
+        <span class="c1"># Passing the cookie to wkhtmltopdf in order to resolve internal links.</span>
+        <span class="k">if</span> <span class="n">request</span> <span class="ow">and</span> <span class="n">request</span><span class="o">.</span><span class="n">db</span><span class="p">:</span>
+            <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--cookie&#39;</span><span class="p">,</span> <span class="s1">&#39;session_id&#39;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">sid</span><span class="p">])</span>
+
+        <span class="c1"># Less verbose error messages</span>
+        <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--quiet&#39;</span><span class="p">])</span>
+
+        <span class="c1"># Build paperformat args</span>
+        <span class="k">if</span> <span class="n">paperformat_id</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">format</span> <span class="ow">and</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">format</span> <span class="o">!=</span> <span class="s1">&#39;custom&#39;</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--page-size&#39;</span><span class="p">,</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">format</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">page_height</span> <span class="ow">and</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">page_width</span> <span class="ow">and</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">format</span> <span class="o">==</span> <span class="s1">&#39;custom&#39;</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--page-width&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">page_width</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;mm&#39;</span><span class="p">])</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--page-height&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">page_height</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;mm&#39;</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="n">specific_paperformat_args</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-margin-top&#39;</span><span class="p">):</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-top&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">specific_paperformat_args</span><span class="p">[</span><span class="s1">&#39;data-report-margin-top&#39;</span><span class="p">])])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-top&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">margin_top</span><span class="p">)])</span>
+
+            <span class="n">dpi</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">specific_paperformat_args</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-dpi&#39;</span><span class="p">):</span>
+                <span class="n">dpi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">specific_paperformat_args</span><span class="p">[</span><span class="s1">&#39;data-report-dpi&#39;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">dpi</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">dpi</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">95</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Generating PDF on Windows platform require DPI &gt;= 96. Using 96 instead.&quot;</span><span class="p">)</span>
+                    <span class="n">dpi</span> <span class="o">=</span> <span class="mi">96</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">dpi</span> <span class="o">=</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">dpi</span>
+            <span class="k">if</span> <span class="n">dpi</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--dpi&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dpi</span><span class="p">)])</span>
+                <span class="k">if</span> <span class="n">wkhtmltopdf_dpi_zoom_ratio</span><span class="p">:</span>
+                    <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--zoom&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="mf">96.0</span> <span class="o">/</span> <span class="n">dpi</span><span class="p">)])</span>
+
+            <span class="k">if</span> <span class="n">specific_paperformat_args</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-header-spacing&#39;</span><span class="p">):</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--header-spacing&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">specific_paperformat_args</span><span class="p">[</span><span class="s1">&#39;data-report-header-spacing&#39;</span><span class="p">])])</span>
+            <span class="k">elif</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">header_spacing</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--header-spacing&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">header_spacing</span><span class="p">)])</span>
+
+            <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-left&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">margin_left</span><span class="p">)])</span>
+
+            <span class="k">if</span> <span class="n">specific_paperformat_args</span> <span class="ow">and</span> <span class="n">specific_paperformat_args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-report-margin-bottom&#39;</span><span class="p">):</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-bottom&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">specific_paperformat_args</span><span class="p">[</span><span class="s1">&#39;data-report-margin-bottom&#39;</span><span class="p">])])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-bottom&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">margin_bottom</span><span class="p">)])</span>
+
+            <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--margin-right&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">margin_right</span><span class="p">)])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">landscape</span> <span class="ow">and</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">orientation</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--orientation&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">paperformat_id</span><span class="o">.</span><span class="n">orientation</span><span class="p">)])</span>
+            <span class="k">if</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">header_line</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--header-line&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">paperformat_id</span><span class="o">.</span><span class="n">disable_shrinking</span><span class="p">:</span>
+                <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--disable-smart-shrinking&#39;</span><span class="p">])</span>
+
+        <span class="c1"># Add extra time to allow the page to render</span>
+        <span class="n">delay</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;report.print_delay&#39;</span><span class="p">,</span> <span class="s1">&#39;1000&#39;</span><span class="p">)</span>
+        <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--javascript-delay&#39;</span><span class="p">,</span> <span class="n">delay</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">landscape</span><span class="p">:</span>
+            <span class="n">command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--orientation&#39;</span><span class="p">,</span> <span class="s1">&#39;landscape&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">command_args</span>
+
+    <span class="k">def</span> <span class="nf">_prepare_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">html</span><span class="p">,</span> <span class="n">report_model</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Divide and recreate the header/footer html by merging all found in html.</span>
+<span class="sd">        The bodies are extracted and added to a list. Then, extract the specific_paperformat_args.</span>
+<span class="sd">        The idea is to put all headers/footers together. Then, we will use a javascript trick</span>
+<span class="sd">        (see minimal_layout template) to set the right header/footer during the processing of wkhtmltopdf.</span>
+<span class="sd">        This allows the computation of multiple reports in a single call to wkhtmltopdf.</span>
+
+<span class="sd">        :param html: The html rendered by render_qweb_html.</span>
+<span class="sd">        :type: bodies: list of string representing each one a html body.</span>
+<span class="sd">        :type header: string representing the html header.</span>
+<span class="sd">        :type footer: string representing the html footer.</span>
+<span class="sd">        :type specific_paperformat_args: dictionary of prioritized paperformat values.</span>
+<span class="sd">        :return: bodies, header, footer, specific_paperformat_args</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">IrConfig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+
+        <span class="c1"># Return empty dictionary if &#39;web.minimal_layout&#39; not found.</span>
+        <span class="n">layout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;web.minimal_layout&#39;</span><span class="p">,</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">layout</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+        <span class="n">base_url</span> <span class="o">=</span> <span class="n">IrConfig</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;report.url&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">layout</span><span class="o">.</span><span class="n">get_base_url</span><span class="p">()</span>
+
+        <span class="n">root</span> <span class="o">=</span> <span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">HTMLParser</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+        <span class="n">match_klass</span> <span class="o">=</span> <span class="s2">&quot;//div[contains(concat(&#39; &#39;, normalize-space(@class), &#39; &#39;), &#39; </span><span class="si">{}</span><span class="s2"> &#39;)]&quot;</span>
+
+        <span class="n">header_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s1">&#39;div&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;minimal_layout_report_headers&#39;</span><span class="p">)</span>
+        <span class="n">footer_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s1">&#39;div&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;minimal_layout_report_footers&#39;</span><span class="p">)</span>
+        <span class="n">bodies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">res_ids</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">body_parent</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//main&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># Retrieve headers</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="n">match_klass</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;header&#39;</span><span class="p">)):</span>
+            <span class="n">body_parent</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+            <span class="n">header_node</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+        <span class="c1"># Retrieve footers</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="n">match_klass</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;footer&#39;</span><span class="p">)):</span>
+            <span class="n">body_parent</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+            <span class="n">footer_node</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+        <span class="c1"># Retrieve bodies</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="n">match_klass</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;article&#39;</span><span class="p">)):</span>
+            <span class="c1"># set context language to body language</span>
+            <span class="n">IrQweb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-oe-lang&#39;</span><span class="p">):</span>
+                <span class="n">IrQweb</span> <span class="o">=</span> <span class="n">IrQweb</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-oe-lang&#39;</span><span class="p">))</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">IrQweb</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span>
+                    <span class="s1">&#39;subst&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                    <span class="s1">&#39;body&#39;</span><span class="p">:</span> <span class="n">Markup</span><span class="p">(</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)),</span>
+                    <span class="s1">&#39;base_url&#39;</span><span class="p">:</span> <span class="n">base_url</span><span class="p">,</span>
+                    <span class="s1">&#39;report_xml_id&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">xml_id</span>
+                <span class="p">},</span> <span class="n">raise_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-oe-model&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">report_model</span><span class="p">:</span>
+                <span class="n">res_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-oe-id&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">res_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">bodies</span><span class="p">:</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">body_parent</span><span class="o">.</span><span class="n">getchildren</span><span class="p">())</span>
+            <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+
+        <span class="c1"># Get paperformat arguments set in the root html tag. They are prioritized over</span>
+        <span class="c1"># paperformat-record arguments.</span>
+        <span class="n">specific_paperformat_args</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">attribute</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;data-report-&#39;</span><span class="p">):</span>
+                <span class="n">specific_paperformat_args</span><span class="p">[</span><span class="n">attribute</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">attribute</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;subst&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;body&#39;</span><span class="p">:</span> <span class="n">Markup</span><span class="p">(</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">header_node</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)),</span>
+            <span class="s1">&#39;base_url&#39;</span><span class="p">:</span> <span class="n">base_url</span>
+        <span class="p">})</span>
+        <span class="n">footer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.qweb&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_render</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;subst&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;body&#39;</span><span class="p">:</span> <span class="n">Markup</span><span class="p">(</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">footer_node</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)),</span>
+            <span class="s1">&#39;base_url&#39;</span><span class="p">:</span> <span class="n">base_url</span>
+        <span class="p">})</span>
+
+        <span class="k">return</span> <span class="n">bodies</span><span class="p">,</span> <span class="n">res_ids</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">footer</span><span class="p">,</span> <span class="n">specific_paperformat_args</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_run_wkhtmltopdf</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">bodies</span><span class="p">,</span>
+            <span class="n">report_ref</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">footer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">landscape</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">specific_paperformat_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">set_viewport_size</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Execute wkhtmltopdf as a subprocess in order to convert html given in input into a pdf</span>
+<span class="sd">        document.</span>
+
+<span class="sd">        :param list[str] bodies: The html bodies of the report, one per page.</span>
+<span class="sd">        :param report_ref: report reference that is needed to get report paperformat.</span>
+<span class="sd">        :param str header: The html header of the report containing all headers.</span>
+<span class="sd">        :param str footer: The html footer of the report containing all footers.</span>
+<span class="sd">        :param landscape: Force the pdf to be rendered under a landscape format.</span>
+<span class="sd">        :param specific_paperformat_args: dict of prioritized paperformat arguments.</span>
+<span class="sd">        :param set_viewport_size: Enable a viewport sized &#39;1024x1280&#39; or &#39;1280x1024&#39; depending of landscape arg.</span>
+<span class="sd">        :return: Content of the pdf as bytes</span>
+<span class="sd">        :rtype: bytes</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">paperformat_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span><span class="o">.</span><span class="n">get_paperformat</span><span class="p">()</span> <span class="k">if</span> <span class="n">report_ref</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_paperformat</span><span class="p">()</span>
+
+        <span class="c1"># Build the base command args for wkhtmltopdf bin</span>
+        <span class="n">command_args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_wkhtmltopdf_args</span><span class="p">(</span>
+            <span class="n">paperformat_id</span><span class="p">,</span>
+            <span class="n">landscape</span><span class="p">,</span>
+            <span class="n">specific_paperformat_args</span><span class="o">=</span><span class="n">specific_paperformat_args</span><span class="p">,</span>
+            <span class="n">set_viewport_size</span><span class="o">=</span><span class="n">set_viewport_size</span><span class="p">)</span>
+
+        <span class="n">files_command_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">temporary_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">header</span><span class="p">:</span>
+            <span class="n">head_file_fd</span><span class="p">,</span> <span class="n">head_file_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;.html&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;report.header.tmp.&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">head_file_fd</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">))</span> <span class="k">as</span> <span class="n">head_file</span><span class="p">:</span>
+                <span class="n">head_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+            <span class="n">temporary_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">head_file_path</span><span class="p">)</span>
+            <span class="n">files_command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--header-html&#39;</span><span class="p">,</span> <span class="n">head_file_path</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">footer</span><span class="p">:</span>
+            <span class="n">foot_file_fd</span><span class="p">,</span> <span class="n">foot_file_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;.html&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;report.footer.tmp.&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">foot_file_fd</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">))</span> <span class="k">as</span> <span class="n">foot_file</span><span class="p">:</span>
+                <span class="n">foot_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">footer</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+            <span class="n">temporary_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">foot_file_path</span><span class="p">)</span>
+            <span class="n">files_command_args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--footer-html&#39;</span><span class="p">,</span> <span class="n">foot_file_path</span><span class="p">])</span>
+
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">body</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s%d</span><span class="s1">.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;report.body.tmp.&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="n">body_file_fd</span><span class="p">,</span> <span class="n">body_file_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;.html&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">body_file_fd</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">))</span> <span class="k">as</span> <span class="n">body_file</span><span class="p">:</span>
+                <span class="c1"># HACK: wkhtmltopdf doesn&#39;t like big table at all and the</span>
+                <span class="c1">#       processing time become exponential with the number</span>
+                <span class="c1">#       of rows (like 1H for 250k rows).</span>
+                <span class="c1">#</span>
+                <span class="c1">#       So we split the table into multiple tables containing</span>
+                <span class="c1">#       500 rows each. This reduce the processing time to 1min</span>
+                <span class="c1">#       for 250k rows. The number 500 was taken from opw-1689673</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">:</span> <span class="c1"># 4Mib</span>
+                    <span class="n">body_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">tree</span> <span class="o">=</span> <span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+                    <span class="n">_split_table</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="mi">500</span><span class="p">)</span>
+                    <span class="n">body_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">lxml</span><span class="o">.</span><span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">tree</span><span class="p">))</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">body_file_path</span><span class="p">)</span>
+            <span class="n">temporary_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">body_file_path</span><span class="p">)</span>
+
+        <span class="n">pdf_report_fd</span><span class="p">,</span> <span class="n">pdf_report_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;.pdf&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;report.tmp.&#39;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">pdf_report_fd</span><span class="p">)</span>
+        <span class="n">temporary_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pdf_report_path</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">wkhtmltopdf</span> <span class="o">=</span> <span class="p">[</span><span class="n">_get_wkhtmltopdf_bin</span><span class="p">()]</span> <span class="o">+</span> <span class="n">command_args</span> <span class="o">+</span> <span class="n">files_command_args</span> <span class="o">+</span> <span class="n">paths</span> <span class="o">+</span> <span class="p">[</span><span class="n">pdf_report_path</span><span class="p">]</span>
+            <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">wkhtmltopdf</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+            <span class="n">out</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+            <span class="n">err</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">process</span><span class="o">.</span><span class="n">returncode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">process</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="o">-</span><span class="mi">11</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span>
+                        <span class="s1">&#39;Wkhtmltopdf failed (error code: </span><span class="si">%s</span><span class="s1">). Memory limit too low or maximum file number of subprocess reached. Message : </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+                        <span class="n">process</span><span class="o">.</span><span class="n">returncode</span><span class="p">,</span>
+                        <span class="n">err</span><span class="p">[</span><span class="o">-</span><span class="mi">1000</span><span class="p">:],</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span>
+                        <span class="s1">&#39;Wkhtmltopdf failed (error code: </span><span class="si">%s</span><span class="s1">). Message: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+                        <span class="n">process</span><span class="o">.</span><span class="n">returncode</span><span class="p">,</span>
+                        <span class="n">err</span><span class="p">[</span><span class="o">-</span><span class="mi">1000</span><span class="p">:],</span>
+                    <span class="p">)</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">err</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;wkhtmltopdf: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">err</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="k">raise</span>
+
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pdf_report_path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pdf_document</span><span class="p">:</span>
+            <span class="n">pdf_content</span> <span class="o">=</span> <span class="n">pdf_document</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="c1"># Manual cleanup of the temporary files</span>
+        <span class="k">for</span> <span class="n">temporary_file</span> <span class="ow">in</span> <span class="n">temporary_files</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">temporary_file</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">):</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Error when trying to remove file </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">temporary_file</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pdf_content</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_report_from_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the first record of ir.actions.report having the ``report_name`` as value for</span>
+<span class="sd">        the field report_name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">report_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;report_name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">report_name</span><span class="p">)]</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">context_get</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">report_obj</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">conditions</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the report (with sudo) from a reference</span>
+<span class="sd">        report_ref: can be one of</span>
+<span class="sd">            - ir.actions.report id</span>
+<span class="sd">            - ir.actions.report record</span>
+<span class="sd">            - ir.model.data reference to ir.actions.report</span>
+<span class="sd">            - ir.actions.report report_name</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ReportSudo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.report&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ReportSudo</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">report_ref</span><span class="o">.</span><span class="n">_name</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Expected report of type </span><span class="si">%s</span><span class="s2">, got </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">report_ref</span><span class="o">.</span><span class="n">_name</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">report_ref</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="n">ReportSudo</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;report_name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">report</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">report</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">report</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">_name</span> <span class="o">!=</span> <span class="s2">&quot;ir.actions.report&quot;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Fetching report </span><span class="si">%r</span><span class="s2">: type </span><span class="si">%s</span><span class="s2">, expected ir.actions.report&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">_name</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">report</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Fetching report </span><span class="si">%r</span><span class="s2">: report not found&quot;</span> <span class="o">%</span> <span class="n">report_ref</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IrActionsReport.barcode">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.barcode">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">barcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">barcode_type</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">600</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span>
+            <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span>
+            <span class="s1">&#39;humanreadable&#39;</span><span class="p">:</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">))),</span>
+            <span class="s1">&#39;quiet&#39;</span><span class="p">:</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">))),</span>
+            <span class="s1">&#39;mask&#39;</span><span class="p">:</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">),</span>
+            <span class="s1">&#39;barBorder&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span>
+            <span class="c1"># The QR code can have different layouts depending on the Error Correction Level</span>
+            <span class="c1"># See: https://en.wikipedia.org/wiki/QR_code#Error_correction</span>
+            <span class="c1"># Level &#39;L&#39; – up to 7% damage   (default)</span>
+            <span class="c1"># Level &#39;M&#39; – up to 15% damage  (i.e. required by l10n_ch QR bill)</span>
+            <span class="c1"># Level &#39;Q&#39; – up to 25% damage</span>
+            <span class="c1"># Level &#39;H&#39; – up to 30% damage</span>
+            <span class="s1">&#39;barLevel&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;L&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;L&#39;</span><span class="p">,</span> <span class="s1">&#39;M&#39;</span><span class="p">,</span> <span class="s1">&#39;Q&#39;</span><span class="p">,</span> <span class="s1">&#39;H&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">x</span> <span class="ow">or</span> <span class="s1">&#39;L&#39;</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">validator</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">validator</span><span class="p">)</span> <span class="ow">in</span> <span class="n">defaults</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;humanReadable&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;humanreadable&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">barcode_type</span> <span class="o">==</span> <span class="s1">&#39;UPCA&#39;</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">):</span>
+            <span class="n">barcode_type</span> <span class="o">=</span> <span class="s1">&#39;EAN13&#39;</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;0</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="k">elif</span> <span class="n">barcode_type</span> <span class="o">==</span> <span class="s1">&#39;auto&#39;</span><span class="p">:</span>
+            <span class="n">symbology_guess</span> <span class="o">=</span> <span class="p">{</span><span class="mi">8</span><span class="p">:</span> <span class="s1">&#39;EAN8&#39;</span><span class="p">,</span> <span class="mi">13</span><span class="p">:</span> <span class="s1">&#39;EAN13&#39;</span><span class="p">}</span>
+            <span class="n">barcode_type</span> <span class="o">=</span> <span class="n">symbology_guess</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s1">&#39;Code128&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">barcode_type</span> <span class="o">==</span> <span class="s1">&#39;QR&#39;</span><span class="p">:</span>
+            <span class="c1"># for `QR` type, `quiet` is not supported. And is simply ignored.</span>
+            <span class="c1"># But we can use `barBorder` to get a similar behaviour.</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;quiet&#39;</span><span class="p">]:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;barBorder&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="n">barcode_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;EAN8&#39;</span><span class="p">,</span> <span class="s1">&#39;EAN13&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">check_barcode_encoding</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">barcode_type</span><span class="p">):</span>
+            <span class="c1"># If the barcode does not respect the encoding specifications, convert its type into Code128.</span>
+            <span class="c1"># Otherwise, the report-lab method may return a barcode different from its value. For instance,</span>
+            <span class="c1"># if the barcode type is EAN-8 and the value 11111111, the report-lab method will take the first</span>
+            <span class="c1"># seven digits and will compute the check digit, which gives: 11111115 -&gt; the barcode does not</span>
+            <span class="c1"># match the expected value.</span>
+            <span class="n">barcode_type</span> <span class="o">=</span> <span class="s1">&#39;Code128&#39;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">barcode</span> <span class="o">=</span> <span class="n">createBarcodeDrawing</span><span class="p">(</span><span class="n">barcode_type</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;png&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="c1"># If a mask is asked and it is available, call its function to</span>
+            <span class="c1"># post-process the generated QR-code image</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;mask&#39;</span><span class="p">]:</span>
+                <span class="n">available_masks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_available_barcode_masks</span><span class="p">()</span>
+                <span class="n">mask_to_apply</span> <span class="o">=</span> <span class="n">available_masks</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;mask&#39;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">mask_to_apply</span><span class="p">:</span>
+                    <span class="n">mask_to_apply</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;width&#39;</span><span class="p">],</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;height&#39;</span><span class="p">],</span> <span class="n">barcode</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">barcode</span><span class="o">.</span><span class="n">asString</span><span class="p">(</span><span class="s1">&#39;png&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">barcode_type</span> <span class="o">==</span> <span class="s1">&#39;Code128&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot convert into barcode.&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">barcode_type</span> <span class="o">==</span> <span class="s1">&#39;QR&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot convert into QR code.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">barcode</span><span class="p">(</span><span class="s1">&#39;Code128&#39;</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrActionsReport.get_available_barcode_masks">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.get_available_barcode_masks">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_available_barcode_masks</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Hook for extension.</span>
+<span class="sd">        This function returns the available QR-code masks, in the form of a</span>
+<span class="sd">        list of (code, mask_function) elements, where code is a string identifying</span>
+<span class="sd">        the mask uniquely, and mask_function is a function returning a reportlab</span>
+<span class="sd">        Drawing object with the result of the mask, and taking as parameters:</span>
+<span class="sd">            - width of the QR-code, in pixels</span>
+<span class="sd">            - height of the QR-code, in pixels</span>
+<span class="sd">            - reportlab Drawing object containing the barcode to apply the mask on</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_render_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Allow to render a QWeb template python-side. This function returns the &#39;ir.ui.view&#39;</span>
+<span class="sd">        render but embellish it with some variables/methods used in reports.</span>
+<span class="sd">        :param values: additional methods/variables used in the rendering</span>
+<span class="sd">        :returns: html representation of the template</span>
+<span class="sd">        :rtype: bytes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Browse the user instead of using the sudo self.env.user</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">uid</span><span class="p">)</span>
+        <span class="n">view_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">inherit_branding</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+            <span class="n">context_timestamp</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">context_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">tz</span><span class="o">=</span><span class="n">user</span><span class="o">.</span><span class="n">tz</span><span class="p">),</span> <span class="n">t</span><span class="p">),</span>
+            <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+            <span class="n">res_company</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="p">,</span>
+            <span class="n">web_base_url</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;web.base.url&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">view_obj</span><span class="o">.</span><span class="n">_render_template</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_merge_pdfs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streams</span><span class="p">):</span>
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">stream</span> <span class="ow">in</span> <span class="n">streams</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">reader</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">appendPagesFromReader</span><span class="p">(</span><span class="n">reader</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">PdfReadError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">NotImplementedError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Odoo is unable to merge the generated PDFs.&quot;</span><span class="p">))</span>
+        <span class="n">result_stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+        <span class="n">streams</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result_stream</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">result_stream</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result_stream</span>
+
+    <span class="k">def</span> <span class="nf">_render_qweb_pdf_prepare_streams</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">res_ids</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;report_type&#39;</span><span class="p">,</span> <span class="s1">&#39;pdf&#39;</span><span class="p">)</span>
+
+        <span class="c1"># access the report details with sudo() but evaluation context as current user</span>
+        <span class="n">report_sudo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="n">has_duplicated_ids</span> <span class="o">=</span> <span class="n">res_ids</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">res_ids</span><span class="p">))</span>
+
+        <span class="n">collected_streams</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+        <span class="c1"># Fetch the existing attachments from the database for later use.</span>
+        <span class="c1"># Reload the stream from the attachment in case of &#39;attachment_use&#39;.</span>
+        <span class="k">if</span> <span class="n">res_ids</span><span class="p">:</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">report_sudo</span><span class="o">.</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">res_id</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+                <span class="k">if</span> <span class="n">res_id</span> <span class="ow">in</span> <span class="n">collected_streams</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">stream</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">attachment</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">has_duplicated_ids</span> <span class="ow">and</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">attachment</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;report_pdf_no_attachment&quot;</span><span class="p">):</span>
+                    <span class="n">attachment</span> <span class="o">=</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">retrieve_attachment</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+                    <span class="c1"># Extract the stream from the attachment.</span>
+                    <span class="k">if</span> <span class="n">attachment</span> <span class="ow">and</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">attachment_use</span><span class="p">:</span>
+                        <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>
+
+                        <span class="c1"># Ensure the stream can be saved in Image.</span>
+                        <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">mimetype</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;image&#39;</span><span class="p">):</span>
+                            <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                            <span class="n">new_stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+                            <span class="n">img</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">new_stream</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;pdf&quot;</span><span class="p">)</span>
+                            <span class="n">stream</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                            <span class="n">stream</span> <span class="o">=</span> <span class="n">new_stream</span>
+
+                <span class="n">collected_streams</span><span class="p">[</span><span class="n">res_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s1">&#39;stream&#39;</span><span class="p">:</span> <span class="n">stream</span><span class="p">,</span>
+                    <span class="s1">&#39;attachment&#39;</span><span class="p">:</span> <span class="n">attachment</span><span class="p">,</span>
+                <span class="p">}</span>
+
+        <span class="c1"># Call &#39;wkhtmltopdf&#39; to generate the missing streams.</span>
+        <span class="n">res_ids_wo_stream</span> <span class="o">=</span> <span class="p">[</span><span class="n">res_id</span> <span class="k">for</span> <span class="n">res_id</span><span class="p">,</span> <span class="n">stream_data</span> <span class="ow">in</span> <span class="n">collected_streams</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">stream_data</span><span class="p">[</span><span class="s1">&#39;stream&#39;</span><span class="p">]]</span>
+        <span class="n">all_res_ids_wo_stream</span> <span class="o">=</span> <span class="n">res_ids</span> <span class="k">if</span> <span class="n">has_duplicated_ids</span> <span class="k">else</span> <span class="n">res_ids_wo_stream</span>
+        <span class="n">is_whtmltopdf_needed</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">res_ids</span> <span class="ow">or</span> <span class="n">res_ids_wo_stream</span>
+
+        <span class="k">if</span> <span class="n">is_whtmltopdf_needed</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_wkhtmltopdf_state</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;install&#39;</span><span class="p">:</span>
+                <span class="c1"># wkhtmltopdf is not installed</span>
+                <span class="c1"># the call should be catched before (cf /report/check_wkhtmltopdf) but</span>
+                <span class="c1"># if get_pdf is called manually (email template), the check could be</span>
+                <span class="c1"># bypassed</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Unable to find Wkhtmltopdf on this system. The PDF can not be created.&quot;</span><span class="p">))</span>
+
+            <span class="c1"># Disable the debug mode in the PDF rendering in order to not split the assets bundle</span>
+            <span class="c1"># into separated files to load. This is done because of an issue in wkhtmltopdf</span>
+            <span class="c1"># failing to load the CSS/Javascript resources in time.</span>
+            <span class="c1"># Without this, the header/footer of the reports randomly disappear</span>
+            <span class="c1"># because the resources files are not loaded in time.</span>
+            <span class="c1"># https://github.com/wkhtmltopdf/wkhtmltopdf/issues/2083</span>
+            <span class="n">additional_context</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;debug&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+
+            <span class="n">html</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">additional_context</span><span class="p">)</span><span class="o">.</span><span class="n">_render_qweb_html</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">all_res_ids_wo_stream</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="n">bodies</span><span class="p">,</span> <span class="n">html_ids</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">footer</span><span class="p">,</span> <span class="n">specific_paperformat_args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">additional_context</span><span class="p">)</span><span class="o">.</span><span class="n">_prepare_html</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">report_model</span><span class="o">=</span><span class="n">report_sudo</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">has_duplicated_ids</span> <span class="ow">and</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">attachment</span> <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span><span class="n">res_ids_wo_stream</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">html_ids</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span>
+                    <span class="s2">&quot;The report&#39;s template </span><span class="si">%r</span><span class="s2"> is wrong, please contact your administrator. </span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;Can not separate file to save as attachment because the report&#39;s template does not contains the&quot;</span>
+                    <span class="s2">&quot; attributes &#39;data-oe-model&#39; and &#39;data-oe-id&#39; on the div with &#39;article&#39; classname.&quot;</span><span class="p">,</span>
+                    <span class="n">report_sudo</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="p">))</span>
+
+            <span class="n">pdf_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_wkhtmltopdf</span><span class="p">(</span>
+                <span class="n">bodies</span><span class="p">,</span>
+                <span class="n">report_ref</span><span class="o">=</span><span class="n">report_ref</span><span class="p">,</span>
+                <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">,</span>
+                <span class="n">footer</span><span class="o">=</span><span class="n">footer</span><span class="p">,</span>
+                <span class="n">landscape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;landscape&#39;</span><span class="p">),</span>
+                <span class="n">specific_paperformat_args</span><span class="o">=</span><span class="n">specific_paperformat_args</span><span class="p">,</span>
+                <span class="n">set_viewport_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;set_viewport_size&#39;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">pdf_content_stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">pdf_content</span><span class="p">)</span>
+
+            <span class="c1"># Printing a PDF report without any records. The content could be returned directly.</span>
+            <span class="k">if</span> <span class="n">has_duplicated_ids</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">res_ids</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">{</span>
+                    <span class="kc">False</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;stream&#39;</span><span class="p">:</span> <span class="n">pdf_content_stream</span><span class="p">,</span>
+                        <span class="s1">&#39;attachment&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+
+            <span class="c1"># Split the pdf for each record using the PDF outlines.</span>
+
+            <span class="c1"># Only one record: append the whole PDF.</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids_wo_stream</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">collected_streams</span><span class="p">[</span><span class="n">res_ids_wo_stream</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="s1">&#39;stream&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pdf_content_stream</span>
+                <span class="k">return</span> <span class="n">collected_streams</span>
+
+            <span class="c1"># In case of multiple docs, we need to split the pdf according the records.</span>
+            <span class="c1"># In the simplest case of 1 res_id == 1 page, we use the PDFReader to print the</span>
+            <span class="c1"># pages one by one.</span>
+            <span class="n">html_ids_wo_none</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">html_ids</span> <span class="k">if</span> <span class="n">x</span><span class="p">]</span>
+            <span class="n">reader</span> <span class="o">=</span> <span class="n">PdfFileReader</span><span class="p">(</span><span class="n">pdf_content_stream</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">reader</span><span class="o">.</span><span class="n">numPages</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids_wo_stream</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">numPages</span><span class="p">):</span>
+                    <span class="n">attachment_writer</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+                    <span class="n">attachment_writer</span><span class="o">.</span><span class="n">addPage</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+                    <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+                    <span class="n">attachment_writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                    <span class="n">collected_streams</span><span class="p">[</span><span class="n">res_ids</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="s1">&#39;stream&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stream</span>
+                <span class="k">return</span> <span class="n">collected_streams</span>
+
+            <span class="c1"># In cases where the number of res_ids != the number of pages,</span>
+            <span class="c1"># we split the pdf based on top outlines computed by wkhtmltopdf.</span>
+            <span class="c1"># An outline is a &lt;h?&gt; html tag found on the document. To retrieve this table,</span>
+            <span class="c1"># we look on the pdf structure using pypdf to compute the outlines_pages from</span>
+            <span class="c1"># the top level heading in /Outlines.</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids_wo_stream</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span><span class="n">res_ids_wo_stream</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">html_ids_wo_none</span><span class="p">):</span>
+                <span class="n">root</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">trailer</span><span class="p">[</span><span class="s1">&#39;/Root&#39;</span><span class="p">]</span>
+                <span class="n">has_valid_outlines</span> <span class="o">=</span> <span class="s1">&#39;/Outlines&#39;</span> <span class="ow">in</span> <span class="n">root</span> <span class="ow">and</span> <span class="s1">&#39;/First&#39;</span> <span class="ow">in</span> <span class="n">root</span><span class="p">[</span><span class="s1">&#39;/Outlines&#39;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">has_valid_outlines</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">{</span><span class="kc">False</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;report_action&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="p">,</span>
+                        <span class="s1">&#39;stream&#39;</span><span class="p">:</span> <span class="n">pdf_content_stream</span><span class="p">,</span>
+                        <span class="s1">&#39;attachment&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="p">}}</span>
+
+                <span class="n">outlines_pages</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">node</span> <span class="o">=</span> <span class="n">root</span><span class="p">[</span><span class="s1">&#39;/Outlines&#39;</span><span class="p">][</span><span class="s1">&#39;/First&#39;</span><span class="p">]</span>
+                <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">outlines_pages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">root</span><span class="p">[</span><span class="s1">&#39;/Dests&#39;</span><span class="p">][</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;/Dest&#39;</span><span class="p">]][</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="s1">&#39;/Next&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="p">:</span>
+                        <span class="k">break</span>
+                    <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s1">&#39;/Next&#39;</span><span class="p">]</span>
+                <span class="n">outlines_pages</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">outlines_pages</span><span class="p">))</span>
+
+                <span class="c1"># The number of outlines must be equal to the number of records to be able to split the document.</span>
+                <span class="n">has_same_number_of_outlines</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">outlines_pages</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span>
+
+                <span class="c1"># There should be a top-level heading on first page</span>
+                <span class="n">has_top_level_heading</span> <span class="o">=</span> <span class="n">outlines_pages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+
+                <span class="k">if</span> <span class="n">has_same_number_of_outlines</span> <span class="ow">and</span> <span class="n">has_top_level_heading</span><span class="p">:</span>
+                    <span class="c1"># Split the PDF according to outlines.</span>
+                    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">num</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outlines_pages</span><span class="p">):</span>
+                        <span class="n">to</span> <span class="o">=</span> <span class="n">outlines_pages</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">outlines_pages</span><span class="p">)</span> <span class="k">else</span> <span class="n">reader</span><span class="o">.</span><span class="n">numPages</span>
+                        <span class="n">attachment_writer</span> <span class="o">=</span> <span class="n">PdfFileWriter</span><span class="p">()</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="n">to</span><span class="p">):</span>
+                            <span class="n">attachment_writer</span><span class="o">.</span><span class="n">addPage</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">getPage</span><span class="p">(</span><span class="n">j</span><span class="p">))</span>
+                        <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+                        <span class="n">attachment_writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                        <span class="n">collected_streams</span><span class="p">[</span><span class="n">res_ids</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="s1">&#39;stream&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stream</span>
+
+                    <span class="k">return</span> <span class="n">collected_streams</span>
+
+            <span class="n">collected_streams</span><span class="p">[</span><span class="kc">False</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;stream&#39;</span><span class="p">:</span> <span class="n">pdf_content_stream</span><span class="p">,</span> <span class="s1">&#39;attachment&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">collected_streams</span>
+
+    <span class="k">def</span> <span class="nf">_prepare_pdf_report_attachment_vals_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span> <span class="n">streams</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Hook to prepare attachment values needed for attachments creation</span>
+<span class="sd">        during the pdf report generation.</span>
+
+<span class="sd">        :param report: The report (with sudo) from a reference report_ref.</span>
+<span class="sd">        :param streams: Dict of streams for each report containing the pdf content and existing attachments.</span>
+<span class="sd">        :return: attachment values list needed for attachments creation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">attachment_vals_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">res_id</span><span class="p">,</span> <span class="n">stream_data</span> <span class="ow">in</span> <span class="n">streams</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># An attachment already exists.</span>
+            <span class="k">if</span> <span class="n">stream_data</span><span class="p">[</span><span class="s1">&#39;attachment&#39;</span><span class="p">]:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># if res_id is false</span>
+            <span class="c1"># we are unable to fetch the record, it won&#39;t be saved as we can&#39;t split the documents unambiguously</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">res_id</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;These documents were not saved as an attachment because the template of </span><span class="si">%s</span><span class="s2"> doesn&#39;t &quot;</span>
+                    <span class="s2">&quot;have any headers seperating different instances of it. If you want it saved,&quot;</span>
+                    <span class="s2">&quot;please print the documents separately&quot;</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">res_id</span><span class="p">)</span>
+            <span class="n">attachment_name</span> <span class="o">=</span> <span class="n">safe_eval</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;object&#39;</span><span class="p">:</span> <span class="n">record</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">time</span><span class="p">})</span>
+
+            <span class="c1"># Unable to compute a name for the attachment.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">attachment_name</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">attachment_vals_list</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">attachment_name</span><span class="p">,</span>
+                <span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">stream_data</span><span class="p">[</span><span class="s1">&#39;stream&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
+                <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+                <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;binary&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">return</span> <span class="n">attachment_vals_list</span>
+
+    <span class="k">def</span> <span class="nf">_render_qweb_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">,</span> <span class="n">res_ids</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res_ids</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">res_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">res_ids</span><span class="p">]</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;report_type&#39;</span><span class="p">,</span> <span class="s1">&#39;pdf&#39;</span><span class="p">)</span>
+        <span class="c1"># In case of test environment without enough workers to perform calls to wkhtmltopdf,</span>
+        <span class="c1"># fallback to render_html.</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;test_enable&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;test_file&#39;</span><span class="p">])</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;force_report_rendering&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_render_qweb_html</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">res_ids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">webp_as_jpg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">collected_streams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_render_qweb_pdf_prepare_streams</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">res_ids</span><span class="o">=</span><span class="n">res_ids</span><span class="p">)</span>
+        <span class="n">has_duplicated_ids</span> <span class="o">=</span> <span class="n">res_ids</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">res_ids</span><span class="p">))</span>
+
+        <span class="c1"># access the report details with sudo() but keep evaluation context as current user</span>
+        <span class="n">report_sudo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+
+        <span class="c1"># Generate the ir.attachment if needed.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">has_duplicated_ids</span> <span class="ow">and</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">attachment</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;report_pdf_no_attachment&quot;</span><span class="p">):</span>
+            <span class="n">attachment_vals_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_pdf_report_attachment_vals_list</span><span class="p">(</span><span class="n">report_sudo</span><span class="p">,</span> <span class="n">collected_streams</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attachment_vals_list</span><span class="p">:</span>
+                <span class="n">attachment_names</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">attachment_vals_list</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">attachment_vals_list</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">AccessError</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cannot save PDF report </span><span class="si">%r</span><span class="s2"> attachments for user </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">attachment_names</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">display_name</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The PDF documents </span><span class="si">%r</span><span class="s2"> are now saved in the database&quot;</span><span class="p">,</span> <span class="n">attachment_names</span><span class="p">)</span>
+
+        <span class="c1"># Merge all streams together for a single record.</span>
+        <span class="n">streams_to_merge</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;stream&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">collected_streams</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;stream&#39;</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">streams_to_merge</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">pdf_content</span> <span class="o">=</span> <span class="n">streams_to_merge</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_pdfs</span><span class="p">(</span><span class="n">streams_to_merge</span><span class="p">)</span> <span class="k">as</span> <span class="n">pdf_merged_stream</span><span class="p">:</span>
+                <span class="n">pdf_content</span> <span class="o">=</span> <span class="n">pdf_merged_stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">stream</span> <span class="ow">in</span> <span class="n">streams_to_merge</span><span class="p">:</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">res_ids</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The PDF report has been generated for model: </span><span class="si">%s</span><span class="s2">, records </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">report_sudo</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">res_ids</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">pdf_content</span><span class="p">,</span> <span class="s1">&#39;pdf&#39;</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_render_qweb_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;report_type&#39;</span><span class="p">,</span> <span class="s1">&#39;text&#39;</span><span class="p">)</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rendering_context</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_render_template</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span> <span class="s1">&#39;text&#39;</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_render_qweb_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;report_type&#39;</span><span class="p">,</span> <span class="s1">&#39;html&#39;</span><span class="p">)</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rendering_context</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_render_template</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">report_name</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span> <span class="s1">&#39;html&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_get_rendering_context_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report</span><span class="p">):</span>
+        <span class="n">report_model_name</span> <span class="o">=</span> <span class="s1">&#39;report.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">report</span><span class="o">.</span><span class="n">report_name</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">report_model_name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_rendering_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="c1"># If the report is using a custom model to render its html, we must use it.</span>
+        <span class="c1"># Otherwise, fallback on the generic html rendering.</span>
+        <span class="n">report_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rendering_context_model</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span> <span class="ow">and</span> <span class="nb">dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">report_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">report_model</span><span class="o">.</span><span class="n">_get_report_values</span><span class="p">(</span><span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">docs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">docids</span><span class="p">)</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;doc_ids&#39;</span><span class="p">:</span> <span class="n">docids</span><span class="p">,</span>
+                <span class="s1">&#39;doc_model&#39;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+                <span class="s1">&#39;docs&#39;</span><span class="p">:</span> <span class="n">docs</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;is_html_empty&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_html_empty</span>
+        <span class="k">return</span> <span class="n">data</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_ref</span><span class="p">,</span> <span class="n">res_ids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_report</span><span class="p">(</span><span class="n">report_ref</span><span class="p">)</span>
+        <span class="n">report_type</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">report_type</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">)</span>
+        <span class="n">render_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_render_&#39;</span> <span class="o">+</span> <span class="n">report_type</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">render_func</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">render_func</span><span class="p">(</span><span class="n">report_ref</span><span class="p">,</span> <span class="n">res_ids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IrActionsReport.report_action">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_actions_report.IrActionsReport.report_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">report_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">docids</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return an action of type ir.actions.report.</span>
+
+<span class="sd">        :param docids: id/ids/browse record of the records to print (if not used, pass an empty list)</span>
+<span class="sd">        :param data:</span>
+<span class="sd">        :param bool config:</span>
+<span class="sd">        :rtype: bytes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span>
+        <span class="k">if</span> <span class="n">docids</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">docids</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+                <span class="n">active_ids</span> <span class="o">=</span> <span class="n">docids</span><span class="o">.</span><span class="n">ids</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">docids</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">active_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">docids</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">docids</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="n">active_ids</span> <span class="o">=</span> <span class="n">docids</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">active_ids</span><span class="o">=</span><span class="n">active_ids</span><span class="p">)</span>
+
+        <span class="n">report_action</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;context&#39;</span><span class="p">:</span> <span class="n">context</span><span class="p">,</span>
+            <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.report&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;report_name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_name</span><span class="p">,</span>
+            <span class="s1">&#39;report_type&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_type</span><span class="p">,</span>
+            <span class="s1">&#39;report_file&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_file</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">discard_logo_check</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;discard_logo_check&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">external_report_layout_id</span> <span class="ow">and</span> <span class="n">config</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">discard_logo_check</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_configure_external_report_layout</span><span class="p">(</span><span class="n">report_action</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">report_action</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_action_configure_external_report_layout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_action</span><span class="p">):</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.actions.actions&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">_for_xml_id</span><span class="p">(</span><span class="s2">&quot;web.action_base_document_layout_configurator&quot;</span><span class="p">)</span>
+        <span class="n">py_ctx</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;context&#39;</span><span class="p">,</span> <span class="p">{}))</span>
+        <span class="n">report_action</span><span class="p">[</span><span class="s1">&#39;close_on_report_download&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">py_ctx</span><span class="p">[</span><span class="s1">&#39;report_action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">report_action</span>
+        <span class="n">py_ctx</span><span class="p">[</span><span class="s1">&#39;dialog_size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;large&#39;</span>
+        <span class="n">action</span><span class="p">[</span><span class="s1">&#39;context&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">py_ctx</span>
+        <span class="k">return</span> <span class="n">action</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

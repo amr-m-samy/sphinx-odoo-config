@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_attachment &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_attachment</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_attachment</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">binascii</span>
+<span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">mimetypes</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">uuid</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span><span class="p">,</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">config</span><span class="p">,</span> <span class="n">human_size</span><span class="p">,</span> <span class="n">ImageProcess</span><span class="p">,</span> <span class="n">str2bool</span><span class="p">,</span> <span class="n">consteq</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.mimetypes</span> <span class="kn">import</span> <span class="n">guess_mimetype</span>
+<span class="kn">from</span> <span class="nn">odoo.osv</span> <span class="kn">import</span> <span class="n">expression</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="IrAttachment">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment">[docs]</a>
+<span class="k">class</span> <span class="nc">IrAttachment</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Attachments are used to link binary files or url to any openerp document.</span>
+
+<span class="sd">    External attachment storage</span>
+<span class="sd">    ---------------------------</span>
+
+<span class="sd">    The computed field ``datas`` is implemented using ``_file_read``,</span>
+<span class="sd">    ``_file_write`` and ``_file_delete``, which can be overridden to implement</span>
+<span class="sd">    other storage engines. Such methods should check for other location pseudo</span>
+<span class="sd">    uri (example: hdfs://hadoopserver).</span>
+
+<span class="sd">    The default implementation is the file:dirname location that stores files</span>
+<span class="sd">    on the local filesystem using name based on their sha1 hash</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.attachment&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Attachment&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;id desc&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_compute_res_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">res_model</span> <span class="ow">and</span> <span class="n">attachment</span><span class="o">.</span><span class="n">res_id</span><span class="p">:</span>
+                <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">attachment</span><span class="o">.</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">res_id</span><span class="p">)</span>
+                <span class="n">attachment</span><span class="o">.</span><span class="n">res_name</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">display_name</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">attachment</span><span class="o">.</span><span class="n">res_name</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_storage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;ir_attachment.location&#39;</span><span class="p">,</span> <span class="s1">&#39;file&#39;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_filestore</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_storage_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># domain to retrieve the attachments to migrate</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;db&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;store_fname&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
+            <span class="s1">&#39;file&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="s1">&#39;db_datas&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
+        <span class="p">}[</span><span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">()]</span>
+
+<div class="viewcode-block" id="IrAttachment.force_storage">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.force_storage">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">force_storage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Force all attachments to be stored in the currently configured storage&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Only administrators can execute this action.&#39;</span><span class="p">))</span>
+
+        <span class="c1"># Migrate only binary attachments and bypass the res_field automatic</span>
+        <span class="c1"># filter added in _search override</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">AND</span><span class="p">([</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_storage_domain</span><span class="p">(),</span>
+            <span class="p">[</span><span class="s1">&#39;&amp;&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;binary&#39;</span><span class="p">),</span> <span class="s1">&#39;|&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;res_field&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;res_field&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]</span>
+        <span class="p">]))</span><span class="o">.</span><span class="n">_migrate</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_migrate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">record_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">storage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">attach</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Migrate attachment </span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">record_count</span><span class="p">,</span> <span class="n">storage</span><span class="p">)</span>
+            <span class="c1"># pass mimetype, to avoid recomputation</span>
+            <span class="n">attach</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;raw&#39;</span><span class="p">:</span> <span class="n">attach</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="s1">&#39;mimetype&#39;</span><span class="p">:</span> <span class="n">attach</span><span class="o">.</span><span class="n">mimetype</span><span class="p">})</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_full_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="c1"># sanitize path</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;[.]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;/</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_filestore</span><span class="p">(),</span> <span class="n">path</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_data</span><span class="p">,</span> <span class="n">sha</span><span class="p">):</span>
+        <span class="c1"># retro compatibility</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">sha</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">sha</span>
+        <span class="n">full_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">full_path</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">fname</span><span class="p">,</span> <span class="n">full_path</span>        <span class="c1"># keep existing path</span>
+
+        <span class="c1"># scatter files across 256 dirs</span>
+        <span class="c1"># we use &#39;/&#39; in the db (even on windows)</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">sha</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">sha</span>
+        <span class="n">full_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+        <span class="n">dirname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">full_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># prevent sha-1 collision</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">full_path</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_same_content</span><span class="p">(</span><span class="n">bin_data</span><span class="p">,</span> <span class="n">full_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;The attachment collides with an existing file.&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">fname</span><span class="p">,</span> <span class="n">full_path</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_file_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">IrAttachment</span><span class="p">)</span>
+        <span class="n">full_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">full_path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;_read_file reading </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_file_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_value</span><span class="p">,</span> <span class="n">checksum</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">IrAttachment</span><span class="p">)</span>
+        <span class="n">fname</span><span class="p">,</span> <span class="n">full_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_path</span><span class="p">(</span><span class="n">bin_value</span><span class="p">,</span> <span class="n">checksum</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">full_path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">full_path</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                    <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">bin_value</span><span class="p">)</span>
+                <span class="c1"># add fname to checklist, in case the transaction aborts</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_mark_for_gc</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;_file_write writing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">full_path</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">fname</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_file_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+        <span class="c1"># simply add fname to checklist, it will be garbage-collected later</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mark_for_gc</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_mark_for_gc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add ``fname`` in a checklist for the filestore garbage collection. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">IrAttachment</span><span class="p">)</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;[.]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;/</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="c1"># we use a spooldir: add an empty file in the subdirectory &#39;checklist&#39;</span>
+        <span class="n">full_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="s1">&#39;checklist&#39;</span><span class="p">),</span> <span class="n">fname</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">full_path</span><span class="p">):</span>
+            <span class="n">dirname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">full_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+                <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">OSError</span><span class="p">):</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">)</span>
+            <span class="nb">open</span><span class="p">(</span><span class="n">full_path</span><span class="p">,</span> <span class="s1">&#39;ab&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">autovacuum</span>
+    <span class="k">def</span> <span class="nf">_gc_file_store</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Perform the garbage collection of the filestore. &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">IrAttachment</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">()</span> <span class="o">!=</span> <span class="s1">&#39;file&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Continue in a new transaction. The LOCK statement below must be the</span>
+        <span class="c1"># first one in the current transaction, otherwise the database snapshot</span>
+        <span class="c1"># used by it may not contain the most recent changes made to the table</span>
+        <span class="c1"># ir_attachment! Indeed, if concurrent transactions create attachments,</span>
+        <span class="c1"># the LOCK statement will wait until those concurrent transactions end.</span>
+        <span class="c1"># But this transaction will not see the new attachements if it has done</span>
+        <span class="c1"># other requests before the LOCK (like the method _storage() above).</span>
+        <span class="n">cr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+        <span class="c1"># prevent all concurrent updates on ir_attachment while collecting,</span>
+        <span class="c1"># but only attempt to grab the lock for a little bit, otherwise it&#39;d</span>
+        <span class="c1"># start blocking other transactions. (will be retried later anyway)</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SET LOCAL lock_timeout TO &#39;10s&#39;&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;LOCK ir_attachment IN SHARE MODE&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">LockNotAvailable</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_gc_file_store_unsafe</span><span class="p">()</span>
+
+        <span class="c1"># commit to release the lock</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_gc_file_store_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># retrieve the file names from the checklist</span>
+        <span class="n">checklist</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">filenames</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="s1">&#39;checklist&#39;</span><span class="p">)):</span>
+            <span class="n">dirname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">dirpath</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+                <span class="n">fname</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+                <span class="n">checklist</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirpath</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+
+        <span class="c1"># Clean up the checklist. The checklist is split in chunks and files are garbage-collected</span>
+        <span class="c1"># for each chunk.</span>
+        <span class="n">removed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">names</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">split_for_in_conditions</span><span class="p">(</span><span class="n">checklist</span><span class="p">):</span>
+            <span class="c1"># determine which files to keep among the checklist</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT store_fname FROM ir_attachment WHERE store_fname IN </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">names</span><span class="p">])</span>
+            <span class="n">whitelist</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+
+            <span class="c1"># remove garbage files, and clean up checklist</span>
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+                <span class="n">filepath</span> <span class="o">=</span> <span class="n">checklist</span><span class="p">[</span><span class="n">fname</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">fname</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">whitelist</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;_file_gc unlinked </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+                        <span class="n">removed</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">):</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;_file_gc could not unlink </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_path</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">OSError</span><span class="p">):</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;filestore gc </span><span class="si">%d</span><span class="s2"> checked, </span><span class="si">%d</span><span class="s2"> removed&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">checklist</span><span class="p">),</span> <span class="n">removed</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;store_fname&#39;</span><span class="p">,</span> <span class="s1">&#39;db_datas&#39;</span><span class="p">,</span> <span class="s1">&#39;file_size&#39;</span><span class="p">)</span>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends_context</span><span class="p">(</span><span class="s1">&#39;bin_size&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_datas</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bin_size&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+                <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">human_size</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">file_size</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="ow">or</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;store_fname&#39;</span><span class="p">,</span> <span class="s1">&#39;db_datas&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">attach</span><span class="o">.</span><span class="n">store_fname</span><span class="p">:</span>
+                <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">_file_read</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">attach</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">db_datas</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_attachment_data</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">raw</span> <span class="ow">or</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_inverse_datas</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_attachment_data</span><span class="p">(</span><span class="k">lambda</span> <span class="n">attach</span><span class="p">:</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">datas</span> <span class="ow">or</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_set_attachment_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asbytes</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="c1"># compute the fields that depend on datas</span>
+            <span class="n">bin_data</span> <span class="o">=</span> <span class="n">asbytes</span><span class="p">(</span><span class="n">attach</span><span class="p">)</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_datas_related_values</span><span class="p">(</span><span class="n">bin_data</span><span class="p">,</span> <span class="n">attach</span><span class="o">.</span><span class="n">mimetype</span><span class="p">)</span>
+
+            <span class="c1"># take current location in filestore to possibly garbage-collect it</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="n">attach</span><span class="o">.</span><span class="n">store_fname</span>
+            <span class="c1"># write as superuser, as user probably does not have write access</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">IrAttachment</span><span class="p">,</span> <span class="n">attach</span><span class="o">.</span><span class="n">sudo</span><span class="p">())</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">fname</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_file_delete</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_datas_related_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mimetype</span><span class="p">):</span>
+        <span class="n">checksum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_checksum</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">index_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">mimetype</span><span class="p">,</span> <span class="n">checksum</span><span class="o">=</span><span class="n">checksum</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="n">index_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">mimetype</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;file_size&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
+            <span class="s1">&#39;checksum&#39;</span><span class="p">:</span> <span class="n">checksum</span><span class="p">,</span>
+            <span class="s1">&#39;index_content&#39;</span><span class="p">:</span> <span class="n">index_content</span><span class="p">,</span>
+            <span class="s1">&#39;store_fname&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;db_datas&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">()</span> <span class="o">!=</span> <span class="s1">&#39;db&#39;</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;store_fname&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file_write</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;checksum&#39;</span><span class="p">])</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;db_datas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+    <span class="k">def</span> <span class="nf">_compute_checksum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; compute the checksum for the given datas</span>
+<span class="sd">            :param bin_data : datas in its binary form</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># an empty file has a checksum too (for caching)</span>
+        <span class="k">return</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="n">bin_data</span> <span class="ow">or</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_same_content</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_data</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="n">BLOCK_SIZE</span> <span class="o">=</span> <span class="mi">1024</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">fd</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">BLOCK_SIZE</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">data</span> <span class="o">!=</span> <span class="n">bin_data</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="n">BLOCK_SIZE</span><span class="p">:(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">BLOCK_SIZE</span><span class="p">]:</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">_compute_mimetype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; compute the mimetype of the given values</span>
+<span class="sd">            :param values : dict of values to create or write an ir_attachment</span>
+<span class="sd">            :return mime : string indicating the mimetype, or application/octet-stream by default</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mimetype</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;mimetype&#39;</span><span class="p">):</span>
+            <span class="n">mimetype</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mimetype</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">):</span>
+            <span class="n">mimetype</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mimetype</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">):</span>
+            <span class="n">mimetype</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;url&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;?&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mimetype</span> <span class="ow">or</span> <span class="n">mimetype</span> <span class="o">==</span> <span class="s1">&#39;application/octet-stream&#39;</span><span class="p">:</span>
+            <span class="n">raw</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;raw&#39;</span><span class="p">):</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;datas&#39;</span><span class="p">):</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;datas&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">raw</span><span class="p">:</span>
+                <span class="n">mimetype</span> <span class="o">=</span> <span class="n">guess_mimetype</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mimetype</span> <span class="ow">or</span> <span class="s1">&#39;application/octet-stream&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_postprocess_contents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="n">ICP</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span>
+        <span class="n">supported_subtype</span> <span class="o">=</span> <span class="n">ICP</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_extensions&#39;</span><span class="p">,</span> <span class="s1">&#39;png,jpeg,bmp,tiff&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+
+        <span class="n">mimetype</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_mimetype</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">_type</span><span class="p">,</span> <span class="n">_match</span><span class="p">,</span> <span class="n">_subtype</span> <span class="o">=</span> <span class="n">mimetype</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+        <span class="n">is_image_resizable</span> <span class="o">=</span> <span class="n">_type</span> <span class="o">==</span> <span class="s1">&#39;image&#39;</span> <span class="ow">and</span> <span class="n">_subtype</span> <span class="ow">in</span> <span class="n">supported_subtype</span>
+        <span class="k">if</span> <span class="n">is_image_resizable</span> <span class="ow">and</span> <span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;datas&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;raw&#39;</span><span class="p">)):</span>
+            <span class="n">is_raw</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;raw&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Can be set to 0 to skip the resize</span>
+            <span class="n">max_resolution</span> <span class="o">=</span> <span class="n">ICP</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_max_px&#39;</span><span class="p">,</span> <span class="s1">&#39;1920x1920&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">str2bool</span><span class="p">(</span><span class="n">max_resolution</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">img</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">if</span> <span class="n">is_raw</span><span class="p">:</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="n">ImageProcess</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">],</span> <span class="n">verify_resolution</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>  <span class="c1"># datas</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="n">ImageProcess</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;datas&#39;</span><span class="p">]),</span> <span class="n">verify_resolution</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">img</span><span class="o">.</span><span class="n">image</span><span class="p">:</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Post processing ignored : Empty source, SVG, or WEBP&#39;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="n">values</span>
+
+                    <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">size</span>
+                    <span class="n">nw</span><span class="p">,</span> <span class="n">nh</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">max_resolution</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;x&#39;</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">w</span> <span class="o">&gt;</span> <span class="n">nw</span> <span class="ow">or</span> <span class="n">h</span> <span class="o">&gt;</span> <span class="n">nh</span><span class="p">:</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">nw</span><span class="p">,</span> <span class="n">nh</span><span class="p">)</span>
+                        <span class="n">quality</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ICP</span><span class="p">(</span><span class="s1">&#39;base.image_autoresize_quality&#39;</span><span class="p">,</span> <span class="mi">80</span><span class="p">))</span>
+                        <span class="n">image_data</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">image_quality</span><span class="p">(</span><span class="n">quality</span><span class="o">=</span><span class="n">quality</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">is_raw</span><span class="p">:</span>
+                            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">image_data</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;datas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">image_data</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">UserError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="c1"># Catch error during test where we provide fake image</span>
+                    <span class="c1"># raise UserError(_(&quot;This file could not be decoded as an image file. Please try with a different file.&quot;))</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Post processing ignored : </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+    <span class="k">def</span> <span class="nf">_check_contents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="n">mimetype</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_mimetype</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">xml_like</span> <span class="o">=</span> <span class="s1">&#39;ht&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span> <span class="ow">or</span> <span class="p">(</span> <span class="c1"># hta, html, xhtml, etc.</span>
+                <span class="s1">&#39;xml&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span> <span class="ow">and</span>    <span class="c1"># other xml (svg, text/xml, etc)</span>
+                <span class="ow">not</span> <span class="s1">&#39;openxmlformats&#39;</span> <span class="ow">in</span> <span class="n">mimetype</span><span class="p">)</span>  <span class="c1"># exception for Office formats</span>
+        <span class="n">force_text</span> <span class="o">=</span> <span class="n">xml_like</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;attachments_mime_plainxml&#39;</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.ui.view&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">check_access_rights</span><span class="p">(</span><span class="s1">&#39;write&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">force_text</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;text/plain&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;image_no_postprocess&#39;</span><span class="p">):</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_contents</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_data</span><span class="p">,</span> <span class="n">file_type</span><span class="p">,</span> <span class="n">checksum</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; compute the index content of the given binary data.</span>
+<span class="sd">            This is a python implementation of the unix command &#39;strings&#39;.</span>
+<span class="sd">            :param bin_data : datas in binary form</span>
+<span class="sd">            :return index_content : string containing all the printable character of the binary data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">index_content</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">file_type</span><span class="p">:</span>
+            <span class="n">index_content</span> <span class="o">=</span> <span class="n">file_type</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">index_content</span> <span class="o">==</span> <span class="s1">&#39;text&#39;</span><span class="p">:</span> <span class="c1"># compute index_content only for text type</span>
+                <span class="n">words</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;[</span><span class="se">\x20</span><span class="s2">-</span><span class="se">\x7E</span><span class="s2">]{4,}&quot;</span><span class="p">,</span> <span class="n">bin_data</span><span class="p">)</span>
+                <span class="n">index_content</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">words</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">index_content</span>
+
+<div class="viewcode-block" id="IrAttachment.get_serving_groups">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.get_serving_groups">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_serving_groups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; An ir.attachment record may be used as a fallback in the</span>
+<span class="sd">        http dispatch if its type field is set to &quot;binary&quot; and its url</span>
+<span class="sd">        field is set as the request&#39;s url. Only the groups returned by</span>
+<span class="sd">        this method are allowed to create and write on such records.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s1">&#39;base.group_system&#39;</span><span class="p">]</span></div>
+
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Name&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Description&#39;</span><span class="p">)</span>
+    <span class="n">res_name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Resource Name&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_res_name&#39;</span><span class="p">)</span>
+    <span class="n">res_model</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Resource Model&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">res_field</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Resource Field&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">res_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2oneReference</span><span class="p">(</span><span class="s1">&#39;Resource ID&#39;</span><span class="p">,</span> <span class="n">model_field</span><span class="o">=</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span>
+                                      <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">company_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.company&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Company&#39;</span><span class="p">,</span> <span class="n">change_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                 <span class="n">default</span><span class="o">=</span><span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="p">)</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;url&#39;</span><span class="p">,</span> <span class="s1">&#39;URL&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;binary&#39;</span><span class="p">,</span> <span class="s1">&#39;File&#39;</span><span class="p">)],</span>
+                            <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Type&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;binary&#39;</span><span class="p">,</span> <span class="n">change_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                            <span class="n">help</span><span class="o">=</span><span class="s2">&quot;You can either upload a file from your computer or copy/paste an internet link to your file.&quot;</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Url&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s1">&#39;btree_not_null&#39;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+    <span class="n">public</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Is public document&#39;</span><span class="p">)</span>
+
+    <span class="c1"># for external access</span>
+    <span class="n">access_token</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Access Token&#39;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="s2">&quot;base.group_user&quot;</span><span class="p">)</span>
+
+    <span class="c1"># the field &#39;datas&#39; is computed and may use the other fields below</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s2">&quot;File Content (raw)&quot;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_raw&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_raw&#39;</span><span class="p">)</span>
+    <span class="n">datas</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;File Content (base64)&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_datas&#39;</span><span class="p">,</span> <span class="n">inverse</span><span class="o">=</span><span class="s1">&#39;_inverse_datas&#39;</span><span class="p">)</span>
+    <span class="n">db_datas</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="s1">&#39;Database Data&#39;</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">store_fname</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Stored Filename&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">unaccent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">file_size</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;File Size&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">checksum</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s2">&quot;Checksum/SHA1&quot;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">mimetype</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Mime Type&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">index_content</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Indexed Content&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_auto_init</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrAttachment</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">_auto_init</span><span class="p">()</span>
+        <span class="n">tools</span><span class="o">.</span><span class="n">create_index</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="p">,</span> <span class="s1">&#39;ir_attachment_res_idx&#39;</span><span class="p">,</span>
+                           <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">res</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;url&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_serving_attachments</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">():</span>
+            <span class="k">return</span>
+        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="c1"># restrict writing on attachments that could be served by the</span>
+            <span class="c1"># ir.http&#39;s dispatch exception handling</span>
+            <span class="c1"># XDO note: this should be done in check(write), constraints for access rights?</span>
+            <span class="c1"># XDO note: if read on sudo, read twice, one for constraints, one for _inverse_datas as user</span>
+            <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;binary&#39;</span> <span class="ow">and</span> <span class="n">attachment</span><span class="o">.</span><span class="n">url</span><span class="p">:</span>
+                <span class="n">has_group</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">has_group</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">has_group</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">attachment</span><span class="o">.</span><span class="n">get_serving_groups</span><span class="p">()):</span>
+                    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Sorry, you are not allowed to write on this document&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="IrAttachment.check">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.check">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Restricts the access to an ir.attachment, according to referred mode &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_superuser</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="c1"># Always require an internal user (aka, employee) to access to a attachment</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">_is_internal</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Sorry, you are not allowed to access this document.&quot;</span><span class="p">))</span>
+        <span class="c1"># collect the records to check (by model)</span>
+        <span class="n">model_ids</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>            <span class="c1"># {model_name: set(ids)}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="c1"># DLE P173: `test_01_portal_attachment`</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flush_model</span><span class="p">([</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;create_uid&#39;</span><span class="p">,</span> <span class="s1">&#39;public&#39;</span><span class="p">,</span> <span class="s1">&#39;res_field&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT res_model, res_id, create_uid, public, res_field FROM ir_attachment WHERE id IN </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ids</span><span class="p">)])</span>
+            <span class="k">for</span> <span class="n">res_model</span><span class="p">,</span> <span class="n">res_id</span><span class="p">,</span> <span class="n">create_uid</span><span class="p">,</span> <span class="n">public</span><span class="p">,</span> <span class="n">res_field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">public</span> <span class="ow">and</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;read&#39;</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_system</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">res_id</span> <span class="ow">and</span> <span class="n">create_uid</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">uid</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Sorry, you are not allowed to access this document.&quot;</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">res_field</span><span class="p">:</span>
+                        <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">res_field</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">groups</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">user_has_groups</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">groups</span><span class="p">):</span>
+                                <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Sorry, you are not allowed to access this document.&quot;</span><span class="p">))</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">res_model</span> <span class="ow">and</span> <span class="n">res_id</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">model_ids</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">res_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">values</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_model&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">):</span>
+            <span class="n">model_ids</span><span class="p">[</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;res_model&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;res_id&#39;</span><span class="p">])</span>
+
+        <span class="c1"># check access rights on the records</span>
+        <span class="k">for</span> <span class="n">res_model</span><span class="p">,</span> <span class="n">res_ids</span> <span class="ow">in</span> <span class="n">model_ids</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># ignore attachments that are not attached to a resource anymore</span>
+            <span class="c1"># when checking access rights (resource was deleted but attachment</span>
+            <span class="c1"># was not)</span>
+            <span class="k">if</span> <span class="n">res_model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">res_model</span> <span class="o">==</span> <span class="s1">&#39;res.users&#39;</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">uid</span> <span class="o">==</span> <span class="nb">list</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="c1"># by default a user cannot write on itself, despite the list of writeable fields</span>
+                <span class="c1"># e.g. in the case of a user inserting an image into his image signature</span>
+                <span class="c1"># we need to bypass this check which would needlessly throw us away</span>
+                <span class="k">continue</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">res_ids</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+            <span class="c1"># For related models, check if we can write to the model, as unlinking</span>
+            <span class="c1"># and creating attachments can be seen as an update to the model</span>
+            <span class="n">access_mode</span> <span class="o">=</span> <span class="s1">&#39;write&#39;</span> <span class="k">if</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="s1">&#39;unlink&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">mode</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">check_access_rights</span><span class="p">(</span><span class="n">access_mode</span><span class="p">)</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">check_access_rule</span><span class="p">(</span><span class="n">access_mode</span><span class="p">)</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_filter_attachment_access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attachment_ids</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Filter the given attachment to return only the records the current user have access to.</span>
+
+<span class="sd">        :param attachment_ids: List of attachment ids we want to filter</span>
+<span class="sd">        :return: &lt;ir.attachment&gt; the current user have access to</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ret_attachments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span>
+        <span class="n">attachments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">attachment_ids</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">attachments</span><span class="o">.</span><span class="n">check_access_rights</span><span class="p">(</span><span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="n">raise_exception</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ret_attachments</span>
+
+        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="n">attachments</span><span class="o">.</span><span class="n">sudo</span><span class="p">():</span>
+            <span class="c1"># Use SUDO here to not raise an error during the prefetch</span>
+            <span class="c1"># And then drop SUDO right to check if we can access it</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">attachment</span><span class="o">.</span><span class="n">sudo</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s1">&#39;read&#39;</span><span class="p">)</span>
+                <span class="n">ret_attachments</span> <span class="o">|=</span> <span class="n">attachment</span>
+            <span class="k">except</span> <span class="n">AccessError</span><span class="p">:</span>
+                <span class="k">continue</span>
+        <span class="k">return</span> <span class="n">ret_attachments</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">access_rights_uid</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># add res_field=False in domain if not present; the arg[0] trick below</span>
+        <span class="c1"># works for domain items and &#39;&amp;&#39;/&#39;|&#39;/&#39;!&#39; operators too</span>
+        <span class="n">disable_binary_fields_attachments</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;res_field&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">domain</span><span class="p">):</span>
+            <span class="n">disable_binary_fields_attachments</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;res_field&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]</span> <span class="o">+</span> <span class="n">domain</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_superuser</span><span class="p">():</span>
+            <span class="c1"># rules do not apply for the superuser</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_search</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">access_rights_uid</span><span class="p">)</span>
+
+        <span class="c1"># For attachments, the permissions of the document they are attached to</span>
+        <span class="c1"># apply, so we must remove attachments for which the user cannot access</span>
+        <span class="c1"># the linked document. For the sake of performance, fetch the fields to</span>
+        <span class="c1"># determine those permissions within the same SQL query.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush_model</span><span class="p">([</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;res_field&#39;</span><span class="p">,</span> <span class="s1">&#39;public&#39;</span><span class="p">,</span> <span class="s1">&#39;create_uid&#39;</span><span class="p">])</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_search</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">access_rights_uid</span><span class="p">)</span>
+        <span class="n">query_str</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;id&quot;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;res_model&quot;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;res_id&quot;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;res_field&quot;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;public&quot;&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="si">}</span><span class="s1">&quot;.&quot;create_uid&quot;&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query_str</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+
+        <span class="c1"># determine permissions based on linked records</span>
+        <span class="n">all_ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">allowed_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">model_attachments</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">))</span>   <span class="c1"># {res_model: {res_id: set(ids)}}</span>
+        <span class="k">for</span> <span class="n">id_</span><span class="p">,</span> <span class="n">res_model</span><span class="p">,</span> <span class="n">res_id</span><span class="p">,</span> <span class="n">res_field</span><span class="p">,</span> <span class="n">public</span><span class="p">,</span> <span class="n">create_uid</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+            <span class="n">all_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">public</span><span class="p">:</span>
+                <span class="n">allowed_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">res_id</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_system</span><span class="p">()</span> <span class="ow">or</span> <span class="n">create_uid</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">uid</span><span class="p">):</span>
+                <span class="n">allowed_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">res_field</span> <span class="ow">and</span> <span class="n">disable_binary_fields_attachments</span><span class="p">)</span> <span class="ow">and</span> <span class="n">res_model</span> <span class="ow">and</span> <span class="n">res_id</span><span class="p">:</span>
+                <span class="n">model_attachments</span><span class="p">[</span><span class="n">res_model</span><span class="p">][</span><span class="n">res_id</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+
+        <span class="c1"># check permissions on records model by model</span>
+        <span class="k">for</span> <span class="n">res_model</span><span class="p">,</span> <span class="n">targets</span> <span class="ow">in</span> <span class="n">model_attachments</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">res_model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">:</span>
+                <span class="n">allowed_ids</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">id_</span> <span class="k">for</span> <span class="n">ids</span> <span class="ow">in</span> <span class="n">targets</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">check_access_rights</span><span class="p">(</span><span class="s1">&#39;read&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="c1"># filter ids according to what access rules permit</span>
+            <span class="n">ResModel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">res_id</span> <span class="ow">in</span> <span class="n">ResModel</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">targets</span><span class="p">))])</span><span class="o">.</span><span class="n">_ids</span><span class="p">:</span>
+                <span class="n">allowed_ids</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">targets</span><span class="p">[</span><span class="n">res_id</span><span class="p">])</span>
+
+        <span class="c1"># filter out all_ids by keeping allowed_ids only</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_</span> <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">all_ids</span> <span class="k">if</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">allowed_ids</span><span class="p">]</span>
+
+        <span class="c1"># If the original search reached the limit, it is important the</span>
+        <span class="c1"># filtered record set does so too. When a JS view receive a</span>
+        <span class="c1"># record set whose length is below the limit, it thinks it</span>
+        <span class="c1"># reached the last page. To avoid an infinite recursion due to the</span>
+        <span class="c1"># permission checks the sub-call need to be aware of the number of</span>
+        <span class="c1"># expected records to retrieve</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_ids</span><span class="p">)</span> <span class="o">==</span> <span class="n">limit</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;need&#39;</span><span class="p">,</span> <span class="n">limit</span><span class="p">):</span>
+            <span class="n">need</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;need&#39;</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+            <span class="n">more_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">need</span><span class="o">=</span><span class="n">need</span><span class="p">)</span><span class="o">.</span><span class="n">_search</span><span class="p">(</span>
+                <span class="n">domain</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_ids</span><span class="p">),</span> <span class="n">limit</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">access_rights_uid</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">more_ids</span><span class="p">)[:</span><span class="n">limit</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)])</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">_as_query</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IrAttachment.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s1">&#39;write&#39;</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">vals</span><span class="p">)</span>
+        <span class="c1"># remove computed field depending of datas</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;file_size&#39;</span><span class="p">,</span> <span class="s1">&#39;checksum&#39;</span><span class="p">,</span> <span class="s1">&#39;store_fname&#39;</span><span class="p">):</span>
+            <span class="n">vals</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;mimetype&#39;</span> <span class="ow">in</span> <span class="n">vals</span> <span class="ow">or</span> <span class="s1">&#39;datas&#39;</span> <span class="ow">in</span> <span class="n">vals</span> <span class="ow">or</span> <span class="s1">&#39;raw&#39;</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_contents</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrAttachment</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrAttachment.copy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.copy">[docs]</a>
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">default</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">&amp;</span> <span class="p">{</span><span class="s1">&#39;datas&#39;</span><span class="p">,</span> <span class="s1">&#39;db_datas&#39;</span><span class="p">,</span> <span class="s1">&#39;raw&#39;</span><span class="p">}:</span>
+            <span class="c1"># ensure the content is kept and recomputes checksum/store_fname</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">default</span> <span class="ow">or</span> <span class="p">{},</span> <span class="n">raw</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrAttachment</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">default</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IrAttachment.unlink">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.unlink">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s1">&#39;unlink&#39;</span><span class="p">)</span>
+
+        <span class="c1"># First delete in the database, *then* in the filesystem if the</span>
+        <span class="c1"># database allowed it. Helps avoid errors when concurrent transactions</span>
+        <span class="c1"># are deleting the same file, and some of the transactions are</span>
+        <span class="c1"># rolled back by PostgreSQL (due to concurrent updates detection).</span>
+        <span class="n">to_delete</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">attach</span><span class="o">.</span><span class="n">store_fname</span> <span class="k">for</span> <span class="n">attach</span> <span class="ow">in</span> <span class="bp">self</span> <span class="k">if</span> <span class="n">attach</span><span class="o">.</span><span class="n">store_fname</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">IrAttachment</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">to_delete</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_file_delete</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="IrAttachment.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="n">record_tuple_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="c1"># remove computed field depending of datas</span>
+        <span class="n">vals_list</span> <span class="o">=</span> <span class="p">[{</span>
+            <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span>
+            <span class="ow">in</span> <span class="n">vals</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;file_size&#39;</span><span class="p">,</span> <span class="s1">&#39;checksum&#39;</span><span class="p">,</span> <span class="s1">&#39;store_fname&#39;</span><span class="p">)</span>
+        <span class="p">}</span> <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_contents</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+            <span class="n">raw</span><span class="p">,</span> <span class="n">datas</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;raw&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;datas&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">raw</span> <span class="ow">or</span> <span class="n">datas</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="c1"># b64decode handles str input but raw needs explicit encoding</span>
+                    <span class="n">raw</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+                <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_datas_related_values</span><span class="p">(</span>
+                    <span class="n">raw</span> <span class="ow">or</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">datas</span> <span class="ow">or</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">),</span>
+                    <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]</span>
+                <span class="p">))</span>
+
+            <span class="c1"># &#39;check()&#39; only uses res_model and res_id from values, and make an exists.</span>
+            <span class="c1"># We can group the values by model, res_id to make only one query when</span>
+            <span class="c1"># creating multiple attachments on a single record.</span>
+            <span class="n">record_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_model&#39;</span><span class="p">),</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">))</span>
+            <span class="n">record_tuple_set</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">record_tuple</span><span class="p">)</span>
+
+        <span class="c1"># don&#39;t use possible contextual recordset for check, see commit for details</span>
+        <span class="n">Attachments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">res_model</span><span class="p">,</span> <span class="n">res_id</span> <span class="ow">in</span> <span class="n">record_tuple_set</span><span class="p">:</span>
+            <span class="n">Attachments</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;res_model&#39;</span><span class="p">:</span><span class="n">res_model</span><span class="p">,</span> <span class="s1">&#39;res_id&#39;</span><span class="p">:</span><span class="n">res_id</span><span class="p">})</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_post_add_create</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="IrAttachment.generate_access_token">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.generate_access_token">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_access_token</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">attachment</span><span class="o">.</span><span class="n">access_token</span><span class="p">:</span>
+                <span class="n">tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">access_token</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">access_token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_access_token</span><span class="p">()</span>
+            <span class="n">attachment</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;access_token&#39;</span><span class="p">:</span> <span class="n">access_token</span><span class="p">})</span>
+            <span class="n">tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">access_token</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">tokens</span></div>
+
+
+<div class="viewcode-block" id="IrAttachment.create_unique">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.create_unique">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">create_unique</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values_list</span><span class="p">):</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">values_list</span><span class="p">:</span>
+            <span class="c1"># Create only if record does not already exist for checksum and size.</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">bin_data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;datas&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span> <span class="ow">or</span> <span class="kc">False</span>
+            <span class="k">except</span> <span class="n">binascii</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Attachment is not encoded in base64.&quot;</span><span class="p">))</span>
+            <span class="n">checksum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_checksum</span><span class="p">(</span><span class="n">bin_data</span><span class="p">)</span>
+            <span class="n">existing_domain</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">],</span>  <span class="c1"># No implicit condition on res_field.</span>
+                <span class="p">[</span><span class="s1">&#39;checksum&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">checksum</span><span class="p">],</span>
+                <span class="p">[</span><span class="s1">&#39;file_size&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bin_data</span><span class="p">)],</span>
+                <span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">values</span><span class="p">[</span><span class="s1">&#39;mimetype&#39;</span><span class="p">]],</span>
+            <span class="p">]</span>
+            <span class="n">existing</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">existing_domain</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">existing</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="n">existing</span><span class="p">:</span>
+                    <span class="n">ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+                <span class="n">ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ids</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_generate_access_token</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())</span>
+
+<div class="viewcode-block" id="IrAttachment.validate_access">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.validate_access">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">access_token</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="n">record_sudo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">access_token</span><span class="p">:</span>
+            <span class="n">tok</span> <span class="o">=</span> <span class="n">record_sudo</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">prefetch_fields</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">access_token</span>
+            <span class="n">valid_token</span> <span class="o">=</span> <span class="n">consteq</span><span class="p">(</span><span class="n">tok</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">access_token</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_token</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="s2">&quot;Invalid access token&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">record_sudo</span>
+
+        <span class="k">if</span> <span class="n">record_sudo</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">prefetch_fields</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">public</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">record_sudo</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">has_group</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">):</span>
+            <span class="c1"># Check the read access on the record linked to the attachment</span>
+            <span class="c1"># eg: Allow to download an attachment on a task from /my/tasks/task_id</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s1">&#39;read&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">record_sudo</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="IrAttachment.action_get">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.action_get">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">action_get</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_for_xml_id</span><span class="p">(</span><span class="s1">&#39;base.action_attachment&#39;</span><span class="p">)</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_serve_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">extra_domain</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;binary&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">url</span><span class="p">)]</span> <span class="o">+</span> <span class="p">(</span><span class="n">extra_domain</span> <span class="ow">or</span> <span class="p">[])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IrAttachment.regenerate_assets_bundles">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_attachment.IrAttachment.regenerate_assets_bundles">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">regenerate_assets_bundles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">search</span><span class="p">([</span>
+            <span class="p">(</span><span class="s1">&#39;public&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">,</span> <span class="s2">&quot;=like&quot;</span><span class="p">,</span> <span class="s2">&quot;/web/assets/%&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;ir.ui.view&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;create_uid&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">),</span>
+        <span class="p">])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">(</span><span class="s1">&#39;assets&#39;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

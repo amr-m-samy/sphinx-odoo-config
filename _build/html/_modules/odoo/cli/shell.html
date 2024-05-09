@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.cli.shell &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.cli.shell</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.cli.shell</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">code</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">config</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">Command</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Shell exit behaviors</span>
+<span class="sd">    ====================</span>
+
+<span class="sd">    Legend:</span>
+<span class="sd">        stop = The REPL main loop stop.</span>
+<span class="sd">        raise = Exception raised.</span>
+<span class="sd">        loop = Stay in REPL.</span>
+
+<span class="sd">   Shell  | ^D    | exit() | quit() | sys.exit() | raise SystemExit()</span>
+<span class="sd">----------------------------------------------------------------------</span>
+<span class="sd"> python   | stop  | raise  | raise  | raise      | raise</span>
+<span class="sd"> ipython  | stop  | stop   | stop   | loop       | loop</span>
+<span class="sd"> ptpython | stop  | raise  | raise  | raise      | raise</span>
+<span class="sd"> bpython  | stop  | stop   | stop   | stop       | stop</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="raise_keyboard_interrupt">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.raise_keyboard_interrupt">[docs]</a>
+<span class="k">def</span> <span class="nf">raise_keyboard_interrupt</span><span class="p">(</span><span class="o">*</span><span class="n">a</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">KeyboardInterrupt</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="Console">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Console">[docs]</a>
+<span class="k">class</span> <span class="nc">Console</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">InteractiveConsole</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">locals</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;&lt;console&gt;&quot;</span><span class="p">):</span>
+        <span class="n">code</span><span class="o">.</span><span class="n">InteractiveConsole</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">locals</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">readline</span>
+            <span class="kn">import</span> <span class="nn">rlcompleter</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;readline or rlcompleter not available, autocomplete disabled.&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">readline</span><span class="o">.</span><span class="n">set_completer</span><span class="p">(</span><span class="n">rlcompleter</span><span class="o">.</span><span class="n">Completer</span><span class="p">(</span><span class="nb">locals</span><span class="p">)</span><span class="o">.</span><span class="n">complete</span><span class="p">)</span>
+            <span class="n">readline</span><span class="o">.</span><span class="n">parse_and_bind</span><span class="p">(</span><span class="s2">&quot;tab: complete&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Shell">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell">[docs]</a>
+<span class="k">class</span> <span class="nc">Shell</span><span class="p">(</span><span class="n">Command</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Start odoo in an interactive shell&quot;&quot;&quot;</span>
+    <span class="n">supported_shells</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ipython&#39;</span><span class="p">,</span> <span class="s1">&#39;ptpython&#39;</span><span class="p">,</span> <span class="s1">&#39;bpython&#39;</span><span class="p">,</span> <span class="s1">&#39;python&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Shell.init">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.init">[docs]</a>
+    <span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">prog</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">parse_config</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">cli</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">report_configuration</span><span class="p">()</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">preload</span><span class="o">=</span><span class="p">[],</span> <span class="n">stop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">raise_keyboard_interrupt</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.console">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.console">[docs]</a>
+    <span class="k">def</span> <span class="nf">console</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">isatty</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">fileno</span><span class="p">()):</span>
+            <span class="n">local_vars</span><span class="p">[</span><span class="s1">&#39;__name__&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;__main__&#39;</span>
+            <span class="n">exec</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="n">local_vars</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;env&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">local_vars</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;No environment set, use `</span><span class="si">%s</span><span class="s1"> shell -d dbname` to get one.&#39;</span> <span class="o">%</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">local_vars</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+
+            <span class="n">preferred_interface</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;shell_interface&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">preferred_interface</span><span class="p">:</span>
+                <span class="n">shells_to_try</span> <span class="o">=</span> <span class="p">[</span><span class="n">preferred_interface</span><span class="p">,</span> <span class="s1">&#39;python&#39;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">shells_to_try</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">supported_shells</span>
+
+            <span class="k">for</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">shells_to_try</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shell</span><span class="p">)(</span><span class="n">local_vars</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not start &#39;</span><span class="si">%s</span><span class="s2">&#39; shell.&quot;</span> <span class="o">%</span> <span class="n">shell</span><span class="p">)</span>
+                    <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Shell error:&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.ipython">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.ipython">[docs]</a>
+    <span class="k">def</span> <span class="nf">ipython</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">IPython</span> <span class="kn">import</span> <span class="n">start_ipython</span>
+        <span class="n">start_ipython</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="p">[],</span> <span class="n">user_ns</span><span class="o">=</span><span class="n">local_vars</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.ptpython">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.ptpython">[docs]</a>
+    <span class="k">def</span> <span class="nf">ptpython</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">ptpython.repl</span> <span class="kn">import</span> <span class="n">embed</span>
+        <span class="n">embed</span><span class="p">({},</span> <span class="n">local_vars</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.bpython">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.bpython">[docs]</a>
+    <span class="k">def</span> <span class="nf">bpython</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">bpython</span> <span class="kn">import</span> <span class="n">embed</span>
+        <span class="n">embed</span><span class="p">(</span><span class="n">local_vars</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.python">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.python">[docs]</a>
+    <span class="k">def</span> <span class="nf">python</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_vars</span><span class="p">):</span>
+        <span class="n">Console</span><span class="p">(</span><span class="nb">locals</span><span class="o">=</span><span class="n">local_vars</span><span class="p">)</span><span class="o">.</span><span class="n">interact</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Shell.shell">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.shell">[docs]</a>
+    <span class="k">def</span> <span class="nf">shell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dbname</span><span class="p">):</span>
+        <span class="n">local_vars</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;openerp&#39;</span><span class="p">:</span> <span class="n">odoo</span><span class="p">,</span>
+            <span class="s1">&#39;odoo&#39;</span><span class="p">:</span> <span class="n">odoo</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">dbname</span><span class="p">:</span>
+            <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span><span class="n">dbname</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                <span class="n">uid</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span>
+                <span class="n">ctx</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="p">{})[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">context_get</span><span class="p">()</span>
+                <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+                <span class="n">local_vars</span><span class="p">[</span><span class="s1">&#39;env&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">env</span>
+                <span class="n">local_vars</span><span class="p">[</span><span class="s1">&#39;self&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">user</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">console</span><span class="p">(</span><span class="n">local_vars</span><span class="p">)</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">console</span><span class="p">(</span><span class="n">local_vars</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Shell.run">
+<a class="viewcode-back" href="../../../odoo.cli.html#odoo.cli.shell.Shell.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shell</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.res_lang &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.res_lang</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.res_lang</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">locale</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span><span class="p">,</span> <span class="n">ValidationError</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">DEFAULT_DATE_FORMAT</span> <span class="o">=</span> <span class="s1">&#39;%m/</span><span class="si">%d</span><span class="s1">/%Y&#39;</span>
+<span class="n">DEFAULT_TIME_FORMAT</span> <span class="o">=</span> <span class="s1">&#39;%H:%M:%S&#39;</span>
+
+
+<div class="viewcode-block" id="Lang">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang">[docs]</a>
+<span class="k">class</span> <span class="nc">Lang</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;res.lang&quot;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s2">&quot;Languages&quot;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s2">&quot;active desc,name&quot;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">_disallowed_datetime_patterns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">DATETIME_FORMATS_MAP</span><span class="p">)</span>
+    <span class="n">_disallowed_datetime_patterns</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;%y&#39;</span><span class="p">)</span> <span class="c1"># this one is in fact allowed, just not good practice</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Locale Code&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;This field is used to set/get locales for user&#39;</span><span class="p">)</span>
+    <span class="n">iso_code</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;ISO code&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;This ISO code is the name of po files to use for translations&#39;</span><span class="p">)</span>
+    <span class="n">url_code</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;URL Code&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;The Lang Code displayed in the URL&#39;</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">()</span>
+    <span class="n">direction</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;ltr&#39;</span><span class="p">,</span> <span class="s1">&#39;Left-to-Right&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;rtl&#39;</span><span class="p">,</span> <span class="s1">&#39;Right-to-Left&#39;</span><span class="p">)],</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;ltr&#39;</span><span class="p">)</span>
+    <span class="n">date_format</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Date Format&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_DATE_FORMAT</span><span class="p">)</span>
+    <span class="n">time_format</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Time Format&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_TIME_FORMAT</span><span class="p">)</span>
+    <span class="n">week_start</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([(</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="s1">&#39;Monday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;2&#39;</span><span class="p">,</span> <span class="s1">&#39;Tuesday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;3&#39;</span><span class="p">,</span> <span class="s1">&#39;Wednesday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;4&#39;</span><span class="p">,</span> <span class="s1">&#39;Thursday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;5&#39;</span><span class="p">,</span> <span class="s1">&#39;Friday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;6&#39;</span><span class="p">,</span> <span class="s1">&#39;Saturday&#39;</span><span class="p">),</span>
+                                   <span class="p">(</span><span class="s1">&#39;7&#39;</span><span class="p">,</span> <span class="s1">&#39;Sunday&#39;</span><span class="p">)],</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;First Day of Week&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;7&#39;</span><span class="p">)</span>
+    <span class="n">grouping</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Separator Format&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;[]&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;The Separator Format should be like [,n] where 0 &lt; n :starting from Unit digit. &quot;</span>
+             <span class="s2">&quot;-1 will end the separation. e.g. [3,2,-1] will represent 106500 to be 1,06,500; &quot;</span>
+             <span class="s2">&quot;[1,2,-1] will represent it to be 106,50,0;[3] will represent it as 106,500. &quot;</span>
+             <span class="s2">&quot;Provided &#39;,&#39; as the thousand separator in each case.&quot;</span><span class="p">)</span>
+    <span class="n">decimal_point</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Decimal Separator&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">trim</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">thousands_sep</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">string</span><span class="o">=</span><span class="s1">&#39;Thousands Separator&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="n">trim</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;flag_image&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_field_flag_image_url</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">lang</span><span class="o">.</span><span class="n">flag_image</span><span class="p">:</span>
+                <span class="n">lang</span><span class="o">.</span><span class="n">flag_image_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/web/image/res.lang/</span><span class="si">{</span><span class="n">lang</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">/flag_image&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">lang</span><span class="o">.</span><span class="n">flag_image_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/base/static/img/country_flags/</span><span class="si">{</span><span class="n">lang</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">.png&quot;</span>
+
+    <span class="n">flag_image</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="s2">&quot;Image&quot;</span><span class="p">)</span>
+    <span class="n">flag_image_url</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="n">compute</span><span class="o">=</span><span class="n">_compute_field_flag_image_url</span><span class="p">)</span>
+
+    <span class="n">_sql_constraints</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s1">&#39;name_uniq&#39;</span><span class="p">,</span> <span class="s1">&#39;unique(name)&#39;</span><span class="p">,</span> <span class="s1">&#39;The name of the language must be unique!&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;code_uniq&#39;</span><span class="p">,</span> <span class="s1">&#39;unique(code)&#39;</span><span class="p">,</span> <span class="s1">&#39;The code of the language must be unique!&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;url_code_uniq&#39;</span><span class="p">,</span> <span class="s1">&#39;unique(url_code)&#39;</span><span class="p">,</span> <span class="s1">&#39;The URL code of the language must be unique!&#39;</span><span class="p">),</span>
+    <span class="p">]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># do not check during installation</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">ready</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_count</span><span class="p">([]):</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;At least one language must be active.&#39;</span><span class="p">))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;time_format&#39;</span><span class="p">,</span> <span class="s1">&#39;date_format&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_format</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">_disallowed_datetime_patterns</span><span class="p">:</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">time_format</span> <span class="ow">and</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span><span class="p">)</span> <span class="ow">or</span> \
+                        <span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">date_format</span> <span class="ow">and</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Invalid date/time format directive specified. &#39;</span>
+                                            <span class="s1">&#39;Please refer to the list of allowed directives, &#39;</span>
+                                            <span class="s1">&#39;displayed when you edit a language.&#39;</span><span class="p">))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">onchange</span><span class="p">(</span><span class="s1">&#39;time_format&#39;</span><span class="p">,</span> <span class="s1">&#39;date_format&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_onchange_format</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">warning</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;warning&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Using 24-hour clock format with AM/PM can cause issues.&quot;</span><span class="p">),</span>
+                <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;Changing to 12-hour clock format instead.&quot;</span><span class="p">),</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;notification&#39;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span> <span class="ow">and</span> <span class="s2">&quot;%H&quot;</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span> <span class="ow">and</span> <span class="s2">&quot;%p&quot;</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span><span class="p">:</span>
+                <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span> <span class="o">=</span> <span class="n">lang</span><span class="o">.</span><span class="n">date_format</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;%H&quot;</span><span class="p">,</span> <span class="s2">&quot;%I&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">warning</span>
+            <span class="k">if</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span> <span class="ow">and</span> <span class="s2">&quot;%H&quot;</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span> <span class="ow">and</span> <span class="s2">&quot;%p&quot;</span> <span class="ow">in</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span><span class="p">:</span>
+                <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span> <span class="o">=</span> <span class="n">lang</span><span class="o">.</span><span class="n">time_format</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;%H&quot;</span><span class="p">,</span> <span class="s2">&quot;%I&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">warning</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="s1">&#39;grouping&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_check_grouping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">warning</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;The Separator Format should be like [,n] where 0 &lt; n :starting from Unit digit. &#39;</span>
+                    <span class="s1">&#39;-1 will end the separation. e.g. [3,2,-1] will represent 106500 to be 1,06,500;&#39;</span>
+                    <span class="s1">&#39;[1,2,-1] will represent it to be 106,50,0;[3] will represent it as 106,500. &#39;</span>
+                    <span class="s1">&#39;Provided as the thousand separator in each case.&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">grouping</span><span class="p">)):</span>
+                    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_register_hook</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># check that there is at least one active language</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_count</span><span class="p">([]):</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No language is active.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_activate_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Activate languages</span>
+<span class="sd">        :param code: code of the language to activate</span>
+<span class="sd">        :return: the language matching &#39;code&#39; activated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">code</span><span class="p">)])</span>
+        <span class="k">if</span> <span class="n">lang</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">lang</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+            <span class="n">lang</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">lang</span>
+
+    <span class="k">def</span> <span class="nf">_create_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lang</span><span class="p">,</span> <span class="n">lang_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create the given language and make it active. &quot;&quot;&quot;</span>
+        <span class="c1"># create the language with locale information</span>
+        <span class="n">fail</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">iso_lang</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">get_iso_codes</span><span class="p">(</span><span class="n">lang</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ln</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">get_locales</span><span class="p">(</span><span class="n">lang</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">locale</span><span class="o">.</span><span class="n">setlocale</span><span class="p">(</span><span class="n">locale</span><span class="o">.</span><span class="n">LC_ALL</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ln</span><span class="p">))</span>
+                <span class="n">fail</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="n">locale</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+                <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">fail</span><span class="p">:</span>
+            <span class="n">lc</span> <span class="o">=</span> <span class="n">locale</span><span class="o">.</span><span class="n">getlocale</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Unable to get information for locale </span><span class="si">%s</span><span class="s1">. Information from the default locale (</span><span class="si">%s</span><span class="s1">) have been used.&#39;</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">lang</span><span class="p">,</span> <span class="n">lc</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">lang_name</span><span class="p">:</span>
+            <span class="n">lang_name</span> <span class="o">=</span> <span class="n">lang</span>
+
+        <span class="k">def</span> <span class="nf">fix_xa0</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Fix badly-encoded non-breaking space Unicode character from locale.localeconv(),</span>
+<span class="sd">               coercing to utf-8, as some platform seem to output localeconv() in their system</span>
+<span class="sd">               encoding, e.g. Windows-1252&quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">s</span> <span class="o">==</span> <span class="s1">&#39;</span><span class="se">\xa0</span><span class="s1">&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\xc2\xa0</span><span class="s1">&#39;</span>
+            <span class="k">return</span> <span class="n">s</span>
+
+        <span class="k">def</span> <span class="nf">fix_datetime_format</span><span class="p">(</span><span class="nb">format</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Python&#39;s strftime supports only the format directives</span>
+<span class="sd">               that are available on the platform&#39;s libc, so in order to</span>
+<span class="sd">               be 100% cross-platform we map to the directives required by</span>
+<span class="sd">               the C standard (1989 version), always available on platforms</span>
+<span class="sd">               with a C standard implementation.&quot;&quot;&quot;</span>
+            <span class="c1"># For some locales, nl_langinfo returns a D_FMT/T_FMT that contains</span>
+            <span class="c1"># unsupported &#39;%-&#39; patterns, e.g. for cs_CZ</span>
+            <span class="nb">format</span> <span class="o">=</span> <span class="nb">format</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;%-&#39;</span><span class="p">,</span> <span class="s1">&#39;%&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">replacement</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">DATETIME_FORMATS_MAP</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="nb">format</span> <span class="o">=</span> <span class="nb">format</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">replacement</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="nb">format</span><span class="p">)</span>
+
+        <span class="n">conv</span> <span class="o">=</span> <span class="n">locale</span><span class="o">.</span><span class="n">localeconv</span><span class="p">()</span>
+        <span class="n">lang_info</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">lang</span><span class="p">,</span>
+            <span class="s1">&#39;iso_code&#39;</span><span class="p">:</span> <span class="n">iso_lang</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">lang_name</span><span class="p">,</span>
+            <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;date_format&#39;</span> <span class="p">:</span> <span class="n">fix_datetime_format</span><span class="p">(</span><span class="n">locale</span><span class="o">.</span><span class="n">nl_langinfo</span><span class="p">(</span><span class="n">locale</span><span class="o">.</span><span class="n">D_FMT</span><span class="p">)),</span>
+            <span class="s1">&#39;time_format&#39;</span> <span class="p">:</span> <span class="n">fix_datetime_format</span><span class="p">(</span><span class="n">locale</span><span class="o">.</span><span class="n">nl_langinfo</span><span class="p">(</span><span class="n">locale</span><span class="o">.</span><span class="n">T_FMT</span><span class="p">)),</span>
+            <span class="s1">&#39;decimal_point&#39;</span> <span class="p">:</span> <span class="n">fix_xa0</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;decimal_point&#39;</span><span class="p">])),</span>
+            <span class="s1">&#39;thousands_sep&#39;</span> <span class="p">:</span> <span class="n">fix_xa0</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;thousands_sep&#39;</span><span class="p">])),</span>
+            <span class="s1">&#39;grouping&#39;</span> <span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;grouping&#39;</span><span class="p">,</span> <span class="p">[])),</span>
+        <span class="p">}</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">lang_info</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">tools</span><span class="o">.</span><span class="n">resetlocale</span><span class="p">()</span>
+
+<div class="viewcode-block" id="Lang.install_lang">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.install_lang">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">install_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        This method is called from odoo/addons/base/data/res_lang_data.xml to load</span>
+<span class="sd">        some language and set it as the default for every partners. The</span>
+<span class="sd">        language is set via tools.config by the &#39;_initialize_db&#39; method on the</span>
+<span class="sd">        &#39;db&#39; object. This is a fragile solution and something else should be</span>
+<span class="sd">        found.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># config[&#39;load_language&#39;] is a comma-separated list or None</span>
+        <span class="n">lang_code</span> <span class="o">=</span> <span class="p">(</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;load_language&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;en_US&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activate_lang</span><span class="p">(</span><span class="n">lang_code</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_lang</span><span class="p">(</span><span class="n">lang_code</span><span class="p">)</span>
+        <span class="n">IrDefault</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.default&#39;</span><span class="p">]</span>
+        <span class="n">default_value</span> <span class="o">=</span> <span class="n">IrDefault</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;lang&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">default_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">IrDefault</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="n">lang_code</span><span class="p">)</span>
+            <span class="c1"># set language of main company, created directly by db bootstrap SQL</span>
+            <span class="n">partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">partner_id</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">partner</span><span class="o">.</span><span class="n">lang</span><span class="p">:</span>
+                <span class="n">partner</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;lang&#39;</span><span class="p">:</span> <span class="n">lang_code</span><span class="p">})</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_lang_get_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">code</span><span class="p">)])</span><span class="o">.</span><span class="n">id</span>
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_lang_get_direction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">code</span><span class="p">)])</span><span class="o">.</span><span class="n">direction</span>
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;url_code&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_lang_get_code</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url_code</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;url_code&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">url_code</span><span class="p">)])</span><span class="o">.</span><span class="n">code</span> <span class="ow">or</span> <span class="n">url_code</span>
+
+    <span class="k">def</span> <span class="nf">_lang_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the language using this code if it is active &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lang_get_id</span><span class="p">(</span><span class="n">code</span><span class="p">))</span>
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;self.code&#39;</span><span class="p">,</span> <span class="s1">&#39;monetary&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_data_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">monetary</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">thousands_sep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">thousands_sep</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">decimal_point</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decimal_point</span>
+        <span class="n">grouping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grouping</span>
+        <span class="k">return</span> <span class="n">grouping</span><span class="p">,</span> <span class="n">thousands_sep</span><span class="p">,</span> <span class="n">decimal_point</span>
+
+<div class="viewcode-block" id="Lang.get_available">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.get_available">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">get_available</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the available languages as a list of (code, url_code, name,</span>
+<span class="sd">            active) sorted by name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">langs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="k">return</span> <span class="n">langs</span><span class="o">.</span><span class="n">get_sorted</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Lang.get_sorted">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.get_sorted">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">([(</span><span class="n">lang</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">url_code</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">flag_image_url</span><span class="p">)</span> <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span></div>
+
+
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;self.id&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_get_cached_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">,</span>
+            <span class="s1">&#39;url_code&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">url_code</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_get_cached</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_cached_values</span><span class="p">()[</span><span class="n">field</span><span class="p">]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_lang_code_to_urlcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">urlc</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_available</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">code</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">urlc</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lang_get</span><span class="p">(</span><span class="n">code</span><span class="p">)</span><span class="o">.</span><span class="n">url_code</span>
+
+<div class="viewcode-block" id="Lang.get_installed">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.get_installed">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="nd">@tools</span><span class="o">.</span><span class="n">ormcache</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">get_installed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Return the installed languages as a list of (code, name) sorted by name. &quot;&quot;&quot;</span>
+        <span class="n">langs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">([(</span><span class="n">lang</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">lang</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="n">langs</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Lang.toggle_active">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.toggle_active">[docs]</a>
+    <span class="k">def</span> <span class="nf">toggle_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">toggle_active</span><span class="p">()</span>
+        <span class="c1"># Automatically load translation</span>
+        <span class="n">active_lang</span> <span class="o">=</span> <span class="p">[</span><span class="n">lang</span><span class="o">.</span><span class="n">code</span> <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="n">l</span><span class="o">.</span><span class="n">active</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">active_lang</span><span class="p">:</span>
+            <span class="n">mods</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">)])</span>
+            <span class="n">mods</span><span class="o">.</span><span class="n">_update_translations</span><span class="p">(</span><span class="n">active_lang</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Lang.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;url_code&#39;</span><span class="p">):</span>
+                <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;url_code&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;iso_code&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;code&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Lang</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Lang.write">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.write">[docs]</a>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="n">lang_codes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;code&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;code&#39;</span> <span class="ow">in</span> <span class="n">vals</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">code</span> <span class="o">!=</span> <span class="n">vals</span><span class="p">[</span><span class="s1">&#39;code&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="n">lang_codes</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Language code cannot be modified.&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search_count</span><span class="p">([(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">lang_codes</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Cannot deactivate a language that is currently used by users.&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">search_count</span><span class="p">([(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">lang_codes</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Cannot deactivate a language that is currently used by contacts.&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">search_count</span><span class="p">([(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">lang_codes</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You cannot archive the language in which Odoo was setup as it is used by automated processes.&quot;</span><span class="p">))</span>
+            <span class="c1"># delete linked ir.default specifying default partner&#39;s language</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.default&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">discard_values</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="n">lang_codes</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Lang</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">ondelete</span><span class="p">(</span><span class="n">at_uninstall</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_unlink_except_default_lang</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">language</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">language</span><span class="o">.</span><span class="n">code</span> <span class="o">==</span> <span class="s1">&#39;en_US&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Base Language &#39;en_US&#39; can not be deleted.&quot;</span><span class="p">))</span>
+            <span class="n">ctx_lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;lang&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ctx_lang</span> <span class="ow">and</span> <span class="p">(</span><span class="n">language</span><span class="o">.</span><span class="n">code</span> <span class="o">==</span> <span class="n">ctx_lang</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You cannot delete the language which is the user&#39;s preferred language.&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">language</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You cannot delete the language which is Active!</span><span class="se">\n</span><span class="s2">Please de-activate the language first.&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Lang.unlink">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.unlink">[docs]</a>
+    <span class="k">def</span> <span class="nf">unlink</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Lang</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Lang.format">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.format">[docs]</a>
+    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">percent</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">grouping</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">monetary</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Format() will return the language-specific output for float values&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">percent</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;%&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;format() must be given exactly one </span><span class="si">%c</span><span class="s2">har format specifier&quot;</span><span class="p">))</span>
+
+        <span class="n">formatted</span> <span class="o">=</span> <span class="n">percent</span> <span class="o">%</span> <span class="n">value</span>
+
+        <span class="c1"># floats and decimal ints need special action!</span>
+        <span class="k">if</span> <span class="n">grouping</span><span class="p">:</span>
+            <span class="n">lang_grouping</span><span class="p">,</span> <span class="n">thousands_sep</span><span class="p">,</span> <span class="n">decimal_point</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_get</span><span class="p">(</span><span class="n">monetary</span><span class="p">)</span>
+            <span class="n">eval_lang_grouping</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">lang_grouping</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">percent</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="s1">&#39;eEfFgG&#39;</span><span class="p">:</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">formatted</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">intersperse</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">eval_lang_grouping</span><span class="p">,</span> <span class="n">thousands_sep</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+                <span class="n">formatted</span> <span class="o">=</span> <span class="n">decimal_point</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">percent</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="s1">&#39;diu&#39;</span><span class="p">:</span>
+                <span class="n">formatted</span> <span class="o">=</span> <span class="n">intersperse</span><span class="p">(</span><span class="n">formatted</span><span class="p">,</span> <span class="n">eval_lang_grouping</span><span class="p">,</span> <span class="n">thousands_sep</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">formatted</span></div>
+
+
+<div class="viewcode-block" id="Lang.action_activate_langs">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.Lang.action_activate_langs">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_activate_langs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Activate the selected languages &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="ow">not</span> <span class="n">l</span><span class="o">.</span><span class="n">active</span><span class="p">):</span>
+            <span class="n">lang</span><span class="o">.</span><span class="n">toggle_active</span><span class="p">()</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="n">_</span><span class="p">(</span><span class="s2">&quot;The languages that you selected have been successfully installed. Users can choose their favorite language in their preferences.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.client&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tag&#39;</span><span class="p">:</span> <span class="s1">&#39;display_notification&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;success&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;sticky&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;next&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window_close&#39;</span><span class="p">},</span>
+            <span class="p">}</span>
+        <span class="p">}</span></div>
+</div>
+
+
+<div class="viewcode-block" id="split">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.split">[docs]</a>
+<span class="k">def</span> <span class="nf">split</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">counts</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [])</span>
+<span class="sd">    [&#39;hello world&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [1])</span>
+<span class="sd">    [&#39;h&#39;, &#39;ello world&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [2])</span>
+<span class="sd">    [&#39;he&#39;, &#39;llo world&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [2,3])</span>
+<span class="sd">    [&#39;he&#39;, &#39;llo&#39;, &#39; world&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [2,3,0])</span>
+<span class="sd">    [&#39;he&#39;, &#39;llo&#39;, &#39; wo&#39;, &#39;rld&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; split(&quot;hello world&quot;, [2,-1,3])</span>
+<span class="sd">    [&#39;he&#39;, &#39;llo world&#39;]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">saved_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="c1"># count to use when encoutering a zero</span>
+    <span class="k">for</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">counts</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">l</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">while</span> <span class="n">l</span><span class="p">:</span>
+                <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">[:</span><span class="n">saved_count</span><span class="p">])</span>
+                <span class="n">l</span> <span class="o">=</span> <span class="n">l</span><span class="p">[</span><span class="n">saved_count</span><span class="p">:]</span>
+            <span class="k">break</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">[:</span><span class="n">count</span><span class="p">])</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="n">l</span><span class="p">[</span><span class="n">count</span><span class="p">:]</span>
+        <span class="n">saved_count</span> <span class="o">=</span> <span class="n">count</span>
+    <span class="k">if</span> <span class="n">l</span><span class="p">:</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<span class="n">intersperse_pat</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;([^0-9]*)([^ ]*)(.*)&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="intersperse">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_lang.intersperse">[docs]</a>
+<span class="k">def</span> <span class="nf">intersperse</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">counts</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    See the asserts below for examples.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">left</span><span class="p">,</span> <span class="n">rest</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">intersperse_pat</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">string</span><span class="p">)</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">reverse</span><span class="p">(</span><span class="n">s</span><span class="p">):</span> <span class="k">return</span> <span class="n">s</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">splits</span> <span class="o">=</span> <span class="n">split</span><span class="p">(</span><span class="n">reverse</span><span class="p">(</span><span class="n">rest</span><span class="p">),</span> <span class="n">counts</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">separator</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">reverse</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">reverse</span><span class="p">(</span><span class="n">splits</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">left</span> <span class="o">+</span> <span class="n">res</span> <span class="o">+</span> <span class="n">right</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">or</span> <span class="mi">0</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_uninstall &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_uninstall</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_uninstall</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="c1"># This assumes an existing but uninitialized database.</span>
+
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">import</span> <span class="nn">unittest</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">registry</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span>
+<span class="kn">from</span> <span class="nn">odoo.tests</span> <span class="kn">import</span> <span class="n">common</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">BaseCase</span>
+
+<span class="kn">from</span> <span class="nn">odoo.modules.registry</span> <span class="kn">import</span> <span class="n">Registry</span>
+
+
+<div class="viewcode-block" id="environment">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_uninstall.environment">[docs]</a>
+<span class="nd">@contextmanager</span>
+<span class="k">def</span> <span class="nf">environment</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return an environment with a new cursor for the current database; the</span>
+<span class="sd">        cursor is committed and closed after the context block.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">reg</span> <span class="o">=</span> <span class="n">registry</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">())</span>
+    <span class="k">with</span> <span class="n">reg</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span></div>
+
+
+
+<span class="n">MODULE</span> <span class="o">=</span> <span class="s1">&#39;test_uninstall&#39;</span>
+<span class="n">MODEL</span> <span class="o">=</span> <span class="s1">&#39;test_uninstall.model&#39;</span>
+
+
+<div class="viewcode-block" id="TestUninstall">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_uninstall.TestUninstall">[docs]</a>
+<span class="k">class</span> <span class="nc">TestUninstall</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Test the install/uninstall of a test module. The module is available in</span>
+<span class="sd">    `odoo.tests` which should be present in the addons-path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestUninstall.test_01_install">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_uninstall.TestUninstall.test_01_install">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_01_install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check a few things showing the module is installed. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">environment</span><span class="p">()</span> <span class="k">as</span> <span class="n">env</span><span class="p">:</span>
+            <span class="n">module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODULE</span><span class="p">)])</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">module</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">button_install</span><span class="p">()</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">environment</span><span class="p">()</span> <span class="k">as</span> <span class="n">env</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="s1">&#39;test_uninstall.model&#39;</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;module&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODULE</span><span class="p">)]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODEL</span><span class="p">)]))</span>
+
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+<span class="w">                </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                SELECT conname</span>
+<span class="sd">                  FROM pg_constraint</span>
+<span class="sd">                 WHERE conrelid = &#39;res_users&#39;::regclass</span>
+<span class="sd">                   AND conname LIKE &#39;res\_users\_test\_uninstall\_res\_user\_%&#39;</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+            <span class="p">)</span>
+            <span class="n">existing_constraints</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">existing_constraints</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">,</span> <span class="n">existing_constraints</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestUninstall.test_02_uninstall">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_uninstall.TestUninstall.test_02_uninstall">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_02_uninstall</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check a few things showing the module is uninstalled. &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">environment</span><span class="p">()</span> <span class="k">as</span> <span class="n">env</span><span class="p">:</span>
+            <span class="n">module</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODULE</span><span class="p">)])</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">module</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">button_uninstall</span><span class="p">()</span>
+        <span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">common</span><span class="o">.</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">environment</span><span class="p">()</span> <span class="k">as</span> <span class="n">env</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="s1">&#39;test_uninstall.model&#39;</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">registry</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;module&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODULE</span><span class="p">)]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">MODEL</span><span class="p">)]))</span>
+
+            <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+<span class="w">                </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                SELECT conname</span>
+<span class="sd">                  FROM pg_constraint</span>
+<span class="sd">                 WHERE conrelid = &#39;res_users&#39;::regclass</span>
+<span class="sd">                   AND conname LIKE &#39;res\_users\_test\_uninstall\_res\_user\_%&#39;</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+            <span class="p">)</span>
+            <span class="n">remaining_constraints</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">remaining_constraints</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">unittest</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

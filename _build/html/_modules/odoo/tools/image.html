@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.image &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.image</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.image</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">binascii</span>
+<span class="kn">import</span> <span class="nn">io</span>
+
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageOps</span>
+<span class="c1"># We can preload Ico too because it is considered safe</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">IcoImagePlugin</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">PIL.Image</span> <span class="kn">import</span> <span class="n">Transpose</span><span class="p">,</span> <span class="n">Palette</span><span class="p">,</span> <span class="n">Resampling</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">Transpose</span> <span class="o">=</span> <span class="n">Palette</span> <span class="o">=</span> <span class="n">Resampling</span> <span class="o">=</span> <span class="n">Image</span>
+
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randrange</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.misc</span> <span class="kn">import</span> <span class="n">DotDict</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.translate</span> <span class="kn">import</span> <span class="n">_</span>
+
+
+<span class="c1"># Preload PIL with the minimal subset of image formats we need</span>
+<span class="n">Image</span><span class="o">.</span><span class="n">preinit</span><span class="p">()</span>
+<span class="n">Image</span><span class="o">.</span><span class="n">_initialized</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="c1"># Maps only the 6 first bits of the base64 data, accurate enough</span>
+<span class="c1"># for our purpose and faster than decoding the full blob first</span>
+<span class="n">FILETYPE_BASE64_MAGICWORD</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="sa">b</span><span class="s1">&#39;/&#39;</span><span class="p">:</span> <span class="s1">&#39;jpg&#39;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s1">&#39;R&#39;</span><span class="p">:</span> <span class="s1">&#39;gif&#39;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s1">&#39;i&#39;</span><span class="p">:</span> <span class="s1">&#39;png&#39;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s1">&#39;P&#39;</span><span class="p">:</span> <span class="s1">&#39;svg+xml&#39;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s1">&#39;U&#39;</span><span class="p">:</span> <span class="s1">&#39;webp&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">EXIF_TAG_ORIENTATION</span> <span class="o">=</span> <span class="mh">0x112</span>
+<span class="c1"># The target is to have 1st row/col to be top/left</span>
+<span class="c1"># Note: rotate is counterclockwise</span>
+<span class="n">EXIF_TAG_ORIENTATION_TO_TRANSPOSE_METHODS</span> <span class="o">=</span> <span class="p">{</span> <span class="c1"># Initial side on 1st row/col:</span>
+    <span class="mi">0</span><span class="p">:</span> <span class="p">[],</span>                                              <span class="c1"># reserved</span>
+    <span class="mi">1</span><span class="p">:</span> <span class="p">[],</span>                                              <span class="c1"># top/left</span>
+    <span class="mi">2</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">FLIP_LEFT_RIGHT</span><span class="p">],</span>                     <span class="c1"># top/right</span>
+    <span class="mi">3</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_180</span><span class="p">],</span>                          <span class="c1"># bottom/right</span>
+    <span class="mi">4</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">FLIP_TOP_BOTTOM</span><span class="p">],</span>                     <span class="c1"># bottom/left</span>
+    <span class="mi">5</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">FLIP_LEFT_RIGHT</span><span class="p">,</span> <span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_90</span><span class="p">],</span><span class="c1"># left/top</span>
+    <span class="mi">6</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_270</span><span class="p">],</span>                          <span class="c1"># right/top</span>
+    <span class="mi">7</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">FLIP_TOP_BOTTOM</span><span class="p">,</span> <span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_90</span><span class="p">],</span><span class="c1"># right/bottom</span>
+    <span class="mi">8</span><span class="p">:</span> <span class="p">[</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_90</span><span class="p">],</span>                           <span class="c1"># left/bottom</span>
+<span class="p">}</span>
+
+<span class="c1"># Arbitrary limit to fit most resolutions, including Samsung Galaxy A22 photo,</span>
+<span class="c1"># 8K with a ratio up to 16:10, and almost all variants of 4320p</span>
+<span class="n">IMAGE_MAX_RESOLUTION</span> <span class="o">=</span> <span class="mf">50e6</span>
+
+
+<div class="viewcode-block" id="ImageProcess">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.ImageProcess">[docs]</a>
+<span class="k">class</span> <span class="nc">ImageProcess</span><span class="p">():</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">verify_resolution</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the `source` image for processing.</span>
+
+<span class="sd">        :param source: the original image binary</span>
+
+<span class="sd">            No processing will be done if the `source` is falsy or if</span>
+<span class="sd">            the image is SVG.</span>
+
+<span class="sd">        :param verify_resolution: if True, make sure the original image size is not</span>
+<span class="sd">            excessive before starting to process it. The max allowed resolution is</span>
+<span class="sd">            defined by `IMAGE_MAX_RESOLUTION`.</span>
+<span class="sd">        :type verify_resolution: bool</span>
+<span class="sd">        :rtype: ImageProcess</span>
+
+<span class="sd">        :raise: ValueError if `verify_resolution` is True and the image is too large</span>
+<span class="sd">        :raise: UserError if the image can&#39;t be identified by PIL</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source</span> <span class="o">=</span> <span class="n">source</span> <span class="ow">or</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span> <span class="ow">or</span> <span class="n">source</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;&lt;&#39;</span> <span class="ow">or</span> <span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;RIFF&#39;</span> <span class="ow">and</span> <span class="n">source</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;WEBPVP8&#39;</span><span class="p">):</span>
+            <span class="c1"># don&#39;t process empty source or SVG or WEBP</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">source</span><span class="p">))</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">binascii</span><span class="o">.</span><span class="n">Error</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;This file could not be decoded as an image file.&quot;</span><span class="p">))</span>
+
+            <span class="c1"># Original format has to be saved before fixing the orientation or</span>
+            <span class="c1"># doing any other operations because the information will be lost on</span>
+            <span class="c1"># the resulting image.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">format</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="n">image_fix_orientation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">)</span>
+
+            <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">size</span>
+            <span class="k">if</span> <span class="n">verify_resolution</span> <span class="ow">and</span> <span class="n">w</span> <span class="o">*</span> <span class="n">h</span> <span class="o">&gt;</span> <span class="n">IMAGE_MAX_RESOLUTION</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Image size excessive, uploaded images must be smaller than </span><span class="si">%s</span><span class="s2"> million pixels.&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">IMAGE_MAX_RESOLUTION</span> <span class="o">/</span> <span class="mf">1e6</span><span class="p">)))</span>
+
+<div class="viewcode-block" id="ImageProcess.image_quality">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.ImageProcess.image_quality">[docs]</a>
+    <span class="k">def</span> <span class="nf">image_quality</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quality</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the image resulting of all the image processing</span>
+<span class="sd">        operations that have been applied previously.</span>
+
+<span class="sd">        Return False if the initialized `image` was falsy, and return</span>
+<span class="sd">        the initialized `image` without change if it was SVG.</span>
+
+<span class="sd">        Also return the initialized `image` if no operations have been applied</span>
+<span class="sd">        and the `output_format` is the same as the original format and the</span>
+<span class="sd">        quality is not specified.</span>
+
+<span class="sd">        :param int quality: quality setting to apply. Default to 0.</span>
+
+<span class="sd">            - for JPEG: 1 is worse, 95 is best. Values above 95 should be</span>
+<span class="sd">              avoided. Falsy values will fallback to 95, but only if the image</span>
+<span class="sd">              was changed, otherwise the original image is returned.</span>
+<span class="sd">            - for PNG: set falsy to prevent conversion to a WEB palette.</span>
+<span class="sd">            - for other formats: no effect.</span>
+<span class="sd">        :param str output_format: the output format. Can be PNG, JPEG, GIF, or ICO.</span>
+<span class="sd">            Default to the format of the original image. BMP is converted to</span>
+<span class="sd">            PNG, other formats than those mentioned above are converted to JPEG.</span>
+<span class="sd">        :return: image</span>
+<span class="sd">        :rtype: bytes or False</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span>
+
+        <span class="n">output_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span>
+
+        <span class="n">output_format</span> <span class="o">=</span> <span class="n">output_format</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span>
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;BMP&#39;</span><span class="p">:</span>
+            <span class="n">output_format</span> <span class="o">=</span> <span class="s1">&#39;PNG&#39;</span>
+        <span class="k">elif</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;PNG&#39;</span><span class="p">,</span> <span class="s1">&#39;JPEG&#39;</span><span class="p">,</span> <span class="s1">&#39;GIF&#39;</span><span class="p">,</span> <span class="s1">&#39;ICO&#39;</span><span class="p">]:</span>
+            <span class="n">output_format</span> <span class="o">=</span> <span class="s1">&#39;JPEG&#39;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">quality</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span>
+
+        <span class="n">opt</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;output_format&#39;</span><span class="p">:</span> <span class="n">output_format</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;PNG&#39;</span><span class="p">:</span>
+            <span class="n">opt</span><span class="p">[</span><span class="s1">&#39;optimize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">quality</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">output_image</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="s1">&#39;P&#39;</span><span class="p">:</span>
+                    <span class="c1"># Floyd Steinberg dithering by default</span>
+                    <span class="n">output_image</span> <span class="o">=</span> <span class="n">output_image</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s1">&#39;RGBA&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s1">&#39;P&#39;</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="n">Palette</span><span class="o">.</span><span class="n">WEB</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;JPEG&#39;</span><span class="p">:</span>
+            <span class="n">opt</span><span class="p">[</span><span class="s1">&#39;optimize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">opt</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">quality</span> <span class="ow">or</span> <span class="mi">95</span>
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;GIF&#39;</span><span class="p">:</span>
+            <span class="n">opt</span><span class="p">[</span><span class="s1">&#39;optimize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">opt</span><span class="p">[</span><span class="s1">&#39;save_all&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">output_image</span><span class="o">.</span><span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;L&quot;</span><span class="p">,</span> <span class="s2">&quot;P&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGBA&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="p">(</span><span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;JPEG&#39;</span> <span class="ow">and</span> <span class="n">output_image</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;RGBA&#39;</span><span class="p">):</span>
+            <span class="n">output_image</span> <span class="o">=</span> <span class="n">output_image</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
+
+        <span class="n">output_bytes</span> <span class="o">=</span> <span class="n">image_apply_opt</span><span class="p">(</span><span class="n">output_image</span><span class="p">,</span> <span class="o">**</span><span class="n">opt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_bytes</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">source</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span> <span class="o">==</span> <span class="n">output_format</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span><span class="p">:</span>
+            <span class="c1"># Format has not changed and image content is unchanged but the</span>
+            <span class="c1"># reached binary is bigger: rather use the original.</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span>
+        <span class="k">return</span> <span class="n">output_bytes</span></div>
+
+
+<div class="viewcode-block" id="ImageProcess.resize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.ImageProcess.resize">[docs]</a>
+    <span class="k">def</span> <span class="nf">resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">max_width</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_height</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resize the image.</span>
+
+<span class="sd">        The image is never resized above the current image size. This method is</span>
+<span class="sd">        only to create a smaller version of the image.</span>
+
+<span class="sd">        The current ratio is preserved. To change the ratio, see `crop_resize`.</span>
+
+<span class="sd">        If `max_width` or `max_height` is falsy, it will be computed from the</span>
+<span class="sd">        other to keep the current ratio. If both are falsy, no resize is done.</span>
+
+<span class="sd">        It is currently not supported for GIF because we do not handle all the</span>
+<span class="sd">        frames properly.</span>
+
+<span class="sd">        :param int max_width: max width</span>
+<span class="sd">        :param int max_height: max height</span>
+<span class="sd">        :return: self to allow chaining</span>
+<span class="sd">        :rtype: ImageProcess</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span> <span class="o">!=</span> <span class="s1">&#39;GIF&#39;</span> <span class="ow">and</span> <span class="p">(</span><span class="n">max_width</span> <span class="ow">or</span> <span class="n">max_height</span><span class="p">):</span>
+            <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">size</span>
+            <span class="n">asked_width</span> <span class="o">=</span> <span class="n">max_width</span> <span class="ow">or</span> <span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">max_height</span><span class="p">)</span> <span class="o">//</span> <span class="n">h</span>
+            <span class="n">asked_height</span> <span class="o">=</span> <span class="n">max_height</span> <span class="ow">or</span> <span class="p">(</span><span class="n">h</span> <span class="o">*</span> <span class="n">max_width</span><span class="p">)</span> <span class="o">//</span> <span class="n">w</span>
+            <span class="k">if</span> <span class="n">asked_width</span> <span class="o">!=</span> <span class="n">w</span> <span class="ow">or</span> <span class="n">asked_height</span> <span class="o">!=</span> <span class="n">h</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">((</span><span class="n">asked_width</span><span class="p">,</span> <span class="n">asked_height</span><span class="p">),</span> <span class="n">Resampling</span><span class="o">.</span><span class="n">LANCZOS</span><span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">width</span> <span class="o">!=</span> <span class="n">w</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">height</span> <span class="o">!=</span> <span class="n">h</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="ImageProcess.crop_resize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.ImageProcess.crop_resize">[docs]</a>
+    <span class="k">def</span> <span class="nf">crop_resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">max_width</span><span class="p">,</span> <span class="n">max_height</span><span class="p">,</span> <span class="n">center_x</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">center_y</span><span class="o">=</span><span class="mf">0.5</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Crop and resize the image.</span>
+
+<span class="sd">        The image is never resized above the current image size. This method is</span>
+<span class="sd">        only to create smaller versions of the image.</span>
+
+<span class="sd">        Instead of preserving the ratio of the original image like `resize`,</span>
+<span class="sd">        this method will force the output to take the ratio of the given</span>
+<span class="sd">        `max_width` and `max_height`, so both have to be defined.</span>
+
+<span class="sd">        The crop is done before the resize in order to preserve as much of the</span>
+<span class="sd">        original image as possible. The goal of this method is primarily to</span>
+<span class="sd">        resize to a given ratio, and it is not to crop unwanted parts of the</span>
+<span class="sd">        original image. If the latter is what you want to do, you should create</span>
+<span class="sd">        another method, or directly use the `crop` method from PIL.</span>
+
+<span class="sd">        It is currently not supported for GIF because we do not handle all the</span>
+<span class="sd">        frames properly.</span>
+
+<span class="sd">        :param int max_width: max width</span>
+<span class="sd">        :param int max_height: max height</span>
+<span class="sd">        :param float center_x: the center of the crop between 0 (left) and 1</span>
+<span class="sd">            (right). Defaults to 0.5 (center).</span>
+<span class="sd">        :param float center_y: the center of the crop between 0 (top) and 1</span>
+<span class="sd">            (bottom). Defaults to 0.5 (center).</span>
+<span class="sd">        :return: self to allow chaining</span>
+<span class="sd">        :rtype: ImageProcess</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_format</span> <span class="o">!=</span> <span class="s1">&#39;GIF&#39;</span> <span class="ow">and</span> <span class="n">max_width</span> <span class="ow">and</span> <span class="n">max_height</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">size</span>
+            <span class="c1"># We want to keep as much of the image as possible -&gt; at least one</span>
+            <span class="c1"># of the 2 crop dimensions always has to be the same value as the</span>
+            <span class="c1"># original image.</span>
+            <span class="c1"># The target size will be reached with the final resize.</span>
+            <span class="k">if</span> <span class="n">w</span> <span class="o">/</span> <span class="n">max_width</span> <span class="o">&gt;</span> <span class="n">h</span> <span class="o">/</span> <span class="n">max_height</span><span class="p">:</span>
+                <span class="n">new_w</span><span class="p">,</span> <span class="n">new_h</span> <span class="o">=</span> <span class="n">w</span><span class="p">,</span> <span class="p">(</span><span class="n">max_height</span> <span class="o">*</span> <span class="n">w</span><span class="p">)</span> <span class="o">//</span> <span class="n">max_width</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">new_w</span><span class="p">,</span> <span class="n">new_h</span> <span class="o">=</span> <span class="p">(</span><span class="n">max_width</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span> <span class="o">//</span> <span class="n">max_height</span><span class="p">,</span> <span class="n">h</span>
+
+            <span class="c1"># No cropping above image size.</span>
+            <span class="k">if</span> <span class="n">new_w</span> <span class="o">&gt;</span> <span class="n">w</span><span class="p">:</span>
+                <span class="n">new_w</span><span class="p">,</span> <span class="n">new_h</span> <span class="o">=</span> <span class="n">w</span><span class="p">,</span> <span class="p">(</span><span class="n">new_h</span> <span class="o">*</span> <span class="n">w</span><span class="p">)</span> <span class="o">//</span> <span class="n">new_w</span>
+            <span class="k">if</span> <span class="n">new_h</span> <span class="o">&gt;</span> <span class="n">h</span><span class="p">:</span>
+                <span class="n">new_w</span><span class="p">,</span> <span class="n">new_h</span> <span class="o">=</span> <span class="p">(</span><span class="n">new_w</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span> <span class="o">//</span> <span class="n">new_h</span><span class="p">,</span> <span class="n">h</span>
+
+            <span class="c1"># Correctly place the center of the crop.</span>
+            <span class="n">x_offset</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">w</span> <span class="o">-</span> <span class="n">new_w</span><span class="p">)</span> <span class="o">*</span> <span class="n">center_x</span><span class="p">)</span>
+            <span class="n">h_offset</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">h</span> <span class="o">-</span> <span class="n">new_h</span><span class="p">)</span> <span class="o">*</span> <span class="n">center_y</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">new_w</span> <span class="o">!=</span> <span class="n">w</span> <span class="ow">or</span> <span class="n">new_h</span> <span class="o">!=</span> <span class="n">h</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">crop</span><span class="p">((</span><span class="n">x_offset</span><span class="p">,</span> <span class="n">h_offset</span><span class="p">,</span> <span class="n">x_offset</span> <span class="o">+</span> <span class="n">new_w</span><span class="p">,</span> <span class="n">h_offset</span> <span class="o">+</span> <span class="n">new_h</span><span class="p">))</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">width</span> <span class="o">!=</span> <span class="n">w</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">height</span> <span class="o">!=</span> <span class="n">h</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">max_width</span><span class="p">,</span> <span class="n">max_height</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ImageProcess.colorize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.ImageProcess.colorize">[docs]</a>
+    <span class="k">def</span> <span class="nf">colorize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Replace the transparent background by a random color.</span>
+
+<span class="sd">        :return: self to allow chaining</span>
+<span class="sd">        :rtype: ImageProcess</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">:</span>
+            <span class="n">original</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span>
+            <span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="n">randrange</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="n">randrange</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="n">randrange</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">24</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;RGB&#39;</span><span class="p">,</span> <span class="n">original</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">paste</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">box</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">original</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">paste</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">original</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">operationsCount</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="image_process">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_process">[docs]</a>
+<span class="k">def</span> <span class="nf">image_process</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">verify_resolution</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quality</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">crop</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">colorize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process the `source` image by executing the given operations and</span>
+<span class="sd">    return the result image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span> <span class="ow">or</span> <span class="p">((</span><span class="ow">not</span> <span class="n">size</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">verify_resolution</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">quality</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">crop</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">colorize</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">output_format</span><span class="p">):</span>
+        <span class="c1"># for performance: don&#39;t do anything if the image is falsy or if</span>
+        <span class="c1"># no operations have been requested</span>
+        <span class="k">return</span> <span class="n">source</span>
+
+    <span class="n">image</span> <span class="o">=</span> <span class="n">ImageProcess</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">verify_resolution</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">size</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">crop</span><span class="p">:</span>
+            <span class="n">center_x</span> <span class="o">=</span> <span class="mf">0.5</span>
+            <span class="n">center_y</span> <span class="o">=</span> <span class="mf">0.5</span>
+            <span class="k">if</span> <span class="n">crop</span> <span class="o">==</span> <span class="s1">&#39;top&#39;</span><span class="p">:</span>
+                <span class="n">center_y</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">elif</span> <span class="n">crop</span> <span class="o">==</span> <span class="s1">&#39;bottom&#39;</span><span class="p">:</span>
+                <span class="n">center_y</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">crop_resize</span><span class="p">(</span><span class="n">max_width</span><span class="o">=</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">max_height</span><span class="o">=</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">center_x</span><span class="o">=</span><span class="n">center_x</span><span class="p">,</span> <span class="n">center_y</span><span class="o">=</span><span class="n">center_y</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">max_width</span><span class="o">=</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">max_height</span><span class="o">=</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">colorize</span><span class="p">:</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">colorize</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">image</span><span class="o">.</span><span class="n">image_quality</span><span class="p">(</span><span class="n">quality</span><span class="o">=</span><span class="n">quality</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="n">output_format</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ----------------------------------------</span>
+<span class="c1"># Misc image tools</span>
+<span class="c1"># ---------------------------------------</span>
+
+<div class="viewcode-block" id="average_dominant_color">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.average_dominant_color">[docs]</a>
+<span class="k">def</span> <span class="nf">average_dominant_color</span><span class="p">(</span><span class="n">colors</span><span class="p">,</span> <span class="n">mitigate</span><span class="o">=</span><span class="mi">175</span><span class="p">,</span> <span class="n">max_margin</span><span class="o">=</span><span class="mi">140</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This function is used to calculate the dominant colors when given a list of colors</span>
+
+<span class="sd">    There are 5 steps:</span>
+
+<span class="sd">    1) Select dominant colors (highest count), isolate its values and remove</span>
+<span class="sd">       it from the current color set.</span>
+<span class="sd">    2) Set margins according to the prevalence of the dominant color.</span>
+<span class="sd">    3) Evaluate the colors. Similar colors are grouped in the dominant set</span>
+<span class="sd">       while others are put in the &quot;remaining&quot; list.</span>
+<span class="sd">    4) Calculate the average color for the dominant set. This is done by</span>
+<span class="sd">       averaging each band and joining them into a tuple.</span>
+<span class="sd">    5) Mitigate final average and convert it to hex</span>
+
+<span class="sd">    :param colors: list of tuples having:</span>
+
+<span class="sd">        0. color count in the image</span>
+<span class="sd">        1. actual color: tuple(R, G, B, A)</span>
+
+<span class="sd">        -&gt; these can be extracted from a PIL image using</span>
+<span class="sd">        :meth:`~PIL.Image.Image.getcolors`</span>
+<span class="sd">    :param mitigate: maximum value a band can reach</span>
+<span class="sd">    :param max_margin: maximum difference from one of the dominant values</span>
+<span class="sd">    :returns: a tuple with two items:</span>
+
+<span class="sd">        0. the average color of the dominant set as: tuple(R, G, B)</span>
+<span class="sd">        1. list of remaining colors, used to evaluate subsequent dominant colors</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dominant_color</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span>
+    <span class="n">dominant_rgb</span> <span class="o">=</span> <span class="n">dominant_color</span><span class="p">[</span><span class="mi">1</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span>
+    <span class="n">dominant_set</span> <span class="o">=</span> <span class="p">[</span><span class="n">dominant_color</span><span class="p">]</span>
+    <span class="n">remaining</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">margins</span> <span class="o">=</span> <span class="p">[</span><span class="n">max_margin</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">dominant_color</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span>
+                             <span class="nb">sum</span><span class="p">([</span><span class="n">col</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">colors</span><span class="p">]))]</span> <span class="o">*</span> <span class="mi">3</span>
+
+    <span class="n">colors</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">dominant_color</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">colors</span><span class="p">:</span>
+        <span class="n">rgb</span> <span class="o">=</span> <span class="n">color</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rgb</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">margins</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">rgb</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">margins</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span>
+            <span class="n">rgb</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">margins</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">rgb</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">margins</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span>
+                <span class="n">rgb</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">margins</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="n">rgb</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">dominant_rgb</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">margins</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="n">dominant_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">color</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">remaining</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">color</span><span class="p">)</span>
+
+    <span class="n">dominant_avg</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+        <span class="n">avg</span> <span class="o">=</span> <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">dominant_set</span><span class="p">:</span>
+            <span class="n">avg</span> <span class="o">+=</span> <span class="n">color</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">color</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">band</span><span class="p">]</span>
+            <span class="n">total</span> <span class="o">+=</span> <span class="n">color</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">dominant_avg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">avg</span> <span class="o">/</span> <span class="n">total</span><span class="p">))</span>
+
+    <span class="n">final_dominant</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">brightest</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">dominant_avg</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">dominant_avg</span><span class="p">[</span><span class="n">color</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">brightest</span> <span class="o">/</span> <span class="n">mitigate</span><span class="p">)</span> <span class="k">if</span> <span class="n">brightest</span> <span class="o">&gt;</span> <span class="n">mitigate</span> <span class="k">else</span> <span class="n">dominant_avg</span><span class="p">[</span><span class="n">color</span><span class="p">]</span>
+        <span class="n">final_dominant</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">final_dominant</span><span class="p">),</span> <span class="n">remaining</span></div>
+
+
+
+<div class="viewcode-block" id="image_fix_orientation">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_fix_orientation">[docs]</a>
+<span class="k">def</span> <span class="nf">image_fix_orientation</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fix the orientation of the image if it has an EXIF orientation tag.</span>
+
+<span class="sd">    This typically happens for images taken from a non-standard orientation</span>
+<span class="sd">    by some phones or other devices that are able to report orientation.</span>
+
+<span class="sd">    The specified transposition is applied to the image before all other</span>
+<span class="sd">    operations, because all of them expect the image to be in its final</span>
+<span class="sd">    orientation, which is the case only when the first row of pixels is the top</span>
+<span class="sd">    of the image and the first column of pixels is the left of the image.</span>
+
+<span class="sd">    Moreover the EXIF tags will not be kept when the image is later saved, so</span>
+<span class="sd">    the transposition has to be done to ensure the final image is correctly</span>
+<span class="sd">    orientated.</span>
+
+<span class="sd">    Note: to be completely correct, the resulting image should have its exif</span>
+<span class="sd">    orientation tag removed, since the transpositions have been applied.</span>
+<span class="sd">    However since this tag is not used in the code, it is acceptable to</span>
+<span class="sd">    save the complexity of removing it.</span>
+
+<span class="sd">    :param image: the source image</span>
+<span class="sd">    :type image: ~PIL.Image.Image</span>
+<span class="sd">    :return: the resulting image, copy of the source, with orientation fixed</span>
+<span class="sd">        or the source image if no operation was applied</span>
+<span class="sd">    :rtype: ~PIL.Image.Image</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">getexif</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="s1">&#39;getexif&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="s1">&#39;_getexif&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># support PIL &lt; 6.0</span>
+    <span class="k">if</span> <span class="n">getexif</span><span class="p">:</span>
+        <span class="n">exif</span> <span class="o">=</span> <span class="n">getexif</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">exif</span><span class="p">:</span>
+            <span class="n">orientation</span> <span class="o">=</span> <span class="n">exif</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">EXIF_TAG_ORIENTATION</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">EXIF_TAG_ORIENTATION_TO_TRANSPOSE_METHODS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">orientation</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">image</span>
+    <span class="k">return</span> <span class="n">image</span></div>
+
+
+
+<div class="viewcode-block" id="binary_to_image">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.binary_to_image">[docs]</a>
+<span class="k">def</span> <span class="nf">binary_to_image</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">source</span><span class="p">))</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">binascii</span><span class="o">.</span><span class="n">Error</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;This file could not be decoded as an image file.&quot;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="base64_to_image">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.base64_to_image">[docs]</a>
+<span class="k">def</span> <span class="nf">base64_to_image</span><span class="p">(</span><span class="n">base64_source</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a PIL image from the given `base64_source`.</span>
+
+<span class="sd">    :param base64_source: the image base64 encoded</span>
+<span class="sd">    :type base64_source: string or bytes</span>
+<span class="sd">    :rtype: ~PIL.Image.Image</span>
+<span class="sd">    :raise: UserError if the base64 is incorrect or the image can&#39;t be identified by PIL</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">base64_source</span><span class="p">)))</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">binascii</span><span class="o">.</span><span class="n">Error</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;This file could not be decoded as an image file.&quot;</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="image_apply_opt">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_apply_opt">[docs]</a>
+<span class="k">def</span> <span class="nf">image_apply_opt</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">output_format</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the given PIL `image` using `params`.</span>
+
+<span class="sd">    :type image: ~PIL.Image.Image</span>
+<span class="sd">    :param str output_format: :meth:`~PIL.Image.Image.save`&#39;s ``format`` parameter</span>
+<span class="sd">    :param dict params: params to expand when calling :meth:`~PIL.Image.Image.save`</span>
+<span class="sd">    :return: the image formatted</span>
+<span class="sd">    :rtype: bytes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s1">&#39;JPEG&#39;</span> <span class="ow">and</span> <span class="n">image</span><span class="o">.</span><span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="s1">&#39;L&#39;</span><span class="p">,</span> <span class="s1">&#39;RGB&#39;</span><span class="p">]:</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
+    <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">output_format</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="image_to_base64">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_to_base64">[docs]</a>
+<span class="k">def</span> <span class="nf">image_to_base64</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">output_format</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a base64_image from the given PIL `image` using `params`.</span>
+
+<span class="sd">    :type image: ~PIL.Image.Image</span>
+<span class="sd">    :param str output_format:</span>
+<span class="sd">    :param dict params: params to expand when calling :meth:`~PIL.Image.Image.save`</span>
+<span class="sd">    :return: the image base64 encoded</span>
+<span class="sd">    :rtype: bytes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">stream</span> <span class="o">=</span> <span class="n">image_apply_opt</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">output_format</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_webp_size">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.get_webp_size">[docs]</a>
+<span class="k">def</span> <span class="nf">get_webp_size</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the size of the provided webp binary source for VP8, VP8X and</span>
+<span class="sd">    VP8L, otherwise returns None.</span>
+<span class="sd">    See https://developers.google.com/speed/webp/docs/riff_container.</span>
+
+<span class="sd">    :param source: binary source</span>
+<span class="sd">    :return: (width, height) tuple, or None if not supported</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;RIFF&#39;</span> <span class="ow">and</span> <span class="n">source</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;WEBPVP8&#39;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;This file is not a webp file.&quot;</span><span class="p">))</span>
+
+    <span class="n">vp8_type</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="mi">15</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">vp8_type</span> <span class="o">==</span> <span class="mh">0x20</span><span class="p">:</span>  <span class="c1"># 0x20 = &#39; &#39;</span>
+        <span class="c1"># Sizes on big-endian 16 bits at offset 26.</span>
+        <span class="n">width_low</span><span class="p">,</span> <span class="n">width_high</span><span class="p">,</span> <span class="n">height_low</span><span class="p">,</span> <span class="n">height_high</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="mi">26</span><span class="p">:</span><span class="mi">30</span><span class="p">]</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="p">(</span><span class="n">width_high</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">width_low</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="p">(</span><span class="n">height_high</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">height_low</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">vp8_type</span> <span class="o">==</span> <span class="mh">0x58</span><span class="p">:</span>  <span class="c1"># 0x48 = &#39;X&#39;</span>
+        <span class="c1"># Sizes (minus one) on big-endian 24 bits at offset 24.</span>
+        <span class="n">width_low</span><span class="p">,</span> <span class="n">width_medium</span><span class="p">,</span> <span class="n">width_high</span><span class="p">,</span> <span class="n">height_low</span><span class="p">,</span> <span class="n">height_medium</span><span class="p">,</span> <span class="n">height_high</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">30</span><span class="p">]</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">width_high</span> <span class="o">&lt;&lt;</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">width_medium</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">width_low</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">height_high</span> <span class="o">&lt;&lt;</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">height_medium</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">height_low</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">vp8_type</span> <span class="o">==</span> <span class="mh">0x4C</span> <span class="ow">and</span> <span class="n">source</span><span class="p">[</span><span class="mi">20</span><span class="p">]</span> <span class="o">==</span> <span class="mh">0x2F</span><span class="p">:</span>  <span class="c1"># 0x4C = &#39;L&#39;</span>
+        <span class="c1"># Sizes (minus one) on big-endian-ish 14 bits at offset 21.</span>
+        <span class="c1"># E.g. [@20] 2F ab cd ef gh</span>
+        <span class="c1"># - width = 1 + (c&amp;0x3)d ab: ignore the two high bits of the second byte</span>
+        <span class="c1"># - height= 1 + hef(c&amp;0xC&gt;&gt;2): used them as the first two bits of the height</span>
+        <span class="n">ab</span><span class="p">,</span> <span class="n">cd</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">gh</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">25</span><span class="p">]</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">((</span><span class="n">cd</span> <span class="o">&amp;</span> <span class="mh">0x3F</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">ab</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">((</span><span class="n">gh</span> <span class="o">&amp;</span> <span class="mh">0xF</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="mi">10</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">ef</span> <span class="o">&lt;&lt;</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">cd</span> <span class="o">&gt;&gt;</span> <span class="mi">6</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="is_image_size_above">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.is_image_size_above">[docs]</a>
+<span class="k">def</span> <span class="nf">is_image_size_above</span><span class="p">(</span><span class="n">base64_source_1</span><span class="p">,</span> <span class="n">base64_source_2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return whether or not the size of the given image `base64_source_1` is</span>
+<span class="sd">    above the size of the given image `base64_source_2`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">base64_source_1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">base64_source_2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">base64_source_1</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="sa">b</span><span class="s1">&#39;P&#39;</span><span class="p">,</span> <span class="s1">&#39;P&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">base64_source_2</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="sa">b</span><span class="s1">&#39;P&#39;</span><span class="p">,</span> <span class="s1">&#39;P&#39;</span><span class="p">):</span>
+        <span class="c1"># False for SVG</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">get_image_size</span><span class="p">(</span><span class="n">base64_source</span><span class="p">):</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">base64_source</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;RIFF&#39;</span> <span class="ow">and</span> <span class="n">source</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s1">&#39;WEBPVP8&#39;</span><span class="p">):</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">get_webp_size</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">size</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DotDict</span><span class="p">({</span><span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># False for unknown WEBP format</span>
+                <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">image_fix_orientation</span><span class="p">(</span><span class="n">binary_to_image</span><span class="p">(</span><span class="n">source</span><span class="p">))</span>
+
+    <span class="n">image_source</span> <span class="o">=</span> <span class="n">get_image_size</span><span class="p">(</span><span class="n">base64_source_1</span><span class="p">)</span>
+    <span class="n">image_target</span> <span class="o">=</span> <span class="n">get_image_size</span><span class="p">(</span><span class="n">base64_source_2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">image_source</span><span class="o">.</span><span class="n">width</span> <span class="o">&gt;</span> <span class="n">image_target</span><span class="o">.</span><span class="n">width</span> <span class="ow">or</span> <span class="n">image_source</span><span class="o">.</span><span class="n">height</span> <span class="o">&gt;</span> <span class="n">image_target</span><span class="o">.</span><span class="n">height</span></div>
+
+
+
+<div class="viewcode-block" id="image_guess_size_from_field_name">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_guess_size_from_field_name">[docs]</a>
+<span class="k">def</span> <span class="nf">image_guess_size_from_field_name</span><span class="p">(</span><span class="n">field_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Attempt to guess the image size based on `field_name`.</span>
+
+<span class="sd">    If it can&#39;t be guessed or if it is a custom field: return (0, 0) instead.</span>
+
+<span class="sd">    :param str field_name: the name of a field</span>
+<span class="sd">    :return: the guessed size</span>
+<span class="sd">    :rtype: tuple (width, height)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">field_name</span> <span class="o">==</span> <span class="s1">&#39;image&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">field_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;x_&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">suffix</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">field_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">suffix</span> <span class="o">&lt;</span> <span class="mi">16</span><span class="p">:</span>
+        <span class="c1"># If the suffix is less than 16, it&#39;s probably not the size</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">suffix</span><span class="p">,</span> <span class="n">suffix</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="image_data_uri">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.image_data_uri">[docs]</a>
+<span class="k">def</span> <span class="nf">image_data_uri</span><span class="p">(</span><span class="n">base64_source</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This returns data URL scheme according RFC 2397</span>
+<span class="sd">    (https://tools.ietf.org/html/rfc2397) for all kind of supported images</span>
+<span class="sd">    (PNG, GIF, JPG and SVG), defaulting on PNG type if not mimetype detected.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="s1">&#39;data:image/</span><span class="si">%s</span><span class="s1">;base64,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">FILETYPE_BASE64_MAGICWORD</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">base64_source</span><span class="p">[:</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;png&#39;</span><span class="p">),</span>
+        <span class="n">base64_source</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_saturation">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.get_saturation">[docs]</a>
+<span class="k">def</span> <span class="nf">get_saturation</span><span class="p">(</span><span class="n">rgb</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the saturation (hsl format) of a given rgb color</span>
+
+<span class="sd">    :param rgb: rgb tuple or list</span>
+<span class="sd">    :return: saturation</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">c_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">rgb</span><span class="p">)</span> <span class="o">/</span> <span class="mi">255</span>
+    <span class="n">c_min</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">rgb</span><span class="p">)</span> <span class="o">/</span> <span class="mi">255</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">c_max</span> <span class="o">-</span> <span class="n">c_min</span>
+    <span class="k">return</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">d</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">c_max</span> <span class="o">+</span> <span class="n">c_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="get_lightness">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.get_lightness">[docs]</a>
+<span class="k">def</span> <span class="nf">get_lightness</span><span class="p">(</span><span class="n">rgb</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the lightness (hsl format) of a given rgb color</span>
+
+<span class="sd">    :param rgb: rgb tuple or list</span>
+<span class="sd">    :return: lightness</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">rgb</span><span class="p">)</span> <span class="o">+</span> <span class="nb">min</span><span class="p">(</span><span class="n">rgb</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">255</span></div>
+
+
+
+<div class="viewcode-block" id="hex_to_rgb">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.hex_to_rgb">[docs]</a>
+<span class="k">def</span> <span class="nf">hex_to_rgb</span><span class="p">(</span><span class="n">hx</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts an hexadecimal string (starting with &#39;#&#39;) to a RGB tuple&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">hx</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">2</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">2</span><span class="p">)])</span></div>
+
+
+
+<div class="viewcode-block" id="rgb_to_hex">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.image.rgb_to_hex">[docs]</a>
+<span class="k">def</span> <span class="nf">rgb_to_hex</span><span class="p">(</span><span class="n">rgb</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a RGB tuple or list to an hexadecimal string&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="s1">&#39;#&#39;</span> <span class="o">+</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="nb">hex</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">rgb</span><span class="p">])</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

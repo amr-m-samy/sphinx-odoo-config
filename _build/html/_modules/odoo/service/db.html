@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.service.db &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.service.db</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.service.db</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">from</span> <span class="nn">xml.etree</span> <span class="kn">import</span> <span class="n">ElementTree</span> <span class="k">as</span> <span class="n">ET</span>
+<span class="kn">import</span> <span class="nn">zipfile</span>
+
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">sql</span>
+<span class="kn">from</span> <span class="nn">pytz</span> <span class="kn">import</span> <span class="n">country_timezones</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">closing</span>
+<span class="kn">from</span> <span class="nn">decorator</span> <span class="kn">import</span> <span class="n">decorator</span>
+
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessDenied</span>
+<span class="kn">import</span> <span class="nn">odoo.release</span>
+<span class="kn">import</span> <span class="nn">odoo.sql_db</span>
+<span class="kn">import</span> <span class="nn">odoo.tools</span>
+<span class="kn">from</span> <span class="nn">odoo.sql_db</span> <span class="kn">import</span> <span class="n">db_connect</span>
+<span class="kn">from</span> <span class="nn">odoo.release</span> <span class="kn">import</span> <span class="n">version_info</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">find_pg_tool</span><span class="p">,</span> <span class="n">exec_pg_environ</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DatabaseExists">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.DatabaseExists">[docs]</a>
+<span class="k">class</span> <span class="nc">DatabaseExists</span><span class="p">(</span><span class="ne">Warning</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="check_db_management_enabled">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.check_db_management_enabled">[docs]</a>
+<span class="k">def</span> <span class="nf">check_db_management_enabled</span><span class="p">(</span><span class="n">method</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">if_db_mgt_enabled</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;list_db&#39;</span><span class="p">]:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Database management functions blocked, admin disabled database listing&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">AccessDenied</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">decorator</span><span class="p">(</span><span class="n">if_db_mgt_enabled</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span></div>
+
+
+<span class="c1">#----------------------------------------------------------</span>
+<span class="c1"># Master password required</span>
+<span class="c1">#----------------------------------------------------------</span>
+
+<div class="viewcode-block" id="check_super">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.check_super">[docs]</a>
+<span class="k">def</span> <span class="nf">check_super</span><span class="p">(</span><span class="n">passwd</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">passwd</span> <span class="ow">and</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">verify_admin_password</span><span class="p">(</span><span class="n">passwd</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">raise</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">()</span></div>
+
+
+<span class="c1"># This should be moved to odoo.modules.db, along side initialize().</span>
+<span class="k">def</span> <span class="nf">_initialize_db</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">demo</span><span class="p">,</span> <span class="n">lang</span><span class="p">,</span> <span class="n">user_password</span><span class="p">,</span> <span class="n">login</span><span class="o">=</span><span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="n">country_code</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">phone</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="c1"># TODO this should be removed as it is done by Registry.new().</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;load_language&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lang</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+        <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">demo</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+
+            <span class="k">if</span> <span class="n">lang</span><span class="p">:</span>
+                <span class="n">modules</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">)])</span>
+                <span class="n">modules</span><span class="o">.</span><span class="n">_update_translations</span><span class="p">(</span><span class="n">lang</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">country_code</span><span class="p">:</span>
+                <span class="n">country</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.country&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;code&#39;</span><span class="p">,</span> <span class="s1">&#39;ilike&#39;</span><span class="p">,</span> <span class="n">country_code</span><span class="p">)])[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;country_id&#39;</span><span class="p">:</span> <span class="n">country_code</span> <span class="ow">and</span> <span class="n">country</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;currency_id&#39;</span><span class="p">:</span> <span class="n">country_code</span> <span class="ow">and</span> <span class="n">country</span><span class="o">.</span><span class="n">currency_id</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">country_timezones</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">country_code</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">users</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span>
+                    <span class="n">users</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;tz&#39;</span><span class="p">:</span> <span class="n">country_timezones</span><span class="p">[</span><span class="n">country_code</span><span class="p">][</span><span class="mi">0</span><span class="p">]})</span>
+            <span class="k">if</span> <span class="n">phone</span><span class="p">:</span>
+                <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;phone&#39;</span><span class="p">:</span> <span class="n">phone</span><span class="p">})</span>
+            <span class="k">if</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">login</span><span class="p">:</span>
+                <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="n">login</span><span class="p">})</span>
+
+            <span class="c1"># update admin&#39;s password and lang and login</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="n">user_password</span><span class="p">,</span> <span class="s1">&#39;lang&#39;</span><span class="p">:</span> <span class="n">lang</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">login</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="s1">&#39;login&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">login</span>
+                <span class="n">emails</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">email_split</span><span class="p">(</span><span class="n">login</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">emails</span><span class="p">:</span>
+                    <span class="n">values</span><span class="p">[</span><span class="s1">&#39;email&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">emails</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;SELECT login, password FROM res_users ORDER BY login&#39;</span><span class="p">)</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;CREATE DATABASE failed:&#39;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_create_empty_database</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="s1">&#39;postgres&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="n">chosen_template</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_template&#39;</span><span class="p">]</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT datname FROM pg_database WHERE datname = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">name</span><span class="p">,),</span> <span class="n">log_exceptions</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">DatabaseExists</span><span class="p">(</span><span class="s2">&quot;database </span><span class="si">%r</span><span class="s2"> already exists!&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># database-altering operations cannot be executed inside a transaction</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="c1"># &#39;C&#39; collate is only safe with template0, but provides more useful indexes</span>
+            <span class="n">collate</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;LC_COLLATE &#39;C&#39;&quot;</span> <span class="k">if</span> <span class="n">chosen_template</span> <span class="o">==</span> <span class="s1">&#39;template0&#39;</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;CREATE DATABASE </span><span class="si">{}</span><span class="s2"> ENCODING &#39;unicode&#39; </span><span class="si">{}</span><span class="s2"> TEMPLATE </span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">collate</span><span class="p">,</span> <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">chosen_template</span><span class="p">)</span>
+            <span class="p">))</span>
+
+    <span class="c1"># TODO: add --extension=trigram,unaccent</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;CREATE EXTENSION IF NOT EXISTS pg_trgm&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;unaccent&#39;</span><span class="p">]:</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;CREATE EXTENSION IF NOT EXISTS unaccent&quot;</span><span class="p">)</span>
+                <span class="c1"># From PostgreSQL&#39;s point of view, making &#39;unaccent&#39; immutable is incorrect</span>
+                <span class="c1"># because it depends on external data - see</span>
+                <span class="c1"># https://www.postgresql.org/message-id/flat/201012021544.oB2FiTn1041521@wwwmaster.postgresql.org#201012021544.oB2FiTn1041521@wwwmaster.postgresql.org</span>
+                <span class="c1"># But in the case of Odoo, we consider that those data don&#39;t</span>
+                <span class="c1"># change in the lifetime of a database. If they do change, all</span>
+                <span class="c1"># indexes created with this function become corrupted!</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;ALTER FUNCTION unaccent(text) IMMUTABLE&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unable to create PostgreSQL extensions : </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+
+    <span class="c1"># restore legacy behaviour on pg15+</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;GRANT CREATE ON SCHEMA PUBLIC TO PUBLIC&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unable to make public schema public-accessible: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+
+<div class="viewcode-block" id="exp_create_database">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_create_database">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_create_database</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">demo</span><span class="p">,</span> <span class="n">lang</span><span class="p">,</span> <span class="n">user_password</span><span class="o">=</span><span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="n">login</span><span class="o">=</span><span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="n">country_code</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">phone</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Similar to exp_create but blocking.&quot;&quot;&quot;</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Create database `</span><span class="si">%s</span><span class="s1">`.&#39;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">)</span>
+    <span class="n">_create_empty_database</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="n">_initialize_db</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">demo</span><span class="p">,</span> <span class="n">lang</span><span class="p">,</span> <span class="n">user_password</span><span class="p">,</span> <span class="n">login</span><span class="p">,</span> <span class="n">country_code</span><span class="p">,</span> <span class="n">phone</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="exp_duplicate_database">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_duplicate_database">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_duplicate_database</span><span class="p">(</span><span class="n">db_original_name</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">neutralize_database</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Duplicate database `</span><span class="si">%s</span><span class="s1">` to `</span><span class="si">%s</span><span class="s1">`.&#39;</span><span class="p">,</span> <span class="n">db_original_name</span><span class="p">,</span> <span class="n">db_name</span><span class="p">)</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">close_db</span><span class="p">(</span><span class="n">db_original_name</span><span class="p">)</span>
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="s1">&#39;postgres&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="c1"># database-altering operations cannot be executed inside a transaction</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">_drop_conn</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">db_original_name</span><span class="p">)</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s2">&quot;CREATE DATABASE </span><span class="si">{}</span><span class="s2"> ENCODING &#39;unicode&#39; TEMPLATE </span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">db_name</span><span class="p">),</span>
+            <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">db_original_name</span><span class="p">)</span>
+        <span class="p">))</span>
+
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="c1"># if it&#39;s a copy of a database, force generation of a new dbuuid</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">neutralize_database</span><span class="p">:</span>
+            <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">neutralize</span><span class="o">.</span><span class="n">neutralize_database</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+    <span class="n">from_fs</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">db_original_name</span><span class="p">)</span>
+    <span class="n">to_fs</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">from_fs</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">to_fs</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">from_fs</span><span class="p">,</span> <span class="n">to_fs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<span class="k">def</span> <span class="nf">_drop_conn</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">db_name</span><span class="p">):</span>
+    <span class="c1"># Try to terminate all other connections that might prevent</span>
+    <span class="c1"># dropping the database</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># PostgreSQL 9.2 renamed pg_stat_activity.procpid to pid:</span>
+        <span class="c1"># http://www.postgresql.org/docs/9.2/static/release-9-2.html#AEN110389</span>
+        <span class="n">pid_col</span> <span class="o">=</span> <span class="s1">&#39;pid&#39;</span> <span class="k">if</span> <span class="n">cr</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">server_version</span> <span class="o">&gt;=</span> <span class="mi">90200</span> <span class="k">else</span> <span class="s1">&#39;procpid&#39;</span>
+
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;SELECT pg_terminate_backend(</span><span class="si">%(pid_col)s</span><span class="s2">)</span>
+<span class="s2">                      FROM pg_stat_activity</span>
+<span class="s2">                      WHERE datname = </span><span class="si">%%</span><span class="s2">s AND</span>
+<span class="s2">                            </span><span class="si">%(pid_col)s</span><span class="s2"> != pg_backend_pid()&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">{</span><span class="s1">&#39;pid_col&#39;</span><span class="p">:</span> <span class="n">pid_col</span><span class="p">},</span>
+                   <span class="p">(</span><span class="n">db_name</span><span class="p">,))</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="exp_drop">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_drop">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_drop</span><span class="p">(</span><span class="n">db_name</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">db_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">list_dbs</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">close_db</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="s1">&#39;postgres&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="c1"># database-altering operations cannot be executed inside a transaction</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">_drop_conn</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">db_name</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;DROP DATABASE </span><span class="si">{}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">db_name</span><span class="p">)))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;DROP DB: </span><span class="si">%s</span><span class="s1"> failed:</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t drop database </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;DROP DB: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">)</span>
+
+    <span class="n">fs</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">fs</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">fs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="exp_dump">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_dump">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_dump</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="nb">format</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryFile</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+b&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">t</span><span class="p">:</span>
+        <span class="n">dump_db</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="nb">format</span><span class="p">)</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">read</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="dump_db_manifest">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.dump_db_manifest">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">dump_db_manifest</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+    <span class="n">pg_version</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">_obj</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">server_version</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name, latest_version FROM ir_module_module WHERE state = &#39;installed&#39;&quot;</span><span class="p">)</span>
+    <span class="n">modules</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;odoo_dump&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;db_name&#39;</span><span class="p">:</span> <span class="n">cr</span><span class="o">.</span><span class="n">dbname</span><span class="p">,</span>
+        <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+        <span class="s1">&#39;version_info&#39;</span><span class="p">:</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">version_info</span><span class="p">,</span>
+        <span class="s1">&#39;major_version&#39;</span><span class="p">:</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">major_version</span><span class="p">,</span>
+        <span class="s1">&#39;pg_version&#39;</span><span class="p">:</span> <span class="n">pg_version</span><span class="p">,</span>
+        <span class="s1">&#39;modules&#39;</span><span class="p">:</span> <span class="n">modules</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">manifest</span></div>
+
+
+<div class="viewcode-block" id="dump_db">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.dump_db">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">dump_db</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">backup_format</span><span class="o">=</span><span class="s1">&#39;zip&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dump database `db` into file-like object `stream` if stream is None</span>
+<span class="sd">    return a file object with the dump &quot;&quot;&quot;</span>
+
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;DUMP DB: </span><span class="si">%s</span><span class="s1"> format </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">backup_format</span><span class="p">)</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="n">find_pg_tool</span><span class="p">(</span><span class="s1">&#39;pg_dump&#39;</span><span class="p">),</span> <span class="s1">&#39;--no-owner&#39;</span><span class="p">,</span> <span class="n">db_name</span><span class="p">]</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">exec_pg_environ</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">backup_format</span> <span class="o">==</span> <span class="s1">&#39;zip&#39;</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">dump_dir</span><span class="p">:</span>
+            <span class="n">filestore</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">filestore</span><span class="p">):</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">filestore</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="s1">&#39;filestore&#39;</span><span class="p">))</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="s1">&#39;manifest.json&#39;</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+                    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">dump_db_manifest</span><span class="p">(</span><span class="n">cr</span><span class="p">),</span> <span class="n">fh</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+            <span class="n">cmd</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;--file=&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="s1">&#39;dump.sql&#39;</span><span class="p">))</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">stream</span><span class="p">:</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">osutil</span><span class="o">.</span><span class="n">zip_dir</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">include_dir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fnct_sort</span><span class="o">=</span><span class="k">lambda</span> <span class="n">file_name</span><span class="p">:</span> <span class="n">file_name</span> <span class="o">!=</span> <span class="s1">&#39;dump.sql&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">t</span><span class="o">=</span><span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryFile</span><span class="p">()</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">osutil</span><span class="o">.</span><span class="n">zip_dir</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">include_dir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fnct_sort</span><span class="o">=</span><span class="k">lambda</span> <span class="n">file_name</span><span class="p">:</span> <span class="n">file_name</span> <span class="o">!=</span> <span class="s1">&#39;dump.sql&#39;</span><span class="p">)</span>
+                <span class="n">t</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">t</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cmd</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;--format=c&#39;</span><span class="p">)</span>
+        <span class="n">stdout</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span> <span class="n">stdin</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span><span class="o">.</span><span class="n">stdout</span>
+        <span class="k">if</span> <span class="n">stream</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copyfileobj</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stream</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">stdout</span></div>
+
+
+<div class="viewcode-block" id="exp_restore">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_restore">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_restore</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">chunks</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">8192</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="p">),</span> <span class="n">n</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="n">d</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="n">n</span><span class="p">]</span>
+    <span class="n">data_file</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="n">data_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">chunk</span><span class="p">))</span>
+        <span class="n">data_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">restore_db</span><span class="p">(</span><span class="n">db_name</span><span class="p">,</span> <span class="n">data_file</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="n">copy</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">data_file</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="restore_db">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.restore_db">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">restore_db</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">dump_file</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">neutralize_database</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">exp_db_exist</span><span class="p">(</span><span class="n">db</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;RESTORE DB: </span><span class="si">%s</span><span class="s1"> already exists&#39;</span><span class="p">,</span> <span class="n">db</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Database already exists&quot;</span><span class="p">)</span>
+
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;RESTORING DB: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db</span><span class="p">)</span>
+    <span class="n">_create_empty_database</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+
+    <span class="n">filestore_path</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">dump_dir</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">is_zipfile</span><span class="p">(</span><span class="n">dump_file</span><span class="p">):</span>
+            <span class="c1"># v8 format</span>
+            <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">dump_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">z</span><span class="p">:</span>
+                <span class="c1"># only extract known members!</span>
+                <span class="n">filestore</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">z</span><span class="o">.</span><span class="n">namelist</span><span class="p">()</span> <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;filestore/&#39;</span><span class="p">)]</span>
+                <span class="n">z</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;dump.sql&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">filestore</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">filestore</span><span class="p">:</span>
+                    <span class="n">filestore_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="s1">&#39;filestore&#39;</span><span class="p">)</span>
+
+            <span class="n">pg_cmd</span> <span class="o">=</span> <span class="s1">&#39;psql&#39;</span>
+            <span class="n">pg_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-q&#39;</span><span class="p">,</span> <span class="s1">&#39;-f&#39;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_dir</span><span class="p">,</span> <span class="s1">&#39;dump.sql&#39;</span><span class="p">)]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># &lt;= 7.0 format (raw pg_dump output)</span>
+            <span class="n">pg_cmd</span> <span class="o">=</span> <span class="s1">&#39;pg_restore&#39;</span>
+            <span class="n">pg_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--no-owner&#39;</span><span class="p">,</span> <span class="n">dump_file</span><span class="p">]</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">find_pg_tool</span><span class="p">(</span><span class="n">pg_cmd</span><span class="p">),</span> <span class="s1">&#39;--dbname=&#39;</span> <span class="o">+</span> <span class="n">db</span><span class="p">,</span> <span class="o">*</span><span class="n">pg_args</span><span class="p">],</span>
+            <span class="n">env</span><span class="o">=</span><span class="n">exec_pg_environ</span><span class="p">(),</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t restore database&quot;</span><span class="p">)</span>
+
+        <span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="n">copy</span><span class="p">:</span>
+                <span class="c1"># if it&#39;s a copy of a database, force generation of a new dbuuid</span>
+                <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">neutralize_database</span><span class="p">:</span>
+                <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">neutralize</span><span class="o">.</span><span class="n">neutralize_database</span><span class="p">(</span><span class="n">cr</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">filestore_path</span><span class="p">:</span>
+                <span class="n">filestore_dest</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_filestore</span><span class="p">()</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">filestore_path</span><span class="p">,</span> <span class="n">filestore_dest</span><span class="p">)</span>
+
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;RESTORE DB: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="exp_rename">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_rename">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_rename</span><span class="p">(</span><span class="n">old_name</span><span class="p">,</span> <span class="n">new_name</span><span class="p">):</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">old_name</span><span class="p">)</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">close_db</span><span class="p">(</span><span class="n">old_name</span><span class="p">)</span>
+
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="s1">&#39;postgres&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="c1"># database-altering operations cannot be executed inside a transaction</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">_cnx</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">_drop_conn</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">old_name</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">SQL</span><span class="p">(</span><span class="s1">&#39;ALTER DATABASE </span><span class="si">{}</span><span class="s1"> RENAME TO </span><span class="si">{}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">old_name</span><span class="p">),</span> <span class="n">sql</span><span class="o">.</span><span class="n">Identifier</span><span class="p">(</span><span class="n">new_name</span><span class="p">)))</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;RENAME DB: </span><span class="si">%s</span><span class="s1"> -&gt; </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">old_name</span><span class="p">,</span> <span class="n">new_name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;RENAME DB: </span><span class="si">%s</span><span class="s1"> -&gt; </span><span class="si">%s</span><span class="s1"> failed:</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">old_name</span><span class="p">,</span> <span class="n">new_name</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t rename database </span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">old_name</span><span class="p">,</span> <span class="n">new_name</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+
+    <span class="n">old_fs</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">old_name</span><span class="p">)</span>
+    <span class="n">new_fs</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filestore</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">old_fs</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">new_fs</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">old_fs</span><span class="p">,</span> <span class="n">new_fs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="exp_change_admin_password">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_change_admin_password">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_change_admin_password</span><span class="p">(</span><span class="n">new_password</span><span class="p">):</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set_admin_password</span><span class="p">(</span><span class="n">new_password</span><span class="p">)</span>
+    <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">save</span><span class="p">([</span><span class="s1">&#39;admin_passwd&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="exp_migrate_databases">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_migrate_databases">[docs]</a>
+<span class="nd">@check_db_management_enabled</span>
+<span class="k">def</span> <span class="nf">exp_migrate_databases</span><span class="p">(</span><span class="n">databases</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">db</span> <span class="ow">in</span> <span class="n">databases</span><span class="p">:</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;migrate database </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;update&#39;</span><span class="p">][</span><span class="s1">&#39;base&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">force_demo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">update_module</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<span class="c1">#----------------------------------------------------------</span>
+<span class="c1"># No master password required</span>
+<span class="c1">#----------------------------------------------------------</span>
+
+<div class="viewcode-block" id="exp_db_exist">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_db_exist">[docs]</a>
+<span class="nd">@odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">exp_db_exist</span><span class="p">(</span><span class="n">db_name</span><span class="p">):</span>
+    <span class="c1">## Not True: in fact, check if connection to database is possible. The database may exists</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="list_dbs">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.list_dbs">[docs]</a>
+<span class="k">def</span> <span class="nf">list_dbs</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;list_db&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">force</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dbfilter&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]:</span>
+        <span class="c1"># In case --db-filter is not provided and --database is passed, Odoo will not</span>
+        <span class="c1"># fetch the list of databases available on the postgres server and instead will</span>
+        <span class="c1"># use the value of --database as comma seperated list of exposed databases.</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">db</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">res</span>
+
+    <span class="n">chosen_template</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;db_template&#39;</span><span class="p">]</span>
+    <span class="n">templates_list</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="s1">&#39;postgres&#39;</span><span class="p">,</span> <span class="n">chosen_template</span><span class="p">]))</span>
+    <span class="n">db</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">db_connect</span><span class="p">(</span><span class="s1">&#39;postgres&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;select datname from pg_database where datdba=(select usesysid from pg_user where usename=current_user) and not datistemplate and datallowconn and datname not in </span><span class="si">%s</span><span class="s2"> order by datname&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">templates_list</span><span class="p">,))</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">ustr</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,)</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;Listing databases failed:&#39;</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="list_db_incompatible">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.list_db_incompatible">[docs]</a>
+<span class="k">def</span> <span class="nf">list_db_incompatible</span><span class="p">(</span><span class="n">databases</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;&quot;Check a list of databases if they are compatible with this version of Odoo</span>
+
+<span class="sd">        :param databases: A list of existing Postgresql databases</span>
+<span class="sd">        :return: A list of databases that are incompatible</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">incompatible_databases</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">server_version</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">version_info</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">database_name</span> <span class="ow">in</span> <span class="n">databases</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">db_connect</span><span class="p">(</span><span class="n">database_name</span><span class="p">)</span><span class="o">.</span><span class="n">cursor</span><span class="p">())</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">table_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="s1">&#39;ir_module_module&#39;</span><span class="p">):</span>
+                <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT latest_version FROM ir_module_module WHERE name=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;base&#39;</span><span class="p">,))</span>
+                <span class="n">base_version</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">base_version</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">base_version</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                    <span class="n">incompatible_databases</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">database_name</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># e.g. 10.saas~15</span>
+                    <span class="n">local_version</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">base_version</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[:</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">local_version</span> <span class="o">!=</span> <span class="n">server_version</span><span class="p">:</span>
+                        <span class="n">incompatible_databases</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">database_name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">incompatible_databases</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">database_name</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">database_name</span> <span class="ow">in</span> <span class="n">incompatible_databases</span><span class="p">:</span>
+        <span class="c1"># release connection</span>
+        <span class="n">odoo</span><span class="o">.</span><span class="n">sql_db</span><span class="o">.</span><span class="n">close_db</span><span class="p">(</span><span class="n">database_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">incompatible_databases</span></div>
+
+
+
+<div class="viewcode-block" id="exp_list">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_list">[docs]</a>
+<span class="k">def</span> <span class="nf">exp_list</span><span class="p">(</span><span class="n">document</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;list_db&#39;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="n">odoo</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">list_dbs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="exp_list_lang">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_list_lang">[docs]</a>
+<span class="k">def</span> <span class="nf">exp_list_lang</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">scan_languages</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="exp_list_countries">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_list_countries">[docs]</a>
+<span class="k">def</span> <span class="nf">exp_list_countries</span><span class="p">():</span>
+    <span class="n">list_countries</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">ET</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;root_path&#39;</span><span class="p">],</span> <span class="s1">&#39;addons/base/data/res_country_data.xml&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">country</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;data&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;record[@model=&quot;res.country&quot;]&#39;</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">country</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;field[@name=&quot;name&quot;]&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="n">country</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;field[@name=&quot;code&quot;]&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">list_countries</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">code</span><span class="p">,</span> <span class="n">name</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">list_countries</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="exp_server_version">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.exp_server_version">[docs]</a>
+<span class="k">def</span> <span class="nf">exp_server_version</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the version of the server</span>
+<span class="sd">        Used by the client to verify the compatibility with its own version</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">release</span><span class="o">.</span><span class="n">version</span></div>
+
+
+<span class="c1">#----------------------------------------------------------</span>
+<span class="c1"># db service dispatch</span>
+<span class="c1">#----------------------------------------------------------</span>
+
+<div class="viewcode-block" id="dispatch">
+<a class="viewcode-back" href="../../../odoo.service.html#odoo.service.db.dispatch">[docs]</a>
+<span class="k">def</span> <span class="nf">dispatch</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="nb">globals</span><span class="p">()</span>
+    <span class="n">exp_method_name</span> <span class="o">=</span> <span class="s1">&#39;exp_&#39;</span> <span class="o">+</span> <span class="n">method</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;db_exist&#39;</span><span class="p">,</span> <span class="s1">&#39;list&#39;</span><span class="p">,</span> <span class="s1">&#39;list_lang&#39;</span><span class="p">,</span> <span class="s1">&#39;server_version&#39;</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">g</span><span class="p">[</span><span class="n">exp_method_name</span><span class="p">](</span><span class="o">*</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">exp_method_name</span> <span class="ow">in</span> <span class="n">g</span><span class="p">:</span>
+        <span class="n">passwd</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">check_super</span><span class="p">(</span><span class="n">passwd</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">g</span><span class="p">[</span><span class="n">exp_method_name</span><span class="p">](</span><span class="o">*</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Method not found: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.ir_profile &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.ir_profile</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.ir_profile</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">dateutil.relativedelta</span> <span class="kn">import</span> <span class="n">relativedelta</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">api</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.http</span> <span class="kn">import</span> <span class="n">request</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.profiler</span> <span class="kn">import</span> <span class="n">make_session</span>
+<span class="kn">from</span> <span class="nn">odoo.tools.speedscope</span> <span class="kn">import</span> <span class="n">Speedscope</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="IrProfile">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_profile.IrProfile">[docs]</a>
+<span class="k">class</span> <span class="nc">IrProfile</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;ir.profile&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Profiling results&#39;</span>
+    <span class="n">_log_access</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># avoid useless foreign key on res_user</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;session desc, id desc&#39;</span>
+    <span class="n">_allow_sudo_commands</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">create_date</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="p">(</span><span class="s1">&#39;Creation Date&#39;</span><span class="p">)</span>
+
+    <span class="n">session</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Session&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Description&#39;</span><span class="p">)</span>
+    <span class="n">duration</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Float</span><span class="p">(</span><span class="s1">&#39;Duration&#39;</span><span class="p">)</span>
+
+    <span class="n">init_stack_trace</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Initial stack trace&#39;</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">sql</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Sql&#39;</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">sql_count</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;Queries Count&#39;</span><span class="p">)</span>
+    <span class="n">traces_async</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Traces Async&#39;</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">traces_sync</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Traces Sync&#39;</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">qweb</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Qweb&#39;</span><span class="p">,</span> <span class="n">prefetch</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">entry_count</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;Entry count&#39;</span><span class="p">)</span>
+
+    <span class="n">speedscope</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Binary</span><span class="p">(</span><span class="s1">&#39;Speedscope&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_speedscope&#39;</span><span class="p">)</span>
+    <span class="n">speedscope_url</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s1">&#39;Open&#39;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_speedscope_url&#39;</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">autovacuum</span>
+    <span class="k">def</span> <span class="nf">_gc_profile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># remove profiles older than 30 days</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;create_date&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;&#39;</span><span class="p">,</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">datetime</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">))]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_compute_speedscope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">execution</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">sp</span> <span class="o">=</span> <span class="n">Speedscope</span><span class="p">(</span><span class="n">init_stack_trace</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">execution</span><span class="o">.</span><span class="n">init_stack_trace</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">execution</span><span class="o">.</span><span class="n">sql</span><span class="p">:</span>
+                <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;sql&#39;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">execution</span><span class="o">.</span><span class="n">sql</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">execution</span><span class="o">.</span><span class="n">traces_async</span><span class="p">:</span>
+                <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;frames&#39;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">execution</span><span class="o">.</span><span class="n">traces_async</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">execution</span><span class="o">.</span><span class="n">traces_sync</span><span class="p">:</span>
+                <span class="n">sp</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;settrace&#39;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">execution</span><span class="o">.</span><span class="n">traces_sync</span><span class="p">))</span>
+
+            <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">add_default</span><span class="p">()</span><span class="o">.</span><span class="n">make</span><span class="p">())</span>
+            <span class="n">execution</span><span class="o">.</span><span class="n">speedscope</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_compute_speedscope_url</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">profile</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">profile</span><span class="o">.</span><span class="n">speedscope_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;/web/speedscope/</span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s1">&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_enabled_until</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If the profiling is enabled, return until when it is enabled.</span>
+<span class="sd">        Otherwise return ``None``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;base.profiling_enabled_until&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">limit</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">())</span> <span class="o">&lt;</span> <span class="n">limit</span> <span class="k">else</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="IrProfile.set_profiling">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_profile.IrProfile.set_profiling">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">set_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">collectors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enable or disable profiling for the current user.</span>
+
+<span class="sd">        :param profile: ``True`` to enable profiling, ``False`` to disable it.</span>
+<span class="sd">        :param list collectors: optional list of collectors to use (string)</span>
+<span class="sd">        :param dict params: optional parameters set on the profiler object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Note: parameters are coming from a rpc calls or route param (public user),</span>
+        <span class="c1"># meaning that corresponding session variables are client-defined.</span>
+        <span class="c1"># This allows to activate any profiler, but can be</span>
+        <span class="c1"># dangerous handling request.session.profile_collectors/profile_params.</span>
+        <span class="k">if</span> <span class="n">profile</span><span class="p">:</span>
+            <span class="n">limit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enabled_until</span><span class="p">()</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User </span><span class="si">%s</span><span class="s2"> started profiling&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">limit</span><span class="p">:</span>
+                <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_session</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">_is_system</span><span class="p">():</span>
+                    <span class="k">return</span> <span class="p">{</span>
+                            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+                            <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;form&#39;</span><span class="p">,</span>
+                            <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="s1">&#39;base.enable.profiling.wizard&#39;</span><span class="p">,</span>
+                            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+                            <span class="s1">&#39;views&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">]],</span>
+                        <span class="p">}</span>
+                <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Profiling is not enabled on this database. Please contact an administrator.&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_session</span><span class="p">:</span>
+                <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_session</span> <span class="o">=</span> <span class="n">make_session</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_expiration</span> <span class="o">=</span> <span class="n">limit</span>
+                <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_collectors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_collectors</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_params</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">elif</span> <span class="n">profile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_session</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">collectors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_collectors</span> <span class="o">=</span> <span class="n">collectors</span>
+
+        <span class="k">if</span> <span class="n">params</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_params</span> <span class="o">=</span> <span class="n">params</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;session&#39;</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_session</span><span class="p">,</span>
+            <span class="s1">&#39;collectors&#39;</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_collectors</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">profile_params</span><span class="p">,</span>
+        <span class="p">}</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="EnableProfilingWizard">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_profile.EnableProfilingWizard">[docs]</a>
+<span class="k">class</span> <span class="nc">EnableProfilingWizard</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">):</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;base.enable.profiling.wizard&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s2">&quot;Enable profiling for some time&quot;</span>
+
+    <span class="n">duration</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([</span>
+        <span class="p">(</span><span class="s1">&#39;minutes_5&#39;</span><span class="p">,</span> <span class="s2">&quot;5 Minutes&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;hours_1&#39;</span><span class="p">,</span> <span class="s2">&quot;1 Hour&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;days_1&#39;</span><span class="p">,</span> <span class="s2">&quot;1 Day&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;months_1&#39;</span><span class="p">,</span> <span class="s2">&quot;1 Month&quot;</span><span class="p">),</span>
+    <span class="p">],</span> <span class="n">string</span><span class="o">=</span><span class="s2">&quot;Enable profiling for&quot;</span><span class="p">)</span>
+    <span class="n">expiration</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="p">(</span><span class="s2">&quot;Enable profiling until&quot;</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="s1">&#39;_compute_expiration&#39;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">depends</span><span class="p">(</span><span class="s1">&#39;duration&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_compute_expiration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">unit</span><span class="p">,</span> <span class="n">quantity</span> <span class="o">=</span> <span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">duration</span> <span class="ow">or</span> <span class="s1">&#39;days_0&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">expiration</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">unit</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">quantity</span><span class="p">)})</span>
+
+<div class="viewcode-block" id="EnableProfilingWizard.submit">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.ir_profile.EnableProfilingWizard.submit">[docs]</a>
+    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;base.profiling_enabled_until&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">expiration</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.wizard.base_partner_merge &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.wizard.base_partner_merge</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.wizard.base_partner_merge</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">ast</span> <span class="kn">import</span> <span class="n">literal_eval</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">Command</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.partner.merge&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MergePartnerLine">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerLine">[docs]</a>
+<span class="k">class</span> <span class="nc">MergePartnerLine</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">):</span>
+
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;base.partner.merge.line&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Merge Partner Line&#39;</span>
+    <span class="n">_order</span> <span class="o">=</span> <span class="s1">&#39;min_id asc&#39;</span>
+
+    <span class="n">wizard_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;base.partner.merge.automatic.wizard&#39;</span><span class="p">,</span> <span class="s1">&#39;Wizard&#39;</span><span class="p">)</span>
+    <span class="n">min_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;MinID&#39;</span><span class="p">)</span>
+    <span class="n">aggr_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Char</span><span class="p">(</span><span class="s1">&#39;Ids&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MergePartnerAutomatic">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic">[docs]</a>
+<span class="k">class</span> <span class="nc">MergePartnerAutomatic</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The idea behind this wizard is to create a list of potential partners to</span>
+<span class="sd">        merge. We use two objects, the first one is the wizard for the end-user.</span>
+<span class="sd">        And the second will contain the partner list to merge.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;base.partner.merge.automatic.wizard&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Merge Partner Wizard&#39;</span>
+
+<div class="viewcode-block" id="MergePartnerAutomatic.default_get">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.default_get">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">default_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">MergePartnerAutomatic</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">default_get</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+        <span class="n">active_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active_ids&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;active_model&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;res.partner&#39;</span> <span class="ow">and</span> <span class="n">active_ids</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;state&#39;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;selection&#39;</span>
+            <span class="k">if</span> <span class="s1">&#39;partner_ids&#39;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="s1">&#39;partner_ids&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">active_ids</span><span class="p">)]</span>
+            <span class="k">if</span> <span class="s1">&#39;dst_partner_id&#39;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="s1">&#39;dst_partner_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_ordered_partner</span><span class="p">(</span><span class="n">active_ids</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+    <span class="c1"># Group by</span>
+    <span class="n">group_by_email</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Email&#39;</span><span class="p">)</span>
+    <span class="n">group_by_name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Name&#39;</span><span class="p">)</span>
+    <span class="n">group_by_is_company</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Is Company&#39;</span><span class="p">)</span>
+    <span class="n">group_by_vat</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;VAT&#39;</span><span class="p">)</span>
+    <span class="n">group_by_parent_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Parent Company&#39;</span><span class="p">)</span>
+
+    <span class="n">state</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Selection</span><span class="p">([</span>
+        <span class="p">(</span><span class="s1">&#39;option&#39;</span><span class="p">,</span> <span class="s1">&#39;Option&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="s1">&#39;Selection&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s1">&#39;finished&#39;</span><span class="p">,</span> <span class="s1">&#39;Finished&#39;</span><span class="p">)</span>
+    <span class="p">],</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;State&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;option&#39;</span><span class="p">)</span>
+
+    <span class="n">number_group</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;Group of Contacts&#39;</span><span class="p">,</span> <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">current_line_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;base.partner.merge.line&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Current Line&#39;</span><span class="p">)</span>
+    <span class="n">line_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">One2many</span><span class="p">(</span><span class="s1">&#39;base.partner.merge.line&#39;</span><span class="p">,</span> <span class="s1">&#39;wizard_id&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Lines&#39;</span><span class="p">)</span>
+    <span class="n">partner_ids</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2many</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Contacts&#39;</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;active_test&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+    <span class="n">dst_partner_id</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Many2one</span><span class="p">(</span><span class="s1">&#39;res.partner&#39;</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="s1">&#39;Destination Contact&#39;</span><span class="p">)</span>
+
+    <span class="n">exclude_contact</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;A user associated to the contact&#39;</span><span class="p">)</span>
+    <span class="n">exclude_journal_item</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Boolean</span><span class="p">(</span><span class="s1">&#39;Journal Items associated to the contact&#39;</span><span class="p">)</span>
+    <span class="n">maximum_group</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Integer</span><span class="p">(</span><span class="s1">&#39;Maximum of Group of Contacts&#39;</span><span class="p">)</span>
+
+    <span class="c1"># ----------------------------------------</span>
+    <span class="c1"># Update method. Core methods to merge steps</span>
+    <span class="c1"># ----------------------------------------</span>
+
+    <span class="k">def</span> <span class="nf">_get_fk_on</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; return a list of many2one relation with the given table.</span>
+<span class="sd">            :param table : the name of the sql table to return relations</span>
+<span class="sd">            :returns a list of tuple &#39;table name&#39;, &#39;column name&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT cl1.relname as table, att1.attname as column</span>
+<span class="s2">            FROM pg_constraint as con, pg_class as cl1, pg_class as cl2, pg_attribute as att1, pg_attribute as att2</span>
+<span class="s2">            WHERE con.conrelid = cl1.oid</span>
+<span class="s2">                AND con.confrelid = cl2.oid</span>
+<span class="s2">                AND array_lower(con.conkey, 1) = 1</span>
+<span class="s2">                AND con.conkey[1] = att1.attnum</span>
+<span class="s2">                AND att1.attrelid = cl1.oid</span>
+<span class="s2">                AND cl2.relname = </span><span class="si">%s</span>
+<span class="s2">                AND att2.attname = &#39;id&#39;</span>
+<span class="s2">                AND array_lower(con.confkey, 1) = 1</span>
+<span class="s2">                AND con.confkey[1] = att2.attnum</span>
+<span class="s2">                AND att2.attrelid = cl2.oid</span>
+<span class="s2">                AND con.contype = &#39;f&#39;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">(</span><span class="n">table</span><span class="p">,))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_update_foreign_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Update all foreign key from the src_partner to dst_partner. All many2one fields will be updated.</span>
+<span class="sd">            :param src_partners : merge source res.partner recordset (does not include destination one)</span>
+<span class="sd">            :param dst_partner : record of destination res.partner</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;_update_foreign_keys for dst_partner: </span><span class="si">%s</span><span class="s1"> for src_partners: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">))</span>
+
+        <span class="c1"># find the many2one relation to a partner</span>
+        <span class="n">Partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+        <span class="n">relations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_fk_on</span><span class="p">(</span><span class="s1">&#39;res_partner&#39;</span><span class="p">)</span>
+
+        <span class="c1"># this guarantees cache consistency</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">relations</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;base_partner_merge_&#39;</span> <span class="ow">in</span> <span class="n">table</span><span class="p">:</span>  <span class="c1"># ignore two tables</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># get list of columns of current table (exept the current fk column)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT column_name FROM information_schema.columns WHERE table_name LIKE &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">table</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">())</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">column</span><span class="p">:</span>
+                    <span class="n">columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="c1"># do the update for the current table/column in SQL</span>
+            <span class="n">query_dic</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;table&#39;</span><span class="p">:</span> <span class="n">table</span><span class="p">,</span>
+                <span class="s1">&#39;column&#39;</span><span class="p">:</span> <span class="n">column</span><span class="p">,</span>
+                <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># unique key treated</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    UPDATE &quot;</span><span class="si">%(table)s</span><span class="s2">&quot; as ___tu</span>
+<span class="s2">                    SET &quot;</span><span class="si">%(column)s</span><span class="s2">&quot; = </span><span class="si">%%</span><span class="s2">s</span>
+<span class="s2">                    WHERE</span>
+<span class="s2">                        &quot;</span><span class="si">%(column)s</span><span class="s2">&quot; = </span><span class="si">%%</span><span class="s2">s AND</span>
+<span class="s2">                        NOT EXISTS (</span>
+<span class="s2">                            SELECT 1</span>
+<span class="s2">                            FROM &quot;</span><span class="si">%(table)s</span><span class="s2">&quot; as ___tw</span>
+<span class="s2">                            WHERE</span>
+<span class="s2">                                &quot;</span><span class="si">%(column)s</span><span class="s2">&quot; = </span><span class="si">%%</span><span class="s2">s AND</span>
+<span class="s2">                                ___tu.</span><span class="si">%(value)s</span><span class="s2"> = ___tw.</span><span class="si">%(value)s</span>
+<span class="s2">                        )&quot;&quot;&quot;</span> <span class="o">%</span> <span class="n">query_dic</span>
+                <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">src_partners</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">(</span><span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">():</span>
+                        <span class="n">query</span> <span class="o">=</span> <span class="s1">&#39;UPDATE &quot;</span><span class="si">%(table)s</span><span class="s1">&quot; SET &quot;</span><span class="si">%(column)s</span><span class="s1">&quot; = </span><span class="si">%%</span><span class="s1">s WHERE &quot;</span><span class="si">%(column)s</span><span class="s1">&quot; IN </span><span class="si">%%</span><span class="s1">s&#39;</span> <span class="o">%</span> <span class="n">query_dic</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">(</span><span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">),))</span>
+                <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+                    <span class="c1"># updating fails, most likely due to a violated unique constraint</span>
+                    <span class="c1"># keeping record with nonexistent partner_id is useless, better delete it</span>
+                    <span class="n">query</span> <span class="o">=</span> <span class="s1">&#39;DELETE FROM &quot;</span><span class="si">%(table)s</span><span class="s1">&quot; WHERE &quot;</span><span class="si">%(column)s</span><span class="s1">&quot; IN </span><span class="si">%%</span><span class="s1">s&#39;</span> <span class="o">%</span> <span class="n">query_dic</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">),))</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_update_reference_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Update all reference fields from the src_partner to dst_partner.</span>
+<span class="sd">            :param src_partners : merge source res.partner recordset (does not include destination one)</span>
+<span class="sd">            :param dst_partner : record of destination res.partner</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;_update_reference_fields for dst_partner: </span><span class="si">%s</span><span class="s1"> for src_partners: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">update_records</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">field_model</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="n">field_id</span><span class="o">=</span><span class="s1">&#39;res_id&#39;</span><span class="p">):</span>
+            <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span> <span class="k">if</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">Model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="n">field_model</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">),</span> <span class="p">(</span><span class="n">field_id</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">():</span>
+                    <span class="n">records</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="n">field_id</span><span class="p">:</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+                    <span class="n">records</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">Error</span><span class="p">:</span>
+                <span class="c1"># updating fails, most likely due to a violated unique constraint</span>
+                <span class="c1"># keeping record with nonexistent partner_id is useless, better delete it</span>
+                <span class="n">records</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="n">update_records</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">update_records</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">src_partners</span><span class="p">:</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;calendar&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">,</span> <span class="n">field_model</span><span class="o">=</span><span class="s1">&#39;model_id.model&#39;</span><span class="p">)</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;ir.attachment&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">,</span> <span class="n">field_model</span><span class="o">=</span><span class="s1">&#39;res_model&#39;</span><span class="p">)</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;mail.followers&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">,</span> <span class="n">field_model</span><span class="o">=</span><span class="s1">&#39;res_model&#39;</span><span class="p">)</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;mail.activity&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">,</span> <span class="n">field_model</span><span class="o">=</span><span class="s1">&#39;res_model&#39;</span><span class="p">)</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;mail.message&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">)</span>
+            <span class="n">update_records</span><span class="p">(</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">partner</span><span class="p">)</span>
+
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.fields&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;ttype&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;reference&#39;</span><span class="p">)])</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">Model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">model</span><span class="p">]</span>
+                <span class="n">field</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="c1"># unknown model or field =&gt; skip</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">Model</span><span class="o">.</span><span class="n">_abstract</span> <span class="ow">or</span> <span class="n">field</span><span class="o">.</span><span class="n">compute</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">src_partners</span><span class="p">:</span>
+                <span class="n">records_ref</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;res.partner,</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="p">)])</span>
+                <span class="n">values</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="s1">&#39;res.partner,</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">records_ref</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="c1"># Company-dependent fields</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">savepoint</span><span class="p">():</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;destination_id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;res.partner,</span><span class="si">{</span><span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;source_ids&#39;</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;res.partner,</span><span class="si">{</span><span class="n">src</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        UPDATE ir_property AS _ip1</span>
+<span class="s2">        SET res_id = </span><span class="si">%(destination_id)s</span>
+<span class="s2">        WHERE res_id IN </span><span class="si">%(source_ids)s</span>
+<span class="s2">        AND NOT EXISTS (</span>
+<span class="s2">             SELECT</span>
+<span class="s2">             FROM ir_property AS _ip2</span>
+<span class="s2">             WHERE _ip2.res_id = </span><span class="si">%(destination_id)s</span>
+<span class="s2">             AND _ip2.fields_id = _ip1.fields_id</span>
+<span class="s2">             AND _ip2.company_id = _ip1.company_id</span>
+<span class="s2">        )&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_summable_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns the list of fields that should be summed when merging partners</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_update_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Update values of dst_partner with the ones from the src_partners.</span>
+<span class="sd">            :param src_partners : recordset of source res.partner</span>
+<span class="sd">            :param dst_partner : record of destination res.partner</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;_update_values for dst_partner: </span><span class="si">%s</span><span class="s1"> for src_partners: </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+
+        <span class="n">model_fields</span> <span class="o">=</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">fields_get</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">summable_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_summable_fields</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">write_serializer</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">BaseModel</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">item</span>
+
+        <span class="c1"># get all fields that are not computed or x2many</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">values_by_company</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>   <span class="c1"># {company: vals}</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">model_fields</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">column</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;many2many&#39;</span><span class="p">,</span> <span class="s1">&#39;one2many&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">compute</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">src_partners</span><span class="p">,</span> <span class="p">[</span><span class="n">dst_partner</span><span class="p">]):</span>
+                    <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="n">column</span><span class="p">]:</span>
+                        <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">summable_fields</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>
+                            <span class="n">values</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">+=</span> <span class="n">write_serializer</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="n">column</span><span class="p">])</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">values</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">write_serializer</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="n">column</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">company_dependent</span> <span class="ow">and</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">summable_fields</span><span class="p">:</span>
+                <span class="c1"># sum the values of partners for each company; use sudo() to</span>
+                <span class="c1"># compute the sum on all companies, including forbidden ones</span>
+                <span class="n">partners</span> <span class="o">=</span> <span class="p">(</span><span class="n">src_partners</span> <span class="o">+</span> <span class="n">dst_partner</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">company</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.company&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([]):</span>
+                    <span class="n">values_by_company</span><span class="p">[</span><span class="n">company</span><span class="p">][</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+                        <span class="n">partners</span><span class="o">.</span><span class="n">with_company</span><span class="p">(</span><span class="n">company</span><span class="p">)</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="n">column</span><span class="p">)</span>
+                    <span class="p">)</span>
+
+        <span class="c1"># remove fields that can not be updated (id and parent_id)</span>
+        <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">parent_id</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;parent_id&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">dst_partner</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">company</span><span class="p">,</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">values_by_company</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">dst_partner</span><span class="o">.</span><span class="n">with_company</span><span class="p">(</span><span class="n">company</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="c1"># try to update the parent_id</span>
+        <span class="k">if</span> <span class="n">parent_id</span> <span class="ow">and</span> <span class="n">parent_id</span> <span class="o">!=</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">dst_partner</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="n">parent_id</span><span class="p">})</span>
+            <span class="k">except</span> <span class="n">ValidationError</span><span class="p">:</span>
+                <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Skip recursive partner hierarchies for parent_id </span><span class="si">%s</span><span class="s1"> of partner: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">parent_id</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">extra_checks</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; private implementation of merge partner</span>
+<span class="sd">            :param partner_ids : ids of partner to merge</span>
+<span class="sd">            :param dst_partner : record of destination res.partner</span>
+<span class="sd">            :param extra_checks: pass False to bypass extra sanity check (e.g. email address)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># super-admin can be used to bypass extra checks</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">():</span>
+            <span class="n">extra_checks</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">Partner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+        <span class="n">partner_ids</span> <span class="o">=</span> <span class="n">Partner</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;For safety reasons, you cannot merge more than 3 contacts together. You can re-open the wizard several times if needed.&quot;</span><span class="p">))</span>
+
+        <span class="c1"># check if the list of partners to merge contains child/parent relation</span>
+        <span class="n">child_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">partner_id</span> <span class="ow">in</span> <span class="n">partner_ids</span><span class="p">:</span>
+            <span class="n">child_ids</span> <span class="o">|=</span> <span class="n">Partner</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;child_of&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">partner_id</span><span class="o">.</span><span class="n">id</span><span class="p">])])</span> <span class="o">-</span> <span class="n">partner_id</span>
+        <span class="k">if</span> <span class="n">partner_ids</span> <span class="o">&amp;</span> <span class="n">child_ids</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You cannot merge a contact with one of his parent.&quot;</span><span class="p">))</span>
+
+        <span class="c1"># check if the list of partners to merge are linked to more than one user</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_ids</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">user_ids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You cannot merge contacts linked to more than one user even if only one is active.&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">extra_checks</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">partner</span><span class="o">.</span><span class="n">email</span> <span class="k">for</span> <span class="n">partner</span> <span class="ow">in</span> <span class="n">partner_ids</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;All contacts must have the same email. Only the Administrator can merge contacts with different emails.&quot;</span><span class="p">))</span>
+
+        <span class="c1"># remove dst_partner from partners to merge</span>
+        <span class="k">if</span> <span class="n">dst_partner</span> <span class="ow">and</span> <span class="n">dst_partner</span> <span class="ow">in</span> <span class="n">partner_ids</span><span class="p">:</span>
+            <span class="n">src_partners</span> <span class="o">=</span> <span class="n">partner_ids</span> <span class="o">-</span> <span class="n">dst_partner</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ordered_partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_ordered_partner</span><span class="p">(</span><span class="n">partner_ids</span><span class="o">.</span><span class="n">ids</span><span class="p">)</span>
+            <span class="n">dst_partner</span> <span class="o">=</span> <span class="n">ordered_partners</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">src_partners</span> <span class="o">=</span> <span class="n">ordered_partners</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;dst_partner: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="c1"># Make the company of all related users consistent with destination partner company</span>
+        <span class="k">if</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">company_id</span><span class="p">:</span>
+            <span class="n">partner_ids</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;user_ids&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;company_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">dst_partner</span><span class="o">.</span><span class="n">company_id</span><span class="o">.</span><span class="n">id</span><span class="p">)],</span>
+                <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">company_id</span><span class="o">.</span><span class="n">id</span>
+            <span class="p">})</span>
+
+        <span class="c1"># call sub methods to do the merge</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_foreign_keys</span><span class="p">(</span><span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_reference_fields</span><span class="p">(</span><span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_values</span><span class="p">(</span><span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_merge_operation</span><span class="p">(</span><span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">)</span>
+
+        <span class="c1"># delete source partner, since they are merged</span>
+        <span class="n">src_partners</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_log_merge_operation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_partners</span><span class="p">,</span> <span class="n">dst_partner</span><span class="p">):</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;(uid = </span><span class="si">%s</span><span class="s1">) merged the partners </span><span class="si">%r</span><span class="s1"> with </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uid</span><span class="p">,</span> <span class="n">src_partners</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="n">dst_partner</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+    <span class="c1"># ----------------------------------------</span>
+    <span class="c1"># Helpers</span>
+    <span class="c1"># ----------------------------------------</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_generate_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">maximum_group</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Build the SQL query on res.partner table to group them according to given criteria</span>
+<span class="sd">            :param fields : list of column names to group by the partners</span>
+<span class="sd">            :param maximum_group : limit of the query</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># make the list of column to group by in sql query</span>
+        <span class="n">sql_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">]:</span>
+                <span class="n">sql_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;lower(</span><span class="si">%s</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;vat&#39;</span><span class="p">]:</span>
+                <span class="n">sql_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;replace(</span><span class="si">%s</span><span class="s2">, &#39; &#39;, &#39;&#39;)&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+        <span class="n">group_fields</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sql_fields</span><span class="p">)</span>
+
+        <span class="c1"># where clause : for given group by columns, only keep the &#39;not null&#39; record</span>
+        <span class="n">filters</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;vat&#39;</span><span class="p">]:</span>
+                <span class="n">filters</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;IS NOT&#39;</span><span class="p">,</span> <span class="s1">&#39;NULL&#39;</span><span class="p">))</span>
+        <span class="n">criteria</span> <span class="o">=</span> <span class="s1">&#39; AND &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">field</span><span class="p">,</span> <span class="n">operator</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">filters</span><span class="p">)</span>
+
+        <span class="c1"># build the query</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;SELECT min(id), array_agg(id)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;FROM res_partner&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">criteria</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;WHERE </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">criteria</span><span class="p">)</span>
+
+        <span class="n">text</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span>
+            <span class="s2">&quot;GROUP BY </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">group_fields</span><span class="p">,</span>
+            <span class="s2">&quot;HAVING COUNT(*) &gt;= 2&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ORDER BY min(id)&quot;</span><span class="p">,</span>
+        <span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">maximum_group</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;LIMIT </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">maximum_group</span><span class="p">,)</span>
+
+        <span class="k">return</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_compute_selected_groupby</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Returns the list of field names the partner can be grouped (as merge</span>
+<span class="sd">            criteria) according to the option checked on the wizard</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">group_by_prefix</span> <span class="o">=</span> <span class="s1">&#39;group_by_&#39;</span>
+
+        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">field_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">group_by_prefix</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="bp">self</span> <span class="ow">and</span> <span class="bp">self</span><span class="p">[</span><span class="n">field_name</span><span class="p">]:</span>
+                    <span class="n">groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">field_name</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">group_by_prefix</span><span class="p">):])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">groups</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;You have to specify a filter for your selection.&quot;</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">groups</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_partner_use_in</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">aggr_ids</span><span class="p">,</span> <span class="n">models</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check if there is no occurence of this group of partner in the selected model</span>
+<span class="sd">            :param aggr_ids : stringified list of partner ids separated with a comma (sql array_agg)</span>
+<span class="sd">            :param models : dict mapping a model name with its foreign key with res_partner table</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model</span><span class="p">]</span><span class="o">.</span><span class="n">search_count</span><span class="p">([(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">aggr_ids</span><span class="p">)])</span>
+            <span class="k">for</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">models</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_ordered_partner</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">partner_ids</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Helper : returns a `res.partner` recordset ordered by create_date/active fields</span>
+<span class="sd">            :param partner_ids : list of partner ids to sort</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span><span class="o">.</span><span class="n">sorted</span><span class="p">(</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="p">(</span><span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">create_date</span> <span class="ow">or</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1970</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))),</span>
+            <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_compute_models</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Compute the different models needed by the system if you want to exclude some partners. &quot;&quot;&quot;</span>
+        <span class="n">model_mapping</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">exclude_contact</span><span class="p">:</span>
+            <span class="n">model_mapping</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;partner_id&#39;</span>
+        <span class="k">if</span> <span class="s1">&#39;account.move.line&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">exclude_journal_item</span><span class="p">:</span>
+            <span class="n">model_mapping</span><span class="p">[</span><span class="s1">&#39;account.move.line&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;partner_id&#39;</span>
+        <span class="k">return</span> <span class="n">model_mapping</span>
+
+    <span class="c1"># ----------------------------------------</span>
+    <span class="c1"># Actions</span>
+    <span class="c1"># ----------------------------------------</span>
+
+<div class="viewcode-block" id="MergePartnerAutomatic.action_skip">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.action_skip">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_skip</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Skip this wizard line. Don&#39;t compute any thing, and simply redirect to the new step.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_line_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_line_id</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_next_screen</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_action_next_screen</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; return the action of the next screen ; this means the wizard is set to treat the</span>
+<span class="sd">            next wizard line. Each line is a subset of partner that can be merged together.</span>
+<span class="sd">            If no line left, the end screen will be displayed (but an action is still returned).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span> <span class="c1"># FIXME: is this still necessary?</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_ids</span><span class="p">:</span>
+            <span class="c1"># in this case, we try to find the next record.</span>
+            <span class="n">current_line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">current_partner_ids</span> <span class="o">=</span> <span class="n">literal_eval</span><span class="p">(</span><span class="n">current_line</span><span class="o">.</span><span class="n">aggr_ids</span><span class="p">)</span>
+            <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;current_line_id&#39;</span><span class="p">:</span> <span class="n">current_line</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;partner_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">current_partner_ids</span><span class="p">)],</span>
+                <span class="s1">&#39;dst_partner_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_ordered_partner</span><span class="p">(</span><span class="n">current_partner_ids</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;selection&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;current_line_id&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;partner_ids&#39;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;finished&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;form&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_process_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Execute the select request and write the result in this wizard</span>
+<span class="sd">            :param query : the SQL query used to fill the wizard line</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="n">model_mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_models</span><span class="p">()</span>
+
+        <span class="c1"># group partner query</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span> <span class="c1"># pylint: disable=sql-injection</span>
+
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">min_id</span><span class="p">,</span> <span class="n">aggr_ids</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">():</span>
+            <span class="c1"># To ensure that the used partners are accessible by the user</span>
+            <span class="n">partners</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">aggr_ids</span><span class="p">)])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">partners</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># exclude partner according to options</span>
+            <span class="k">if</span> <span class="n">model_mapping</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partner_use_in</span><span class="p">(</span><span class="n">partners</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="n">model_mapping</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;base.partner.merge.line&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;wizard_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;min_id&#39;</span><span class="p">:</span> <span class="n">min_id</span><span class="p">,</span>
+                <span class="s1">&#39;aggr_ids&#39;</span><span class="p">:</span> <span class="n">partners</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;selection&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;number_group&#39;</span><span class="p">:</span> <span class="n">counter</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;counter: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">counter</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MergePartnerAutomatic.action_start_manual_process">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.action_start_manual_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_start_manual_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Start the process &#39;Merge with Manual Check&#39;. Fill the wizard according to the group_by and exclude</span>
+<span class="sd">            options, and redirect to the first step (treatment of first wizard line). After, for each subset of</span>
+<span class="sd">            partner to merge, the wizard will be actualized.</span>
+<span class="sd">                - Compute the selected groups (with duplication)</span>
+<span class="sd">                - If the user has selected the &#39;exclude_xxx&#39; fields, avoid the partners</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_selected_groupby</span><span class="p">()</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_query</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_group</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_process_query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_next_screen</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MergePartnerAutomatic.action_start_automatic_process">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.action_start_automatic_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_start_automatic_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Start the process &#39;Merge Automatically&#39;. This will fill the wizard with the same mechanism as &#39;Merge</span>
+<span class="sd">            with Manual Check&#39;, but instead of refreshing wizard with the current line, it will automatically process</span>
+<span class="sd">            all lines by merging partner grouped according to the checked options.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action_start_manual_process</span><span class="p">()</span>  <span class="c1"># here we don&#39;t redirect to the next screen, since it is automatic process</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">invalidate_all</span><span class="p">()</span> <span class="c1"># FIXME: is this still necessary?</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_ids</span><span class="p">:</span>
+            <span class="n">partner_ids</span> <span class="o">=</span> <span class="n">literal_eval</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">aggr_ids</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_merge</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span>
+            <span class="n">line</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>  <span class="c1"># TODO JEM : explain why</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;finished&#39;</span><span class="p">})</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;form&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="MergePartnerAutomatic.parent_migration_process_cb">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.parent_migration_process_cb">[docs]</a>
+    <span class="k">def</span> <span class="nf">parent_migration_process_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT</span>
+<span class="s2">                min(p1.id),</span>
+<span class="s2">                array_agg(DISTINCT p1.id)</span>
+<span class="s2">            FROM</span>
+<span class="s2">                res_partner as p1</span>
+<span class="s2">            INNER join</span>
+<span class="s2">                res_partner as p2</span>
+<span class="s2">            ON</span>
+<span class="s2">                p1.email = p2.email AND</span>
+<span class="s2">                p1.name = p2.name AND</span>
+<span class="s2">                (p1.parent_id = p2.id OR p1.id = p2.parent_id)</span>
+<span class="s2">            WHERE</span>
+<span class="s2">                p2.id IS NOT NULL</span>
+<span class="s2">            GROUP BY</span>
+<span class="s2">                p1.email,</span>
+<span class="s2">                p1.name,</span>
+<span class="s2">                CASE WHEN p1.parent_id = p2.id THEN p2.id</span>
+<span class="s2">                    ELSE p1.id</span>
+<span class="s2">                END</span>
+<span class="s2">            HAVING COUNT(*) &gt;= 2</span>
+<span class="s2">            ORDER BY</span>
+<span class="s2">                min(p1.id)</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_process_query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_ids</span><span class="p">:</span>
+            <span class="n">partner_ids</span> <span class="o">=</span> <span class="n">literal_eval</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">aggr_ids</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_merge</span><span class="p">(</span><span class="n">partner_ids</span><span class="p">)</span>
+            <span class="n">line</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;finished&#39;</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            UPDATE</span>
+<span class="s2">                res_partner</span>
+<span class="s2">            SET</span>
+<span class="s2">                is_company = NULL,</span>
+<span class="s2">                parent_id = NULL</span>
+<span class="s2">            WHERE</span>
+<span class="s2">                parent_id = id</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+            <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;form&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="MergePartnerAutomatic.action_update_all_process">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.action_update_all_process">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_update_all_process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent_migration_process_cb</span><span class="p">()</span>
+
+        <span class="c1"># NOTE JEM : seems louche to create a new wizard instead of reuse the current one with updated options.</span>
+        <span class="c1"># since it is like this from the initial commit of this wizard, I don&#39;t change it. yet ...</span>
+        <span class="n">wizard</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create</span><span class="p">({</span><span class="s1">&#39;group_by_vat&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;group_by_email&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;group_by_name&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+        <span class="n">wizard</span><span class="o">.</span><span class="n">action_start_automatic_process</span><span class="p">()</span>
+
+        <span class="c1"># NOTE JEM : no idea if this query is usefull</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            UPDATE</span>
+<span class="s2">                res_partner</span>
+<span class="s2">            SET</span>
+<span class="s2">                is_company = NULL</span>
+<span class="s2">            WHERE</span>
+<span class="s2">                parent_id IS NOT NULL AND</span>
+<span class="s2">                is_company IS NOT NULL</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_next_screen</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MergePartnerAutomatic.action_merge">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.wizard.html#odoo.addons.base.wizard.base_partner_merge.MergePartnerAutomatic.action_merge">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_merge</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Merge Contact button. Merge the selected partners, and redirect to</span>
+<span class="sd">            the end screen (since there is no other wizard line to process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">partner_ids</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;finished&#39;</span><span class="p">})</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;res_model&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+                <span class="s1">&#39;res_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;view_mode&#39;</span><span class="p">:</span> <span class="s1">&#39;form&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="s1">&#39;new&#39;</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_merge</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">partner_ids</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dst_partner_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_line_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_line_id</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_next_screen</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

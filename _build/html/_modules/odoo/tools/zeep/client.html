@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.zeep.client &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.zeep.client</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.zeep.client</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">zeep</span>
+
+<span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">requests</span> <span class="kn">import</span> <span class="n">Response</span>
+<span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">SimpleNamespace</span><span class="p">,</span> <span class="n">FunctionType</span>
+
+
+<span class="n">TIMEOUT</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">SERIALIZABLE_TYPES</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="nb">type</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">Response</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="Client">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.Client">[docs]</a>
+<span class="k">class</span> <span class="nc">Client</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A wrapper for Zeep.Client</span>
+
+<span class="sd">    * providing a simpler API to pass timeouts and session,</span>
+<span class="sd">    * restricting its attributes to a few, most-commonly used accross Odoo&#39;s modules,</span>
+<span class="sd">    * serializing the returned values of its methods.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">transport</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;transport&#39;</span><span class="p">,</span> <span class="n">zeep</span><span class="o">.</span><span class="n">Transport</span><span class="p">())</span>
+        <span class="c1"># The timeout for loading wsdl and xsd documents.</span>
+        <span class="n">transport</span><span class="o">.</span><span class="n">load_timeout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;timeout&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">transport</span><span class="o">.</span><span class="n">load_timeout</span> <span class="ow">or</span> <span class="n">TIMEOUT</span>
+        <span class="c1"># The timeout for operations (POST/GET)</span>
+        <span class="n">transport</span><span class="o">.</span><span class="n">operation_timeout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;operation_timeout&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">transport</span><span class="o">.</span><span class="n">operation_timeout</span> <span class="ow">or</span> <span class="n">TIMEOUT</span>
+        <span class="c1"># The `requests.session` used for HTTP requests</span>
+        <span class="n">transport</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">transport</span><span class="o">.</span><span class="n">session</span>
+
+        <span class="n">client</span> <span class="o">=</span> <span class="n">zeep</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__obj</span> <span class="o">=</span> <span class="n">client</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__service</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">__serialize_object</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">__serialize_object</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="k">for</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">dict</span><span class="p">,</span> <span class="n">zeep</span><span class="o">.</span><span class="n">xsd</span><span class="o">.</span><span class="n">valueobjects</span><span class="o">.</span><span class="n">CompoundValue</span><span class="p">)):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">SerialProxy</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__serialize_object</span><span class="p">(</span><span class="n">obj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">})</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">in</span> <span class="n">SERIALIZABLE_TYPES</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">obj</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">obj</span><span class="si">}</span><span class="s1"> is not serializable&#39;</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">__serialize_object_wrapper</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__serialize_object</span><span class="p">(</span><span class="n">method</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">wrapper</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">service</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__service</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__service</span> <span class="o">=</span> <span class="n">ReadOnlyMethodNamespace</span><span class="p">(</span><span class="o">**</span><span class="p">{</span>
+                <span class="n">key</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">__serialize_object_wrapper</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">operation</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__obj</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">_operations</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">})</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__service</span>
+
+<div class="viewcode-block" id="Client.type_factory">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.Client.type_factory">[docs]</a>
+    <span class="k">def</span> <span class="nf">type_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">):</span>
+        <span class="n">types</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__obj</span><span class="o">.</span><span class="n">wsdl</span><span class="o">.</span><span class="n">types</span>
+        <span class="n">namespace</span> <span class="o">=</span> <span class="n">namespace</span> <span class="k">if</span> <span class="n">namespace</span> <span class="ow">in</span> <span class="n">types</span><span class="o">.</span><span class="n">namespaces</span> <span class="k">else</span> <span class="n">types</span><span class="o">.</span><span class="n">get_ns_prefix</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span>
+        <span class="n">documents</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">documents</span><span class="o">.</span><span class="n">get_by_namespace</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">fail_silently</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">types</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">key</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="se">{{</span><span class="si">{</span><span class="n">namespace</span><span class="si">}</span><span class="se">}}</span><span class="s1">&#39;</span><span class="p">):]:</span> <span class="n">type_</span>
+            <span class="k">for</span> <span class="n">document</span> <span class="ow">in</span> <span class="n">documents</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="n">document</span><span class="o">.</span><span class="n">_types</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">ReadOnlyMethodNamespace</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">__serialize_object_wrapper</span><span class="p">(</span><span class="n">type_</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="n">types</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span></div>
+
+
+<div class="viewcode-block" id="Client.get_type">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.Client.get_type">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__serialize_object_wrapper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__obj</span><span class="o">.</span><span class="n">wsdl</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">get_type</span><span class="p">(</span><span class="n">name</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Client.create_service">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.Client.create_service">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_service</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">binding_name</span><span class="p">,</span> <span class="n">address</span><span class="p">):</span>
+        <span class="n">service</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__obj</span><span class="o">.</span><span class="n">create_service</span><span class="p">(</span><span class="n">binding_name</span><span class="p">,</span> <span class="n">address</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ReadOnlyMethodNamespace</span><span class="p">(</span><span class="o">**</span><span class="p">{</span>
+            <span class="n">key</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">__serialize_object_wrapper</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">operation</span> <span class="ow">in</span> <span class="n">service</span><span class="o">.</span><span class="n">_operations</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="Client.bind">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.Client.bind">[docs]</a>
+    <span class="k">def</span> <span class="nf">bind</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service_name</span><span class="p">,</span> <span class="n">port_name</span><span class="p">):</span>
+        <span class="n">service</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__obj</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="n">service_name</span><span class="p">,</span> <span class="n">port_name</span><span class="p">)</span>
+        <span class="n">operations</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">key</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">__serialize_object_wrapper</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">operation</span> <span class="ow">in</span> <span class="n">service</span><span class="o">.</span><span class="n">_operations</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="n">operations</span><span class="p">[</span><span class="s1">&#39;_binding_options&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">_binding_options</span>
+        <span class="k">return</span> <span class="n">ReadOnlyMethodNamespace</span><span class="p">(</span><span class="o">**</span><span class="n">operations</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ReadOnlyMethodNamespace">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.ReadOnlyMethodNamespace">[docs]</a>
+<span class="k">class</span> <span class="nc">ReadOnlyMethodNamespace</span><span class="p">(</span><span class="n">SimpleNamespace</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A read-only attribute-based namespace not prefixed by `_` and restricted to functions.</span>
+
+<span class="sd">    By default, `types.SympleNamespace` doesn&#39;t implement `__setitem__` and `__delitem__`,</span>
+<span class="sd">    no need to implement them to ensure the read-only property of this class.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span>
+            <span class="p">(</span><span class="ow">not</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">))</span>
+            <span class="ow">or</span>
+            <span class="p">(</span><span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;_binding_options&#39;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="fm">__delattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+
+<div class="viewcode-block" id="SerialProxy">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.SerialProxy">[docs]</a>
+<span class="k">class</span> <span class="nc">SerialProxy</span><span class="p">(</span><span class="n">SimpleNamespace</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;An attribute-based namespace not prefixed by `_` and restricted to few types.</span>
+
+<span class="sd">    It pretends to be a zeep `CompoundValue` so zeep.helpers.serialize_object threats it as such.</span>
+
+<span class="sd">    `__getitem__` and `__delitem__` are supported, but `__setitem__` is prevented,</span>
+<span class="sd">    e.g.</span>
+<span class="sd">    ```py</span>
+<span class="sd">    proxy = SerialProxy(foo=&#39;foo&#39;)</span>
+<span class="sd">    proxy.foo  # Allowed</span>
+<span class="sd">    proxy[&#39;foo&#39;]  # Allowed</span>
+<span class="sd">    proxy.foo = &#39;bar&#39;  # Allowed</span>
+<span class="sd">    proxy[&#39;foo&#39;] = &#39;bar&#39;  # Prevented</span>
+<span class="sd">    del proxy.foo  # Allowed</span>
+<span class="sd">    del proxy[&#39;foo&#39;]  # Allowed</span>
+<span class="sd">    ```</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Pretend to be a CompoundValue so zeep can serialize this when sending a request with this object in the payload</span>
+    <span class="c1"># https://stackoverflow.com/a/42958013</span>
+    <span class="c1"># https://github.com/mvantellingen/python-zeep/blob/a65b4363c48b5c3f687b8df570bcbada8ba66b9b/src/zeep/helpers.py#L15</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">__class__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">zeep</span><span class="o">.</span><span class="n">xsd</span><span class="o">.</span><span class="n">valueobjects</span><span class="o">.</span><span class="n">CompoundValue</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__check</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__check</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="c1"># Not required as SimpleNamespace doesn&#39;t implement it by default, but this makes it explicit.</span>
+    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="fm">__delitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="fm">__delattr__</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SerialProxy.keys">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.SerialProxy.keys">[docs]</a>
+    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SerialProxy.values">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.SerialProxy.values">[docs]</a>
+    <span class="k">def</span> <span class="nf">values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SerialProxy.items">
+<a class="viewcode-back" href="../../../../odoo.tools.zeep.html#odoo.tools.zeep.client.SerialProxy.items">[docs]</a>
+    <span class="k">def</span> <span class="nf">items</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">()</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">__check</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">SERIALIZABLE_TYPES</span> <span class="o">+</span> <span class="p">(</span><span class="n">SerialProxy</span><span class="p">,)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

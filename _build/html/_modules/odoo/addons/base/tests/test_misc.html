@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_misc &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_misc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_misc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">from</span> <span class="nn">dateutil.relativedelta</span> <span class="kn">import</span> <span class="n">relativedelta</span>
+<span class="kn">import</span> <span class="nn">os.path</span>
+<span class="kn">import</span> <span class="nn">pytz</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">config</span><span class="p">,</span>
+    <span class="n">date_utils</span><span class="p">,</span>
+    <span class="n">file_open</span><span class="p">,</span>
+    <span class="n">file_path</span><span class="p">,</span>
+    <span class="n">merge_sequences</span><span class="p">,</span>
+    <span class="n">misc</span><span class="p">,</span>
+    <span class="n">remove_accents</span><span class="p">,</span>
+    <span class="n">validate_url</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">BaseCase</span>
+
+
+<div class="viewcode-block" id="TestCountingStream">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCountingStream">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCountingStream</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestCountingStream.test_empty_stream">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCountingStream.test_empty_stream">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_empty_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">CountingStream</span><span class="p">(</span><span class="nb">iter</span><span class="p">([]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsNone</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCountingStream.test_single">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCountingStream.test_single">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_single</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">CountingStream</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsNone</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCountingStream.test_full">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCountingStream.test_full">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_full</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">CountingStream</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">42</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestCountingStream.test_repeated">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCountingStream.test_repeated">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_repeated</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Once the CountingStream has stopped iterating, the index should not</span>
+<span class="sd">        increase anymore (the internal state should not be allowed to change)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">CountingStream</span><span class="p">(</span><span class="nb">iter</span><span class="p">([]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsNone</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIsNone</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestMergeSequences">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestMergeSequences">[docs]</a>
+<span class="k">class</span> <span class="nc">TestMergeSequences</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestMergeSequences.test_merge_sequences">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestMergeSequences.test_merge_sequences">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_merge_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># base case</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="n">merge_sequences</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+
+        <span class="c1"># &#39;Z&#39; can be anywhere</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="n">merge_sequences</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Z&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;Z&#39;</span><span class="p">])</span>
+
+        <span class="c1"># &#39;Y&#39; must precede &#39;C&#39;;</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="n">merge_sequences</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+
+        <span class="c1"># &#39;X&#39; must follow &#39;A&#39; and precede &#39;C&#39;</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="n">merge_sequences</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">])</span>
+
+        <span class="c1"># all cases combined</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="n">merge_sequences</span><span class="p">(</span>
+            <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s1">&#39;Z&#39;</span><span class="p">],</span>                  <span class="c1"># &#39;Z&#39; can be anywhere</span>
+            <span class="p">[</span><span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span>             <span class="c1"># &#39;Y&#39; must precede &#39;C&#39;;</span>
+            <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="s1">&#39;Y&#39;</span><span class="p">],</span>        <span class="c1"># &#39;X&#39; must follow &#39;A&#39; and precede &#39;Y&#39;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;Z&#39;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestDateRangeFunction">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction">[docs]</a>
+<span class="k">class</span> <span class="nc">TestDateRangeFunction</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test on date_range generator. &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_naive_datetimes">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_naive_datetimes">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_naive_datetimes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check date_range with naive datetimes. &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">dates</span> <span class="o">=</span> <span class="p">[</span><span class="n">date</span> <span class="k">for</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">dates</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_date">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_date">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_date</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check date_range with naive datetimes. &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)),</span> <span class="n">expected</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_timezone_aware_datetimes_other_than_utc">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_timezone_aware_datetimes_other_than_utc">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_timezone_aware_datetimes_other_than_utc</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check date_range with timezone-aware datetimes other than UTC.&quot;&quot;&quot;</span>
+        <span class="n">timezone</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">)</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">end</span><span class="p">)</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                    <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span><span class="n">timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expected</span><span class="p">]</span>
+
+        <span class="n">dates</span> <span class="o">=</span> <span class="p">[</span><span class="n">date</span> <span class="k">for</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span> <span class="n">dates</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_mismatching_zones">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_mismatching_zones">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_mismatching_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check date_range with mismatching zone should raise an exception.&quot;&quot;&quot;</span>
+        <span class="n">start_timezone</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">)</span>
+        <span class="n">end_timezone</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="s1">&#39;America/Recife&#39;</span><span class="p">)</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">start_timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">end_timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">end</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+            <span class="n">dates</span> <span class="o">=</span> <span class="p">[</span><span class="n">date</span> <span class="k">for</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_inconsistent_datetimes">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_inconsistent_datetimes">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_inconsistent_datetimes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check date_range with a timezone-aware datetime and a naive one.&quot;&quot;&quot;</span>
+        <span class="n">context_timezone</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">)</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1985</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">1986</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">context_timezone</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">end</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+            <span class="n">dates</span> <span class="o">=</span> <span class="p">[</span><span class="n">date</span> <span class="k">for</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="TestDateRangeFunction.test_date_range_with_hour">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDateRangeFunction.test_date_range_with_hour">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_date_range_with_hour</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Test date range with hour and naive datetime.&quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">26</span><span class="p">)</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">17</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">18</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">19</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">22</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">23</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">26</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">dates</span> <span class="o">=</span> <span class="p">[</span><span class="n">date</span> <span class="k">for</span> <span class="n">date</span> <span class="ow">in</span> <span class="n">date_utils</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">step</span><span class="p">)]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">dates</span><span class="p">,</span> <span class="n">expected</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestFormatLangDate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLangDate">[docs]</a>
+<span class="k">class</span> <span class="nc">TestFormatLangDate</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestFormatLangDate.test_00_accepted_types">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLangDate.test_00_accepted_types">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_00_accepted_types</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">tz</span> <span class="o">=</span> <span class="s1">&#39;Europe/Brussels&#39;</span>
+        <span class="n">datetime_str</span> <span class="o">=</span> <span class="s1">&#39;2017-01-31 12:00:00&#39;</span>
+        <span class="n">date_datetime</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">datetime_str</span><span class="p">,</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">)</span>
+        <span class="n">date_date</span> <span class="o">=</span> <span class="n">date_datetime</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+        <span class="n">date_str</span> <span class="o">=</span> <span class="s1">&#39;2017-01-31&#39;</span>
+        <span class="n">time_part</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">time</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">22</span><span class="p">)</span>
+        <span class="n">t_medium</span> <span class="o">=</span> <span class="s1">&#39;h:mm:ss a&#39;</span>
+        <span class="n">medium</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;MMM d, YYYY, </span><span class="si">{</span><span class="n">t_medium</span><span class="si">}</span><span class="s1">&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_datetime</span><span class="p">),</span> <span class="s1">&#39;01/31/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_date</span><span class="p">),</span> <span class="s1">&#39;01/31/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">),</span> <span class="s1">&#39;01/31/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_datetime</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">medium</span><span class="p">),</span> <span class="s1">&#39;Jan 31, 2017, 1:00:00 PM&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">medium</span><span class="p">),</span> <span class="s1">&#39;Jan 31, 2017, 1:00:00 PM&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="n">t_medium</span><span class="p">),</span> <span class="s1">&#39;4:30:22 PM&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="n">t_medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="n">t_medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="n">t_medium</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLangDate.test_01_code_and_format">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLangDate.test_01_code_and_format">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_01_code_and_format</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">date_str</span> <span class="o">=</span> <span class="s1">&#39;2017-01-31&#39;</span>
+        <span class="n">lang</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Activate French and Simplified Chinese (test with non-ASCII characters)</span>
+        <span class="n">lang</span><span class="o">.</span><span class="n">_activate_lang</span><span class="p">(</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span>
+        <span class="n">lang</span><span class="o">.</span><span class="n">_activate_lang</span><span class="p">(</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span>
+
+        <span class="c1"># -- test `date`</span>
+        <span class="c1"># Change a single parameter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">),</span> <span class="s1">&#39;31/01/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">),</span> <span class="s1">&#39;31/01/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">date_format</span><span class="o">=</span><span class="s1">&#39;MMM d, y&#39;</span><span class="p">),</span> <span class="s1">&#39;Jan 31, 2017&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Change 2 parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">),</span> <span class="s1">&#39;31/01/2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">date_format</span><span class="o">=</span><span class="s1">&#39;MMM d, y&#39;</span><span class="p">),</span> <span class="sa">u</span><span class="s1">&#39;1</span><span class="se">\u6708</span><span class="s1"> 31, 2017&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">,</span> <span class="n">date_format</span><span class="o">=</span><span class="s1">&#39;MMM d, y&#39;</span><span class="p">),</span> <span class="s1">&#39;janv. 31, 2017&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Change 3 parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_str</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;en_US&#39;</span><span class="p">,</span> <span class="n">date_format</span><span class="o">=</span><span class="s1">&#39;MMM d, y&#39;</span><span class="p">),</span> <span class="s1">&#39;Jan 31, 2017&#39;</span><span class="p">)</span>
+
+        <span class="c1"># -- test `datetime`</span>
+        <span class="n">datetime_str</span> <span class="o">=</span> <span class="s1">&#39;2017-01-31 10:33:00&#39;</span>
+        <span class="c1"># Change languages and timezones</span>
+        <span class="n">datetime_us_str</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;en_US&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">),</span> <span class="n">datetime_us_str</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;America/New_York&#39;</span><span class="p">),</span> <span class="n">datetime_us_str</span><span class="p">)</span>
+
+        <span class="c1"># Change language, timezone and format</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;America/New_York&#39;</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="s1">&#39;dd/MM/YYYY HH:mm&#39;</span><span class="p">),</span> <span class="s1">&#39;31/01/2017 05:33&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;en_US&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="s1">&#39;MMM d, y&#39;</span><span class="p">),</span> <span class="s1">&#39;Jan 31, 2017&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Check given `lang_code` overwites context lang</span>
+        <span class="n">fmt_fr</span> <span class="o">=</span> <span class="s1">&#39;dd MMMM YYYY à HH:mm:ss Z&#39;</span>
+        <span class="n">fmt_us</span> <span class="o">=</span> <span class="s2">&quot;MMMM dd, YYYY &#39;at&#39; hh:mm:ss a Z&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">fmt_fr</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">),</span> <span class="s1">&#39;31 janvier 2017 à 11:33:00 +0100&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_datetime</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">,</span> <span class="n">dt_format</span><span class="o">=</span><span class="n">fmt_us</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;en_US&#39;</span><span class="p">),</span> <span class="s1">&#39;January 31, 2017 at 11:33:00 AM +0100&#39;</span><span class="p">)</span>
+
+        <span class="c1"># -- test `time`</span>
+        <span class="n">time_part</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">time</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">22</span><span class="p">)</span>
+        <span class="n">time_part_tz</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">time</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">22</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="s1">&#39;America/New_York&#39;</span><span class="p">))</span>  <span class="c1"># 4:30 PM timezoned</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;HH:mm:ss&#39;</span><span class="p">),</span> <span class="s1">&#39;16:30:22&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s2">&quot;ah:m:ss&quot;</span><span class="p">),</span> <span class="s1">&#39;</span><span class="se">\u4e0b\u5348</span><span class="s1">4:30:22&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Check format in different languages</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;HH:mm&#39;</span><span class="p">),</span> <span class="s1">&#39;16:30&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;ah:mm&#39;</span><span class="p">),</span> <span class="s1">&#39;</span><span class="se">\u4e0b\u5348</span><span class="s1">4:30&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Check timezoned time part</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part_tz</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;HH:mm:ss Z&#39;</span><span class="p">),</span> <span class="s1">&#39;16:30:22 -0504&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part_tz</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;zzzz ah:mm:ss&#39;</span><span class="p">),</span> <span class="s1">&#39;</span><span class="se">\u5317\u7f8e\u4e1c\u90e8\u6807\u51c6\u65f6\u95f4\u0020\u4e0b\u5348</span><span class="s1">4:30:22&#39;</span><span class="p">)</span>
+
+        <span class="c1">#Check timezone conversion in format_time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="s1">&#39;Europe/Brussels&#39;</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;HH:mm:ss Z&#39;</span><span class="p">),</span> <span class="s1">&#39;11:33:00 +0100&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">datetime_str</span><span class="p">,</span> <span class="s1">&#39;America/New_York&#39;</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;HH:mm:ss Z&#39;</span><span class="p">),</span> <span class="s1">&#39;05:33:00 -0500&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Check given `lang_code` overwites context lang</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;ah:mm&#39;</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">),</span> <span class="s1">&#39;</span><span class="se">\u4e0b\u5348</span><span class="s1">4:30&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_time</span><span class="p">(</span><span class="n">lang</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;zh_CN&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">time_part</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;ah:mm&#39;</span><span class="p">,</span> <span class="n">lang_code</span><span class="o">=</span><span class="s1">&#39;fr_FR&#39;</span><span class="p">),</span> <span class="s1">&#39;PM4:30&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLangDate.test_02_tz">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLangDate.test_02_tz">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_02_tz</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">tz</span> <span class="o">=</span> <span class="s1">&#39;Europe/Brussels&#39;</span>
+        <span class="n">datetime_str</span> <span class="o">=</span> <span class="s1">&#39;2016-12-31 23:55:00&#39;</span>
+        <span class="n">date_datetime</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">datetime_str</span><span class="p">,</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">)</span>
+
+        <span class="c1"># While London is still in 2016, Brussels is already in 2017</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_datetime</span><span class="p">),</span> <span class="s1">&#39;01/01/2017&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Force London timezone</span>
+        <span class="n">date_datetime</span> <span class="o">=</span> <span class="n">date_datetime</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">pytz</span><span class="o">.</span><span class="n">UTC</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">format_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="n">date_datetime</span><span class="p">),</span> <span class="s1">&#39;12/31/2016&#39;</span><span class="p">,</span> <span class="s2">&quot;User&#39;s tz must be ignored when tz is specifed in datetime object&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestCallbacks">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCallbacks">[docs]</a>
+<span class="k">class</span> <span class="nc">TestCallbacks</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestCallbacks.test_callback">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCallbacks.test_callback">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">callbacks</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+
+        <span class="c1"># add foo</span>
+        <span class="k">def</span> <span class="nf">foo</span><span class="p">():</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">)</span>
+
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">foo</span><span class="p">)</span>
+
+        <span class="c1"># add bar</span>
+        <span class="nd">@callbacks</span><span class="o">.</span><span class="n">add</span>
+        <span class="k">def</span> <span class="nf">bar</span><span class="p">():</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;bar&quot;</span><span class="p">)</span>
+
+        <span class="c1"># add foo again</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">foo</span><span class="p">)</span>
+
+        <span class="c1"># this should call foo(), bar(), foo()</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="s2">&quot;bar&quot;</span><span class="p">,</span> <span class="s2">&quot;foo&quot;</span><span class="p">])</span>
+
+        <span class="c1"># this should do nothing</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="s2">&quot;bar&quot;</span><span class="p">,</span> <span class="s2">&quot;foo&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestCallbacks.test_aggregate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCallbacks.test_aggregate">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_aggregate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">callbacks</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+
+        <span class="c1"># register foo once</span>
+        <span class="nd">@callbacks</span><span class="o">.</span><span class="n">add</span>
+        <span class="k">def</span> <span class="nf">foo</span><span class="p">():</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callbacks</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;foo&quot;</span><span class="p">])</span>
+
+        <span class="c1"># aggregate data</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+        <span class="c1"># foo() is called once</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">callbacks</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]])</span></div>
+
+
+<div class="viewcode-block" id="TestCallbacks.test_reentrant">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestCallbacks.test_reentrant">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_reentrant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">callbacks</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">Callbacks</span><span class="p">()</span>
+
+        <span class="c1"># register foo that runs callbacks</span>
+        <span class="nd">@callbacks</span><span class="o">.</span><span class="n">add</span>
+        <span class="k">def</span> <span class="nf">foo</span><span class="p">():</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;foo1&quot;</span><span class="p">)</span>
+            <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;foo2&quot;</span><span class="p">)</span>
+
+        <span class="nd">@callbacks</span><span class="o">.</span><span class="n">add</span>
+        <span class="k">def</span> <span class="nf">bar</span><span class="p">():</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;bar&quot;</span><span class="p">)</span>
+
+        <span class="c1"># both foo() and bar() are called once</span>
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;foo1&quot;</span><span class="p">,</span> <span class="s2">&quot;bar&quot;</span><span class="p">,</span> <span class="s2">&quot;foo2&quot;</span><span class="p">])</span>
+
+        <span class="n">callbacks</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;foo1&quot;</span><span class="p">,</span> <span class="s2">&quot;bar&quot;</span><span class="p">,</span> <span class="s2">&quot;foo2&quot;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestRemoveAccents">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestRemoveAccents">[docs]</a>
+<span class="k">class</span> <span class="nc">TestRemoveAccents</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestRemoveAccents.test_empty_string">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestRemoveAccents.test_empty_string">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_empty_string</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="kc">False</span><span class="p">),</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestRemoveAccents.test_latin">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestRemoveAccents.test_latin">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_latin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="s1">&#39;Niño Hernández&#39;</span><span class="p">),</span> <span class="s1">&#39;Nino Hernandez&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="s1">&#39;Anaïs Clémence&#39;</span><span class="p">),</span> <span class="s1">&#39;Anais Clemence&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestRemoveAccents.test_non_latin">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestRemoveAccents.test_non_latin">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_non_latin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="s1">&#39;العربية&#39;</span><span class="p">),</span> <span class="s1">&#39;العربية&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">remove_accents</span><span class="p">(</span><span class="s1">&#39;русский алфавит&#39;</span><span class="p">),</span> <span class="s1">&#39;русскии алфавит&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestAddonsFileAccess">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess">[docs]</a>
+<span class="k">class</span> <span class="nc">TestAddonsFileAccess</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestAddonsFileAccess.assertCannotAccess">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess.assertCannotAccess">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertCannotAccess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">ExceptionType</span><span class="o">=</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ExceptionType</span><span class="p">):</span>
+            <span class="n">file_path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="n">filter_ext</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestAddonsFileAccess.assertCanRead">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess.assertCanRead">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertCanRead</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">needle</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">file_open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">filter_ext</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="n">needle</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="TestAddonsFileAccess.assertCannotRead">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess.assertCannotRead">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertCannotRead</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">ExceptionType</span><span class="o">=</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">ExceptionType</span><span class="p">):</span>
+            <span class="n">file_open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="n">filter_ext</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestAddonsFileAccess.test_file_path">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess.test_file_path">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_file_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># absolute path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span> <span class="c1"># means &quot;no filter&quot; too</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,)))</span>
+
+        <span class="c1"># directory target is ok</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="n">file_path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;..&#39;</span><span class="p">)))</span>
+
+        <span class="c1"># relative path</span>
+        <span class="n">relpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">)[</span><span class="o">-</span><span class="mi">3</span><span class="p">:]))</span> <span class="c1"># &#39;base/tests/test_misc.py&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="n">relpath</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="n">relpath</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,)))</span>
+
+        <span class="c1"># leading &#39;addons/&#39; is ignored if present</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">file_path</span><span class="p">(</span><span class="s2">&quot;addons/web/__init__.py&quot;</span><span class="p">))</span>
+        <span class="n">relpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;addons&#39;</span><span class="p">,</span> <span class="n">relpath</span><span class="p">)</span> <span class="c1"># &#39;addons/base/tests/test_misc.py&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">file_path</span><span class="p">(</span><span class="n">relpath</span><span class="p">))</span>
+
+        <span class="c1"># files in root_path are allowed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">file_path</span><span class="p">(</span><span class="s1">&#39;tools/misc.py&#39;</span><span class="p">))</span>
+
+        <span class="c1"># errors when outside addons_paths</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="s1">&#39;/doesnt/exist&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="s1">&#39;/tmp&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="s1">&#39;../../../../../../../../../tmp&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;../../../../../&#39;</span><span class="p">))</span>
+
+        <span class="c1"># data_dir is forbidden</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">])</span>
+
+        <span class="c1"># errors for illegal extensions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.png&#39;</span><span class="p">,))</span>
+        <span class="c1"># file doesnt exist but has wrong extension</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotAccess</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,</span> <span class="s1">&#39;.foo&#39;</span><span class="p">),</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.png&#39;</span><span class="p">,))</span></div>
+
+
+<div class="viewcode-block" id="TestAddonsFileAccess.test_file_open">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestAddonsFileAccess.test_file_open">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_file_open</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># The needle includes UTF8 so we test reading non-ASCII files at the same time.</span>
+        <span class="c1"># This depends on the system locale and is harder to unit test, but if you manage to run the</span>
+        <span class="c1"># test with a non-UTF8 locale (`LC_ALL=fr_FR.iso8859-1 python3...`) it should not crash ;-)</span>
+        <span class="n">test_needle</span> <span class="o">=</span> <span class="s2">&quot;A needle with non-ascii bytes: ♥&quot;</span>
+
+        <span class="c1"># absolute path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">test_needle</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">test_needle</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="n">test_needle</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,))</span>
+
+        <span class="c1"># directory target *is* an error</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">):</span>
+            <span class="n">file_open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;..&#39;</span><span class="p">))</span>
+
+        <span class="c1"># relative path</span>
+        <span class="n">relpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">)[</span><span class="o">-</span><span class="mi">3</span><span class="p">:]))</span> <span class="c1"># &#39;base/tests/test_misc.py&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="n">relpath</span><span class="p">,</span> <span class="n">test_needle</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="n">relpath</span><span class="p">,</span> <span class="n">test_needle</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="n">relpath</span><span class="p">,</span> <span class="n">test_needle</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rb&#39;</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,))</span>
+
+        <span class="c1"># leading &#39;addons/&#39; is ignored if present</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="s2">&quot;addons/web/__init__.py&quot;</span><span class="p">,</span> <span class="s2">&quot;import&quot;</span><span class="p">)</span>
+        <span class="n">relpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;addons&#39;</span><span class="p">,</span> <span class="n">relpath</span><span class="p">)</span> <span class="c1"># &#39;addons/base/tests/test_misc.py&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="n">relpath</span><span class="p">,</span> <span class="n">test_needle</span><span class="p">)</span>
+
+        <span class="c1"># files in root_path are allowed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCanRead</span><span class="p">(</span><span class="s1">&#39;tools/misc.py&#39;</span><span class="p">)</span>
+
+        <span class="c1"># errors when outside addons_paths</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="s1">&#39;/doesnt/exist&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="s1">&#39;/tmp&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="s1">&#39;../../../../../../../../../tmp&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;../../../../../&#39;</span><span class="p">))</span>
+
+        <span class="c1"># data_dir is forbidden</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;data_dir&#39;</span><span class="p">])</span>
+
+        <span class="c1"># errors for illegal extensions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.png&#39;</span><span class="p">,))</span>
+        <span class="c1"># file doesnt exist but has wrong extension</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertCannotRead</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,</span> <span class="s1">&#39;.foo&#39;</span><span class="p">),</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;.png&#39;</span><span class="p">,))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestDictTools">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDictTools">[docs]</a>
+<span class="k">class</span> <span class="nc">TestDictTools</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestDictTools.test_readonly_dict">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestDictTools.test_readonly_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_readonly_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">ReadonlyDict</span><span class="p">({</span><span class="s1">&#39;foo&#39;</span><span class="p">:</span> <span class="s1">&#39;bar&#39;</span><span class="p">})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">TypeError</span><span class="p">):</span>
+            <span class="n">d</span><span class="p">[</span><span class="s1">&#39;baz&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;xyz&#39;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">AttributeError</span><span class="p">):</span>
+            <span class="n">d</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;baz&#39;</span><span class="p">:</span> <span class="s1">&#39;xyz&#39;</span><span class="p">})</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="ne">TypeError</span><span class="p">):</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;baz&#39;</span><span class="p">:</span> <span class="s1">&#39;xyz&#39;</span><span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestFormatLang">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang">[docs]</a>
+<span class="k">class</span> <span class="nc">TestFormatLang</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestFormatLang.test_value_and_digits">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_value_and_digits">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_value_and_digits</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.23</span><span class="p">,</span> <span class="n">digits</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;100.2&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.23</span><span class="p">,</span> <span class="n">digits</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span> <span class="s1">&#39;100.230&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;If value is an empty string, it should return an empty string (not 0)&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span> <span class="s1">&#39;100.00&#39;</span><span class="p">,</span> <span class="s1">&#39;If digits is None (default value), it should default to 2&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Default rounding is &#39;HALF_EVEN&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.205</span><span class="p">),</span> <span class="s1">&#39;100.20&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.215</span><span class="p">),</span> <span class="s1">&#39;100.22&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_grouping">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_grouping">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_grouping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;res.lang&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;formatLang Lang&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;code&quot;</span><span class="p">:</span> <span class="s2">&quot;fLT&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;grouping&quot;</span><span class="p">:</span> <span class="s2">&quot;[3,2,-1]&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;decimal_point&quot;</span><span class="p">:</span> <span class="s2">&quot;!&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;thousands_sep&quot;</span><span class="p">:</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_activate_lang</span><span class="p">(</span><span class="s1">&#39;fLT&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fLT&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">1000000000</span><span class="p">,</span> <span class="n">grouping</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="s1">&#39;10000?00?000!00&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.lang&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s1">&#39;fLT&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">1000000000</span><span class="p">,</span> <span class="n">grouping</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="s1">&#39;1000000000.00&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_decimal_precision">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_decimal_precision">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_decimal_precision</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">decimal_precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;decimal.precision&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;formatLang Decimal Precision&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;digits&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>  <span class="c1"># We want .001 decimals to make sure the decimal precision parameter &#39;dp&#39; is chosen.</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">dp</span><span class="o">=</span><span class="n">decimal_precision</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="s1">&#39;100.000&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_currency_object">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_currency_object">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_currency_object</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">currency_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.currency&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;formatLang Currency&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;symbol&#39;</span><span class="p">:</span> <span class="s1">&#39;fL&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;rounding&#39;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span>  <span class="c1"># We want .1 decimals to make sure &#39;currency_obj&#39; is chosen.</span>
+            <span class="s1">&#39;position&#39;</span><span class="p">:</span> <span class="s1">&#39;after&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">currency_obj</span><span class="o">=</span><span class="n">currency_object</span><span class="p">),</span> <span class="s1">&#39;100.0</span><span class="si">%s</span><span class="s1">fL&#39;</span> <span class="o">%</span> <span class="sa">u</span><span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="n">currency_object</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;position&#39;</span><span class="p">:</span> <span class="s1">&#39;before&#39;</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">currency_obj</span><span class="o">=</span><span class="n">currency_object</span><span class="p">),</span> <span class="s1">&#39;fL</span><span class="si">%s</span><span class="s1">100.0&#39;</span> <span class="o">%</span> <span class="sa">u</span><span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_decimal_precision_and_currency_object">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_decimal_precision_and_currency_object">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_decimal_precision_and_currency_object</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">decimal_precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;decimal.precision&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;formatLang Decimal Precision&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;digits&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">currency_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.currency&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;formatLang Currency&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;symbol&#39;</span><span class="p">:</span> <span class="s1">&#39;fL&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;rounding&#39;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span>
+            <span class="s1">&#39;position&#39;</span><span class="p">:</span> <span class="s1">&#39;after&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># If we have a &#39;dp&#39; and &#39;currency_obj&#39;, we use the decimal precision of &#39;dp&#39; and the format of &#39;currency_obj&#39;.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">dp</span><span class="o">=</span><span class="n">decimal_precision</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">currency_obj</span><span class="o">=</span><span class="n">currency_object</span><span class="p">),</span> <span class="s1">&#39;100.000</span><span class="si">%s</span><span class="s1">fL&#39;</span> <span class="o">%</span> <span class="sa">u</span><span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_rounding_method">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_rounding_method">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rounding_method</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.205</span><span class="p">),</span> <span class="s1">&#39;100.20&#39;</span><span class="p">)</span>  <span class="c1"># Default is &#39;HALF-EVEN&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.215</span><span class="p">),</span> <span class="s1">&#39;100.22&#39;</span><span class="p">)</span>  <span class="c1"># Default is &#39;HALF-EVEN&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.205</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-UP&#39;</span><span class="p">),</span> <span class="s1">&#39;100.21&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.215</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-UP&#39;</span><span class="p">),</span> <span class="s1">&#39;100.22&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.205</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-DOWN&#39;</span><span class="p">),</span> <span class="s1">&#39;100.20&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">100.215</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-DOWN&#39;</span><span class="p">),</span> <span class="s1">&#39;100.21&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_rounding_unit">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_rounding_unit">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rounding_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">1000000.00</span><span class="p">),</span> <span class="s1">&#39;1,000,000.00&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">1000000.00</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;units&#39;</span><span class="p">),</span> <span class="s1">&#39;1,000,000&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">1000000.00</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;thousands&#39;</span><span class="p">),</span> <span class="s1">&#39;1,000&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">1000000.00</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;lakhs&#39;</span><span class="p">),</span> <span class="s1">&#39;10&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mf">1000000.00</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s2">&quot;millions&quot;</span><span class="p">),</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestFormatLang.test_rounding_method_and_rounding_unit">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestFormatLang.test_rounding_method_and_rounding_unit">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_rounding_method_and_rounding_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">1822060000</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-UP&#39;</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;lakhs&#39;</span><span class="p">),</span> <span class="s1">&#39;18,221&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">1822050000</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-UP&#39;</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;lakhs&#39;</span><span class="p">),</span> <span class="s1">&#39;18,221&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">misc</span><span class="o">.</span><span class="n">formatLang</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="mi">1822049900</span><span class="p">,</span> <span class="n">rounding_method</span><span class="o">=</span><span class="s1">&#39;HALF-UP&#39;</span><span class="p">,</span> <span class="n">rounding_unit</span><span class="o">=</span><span class="s1">&#39;lakhs&#39;</span><span class="p">),</span> <span class="s1">&#39;18,220&#39;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestUrlValidate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestUrlValidate">[docs]</a>
+<span class="k">class</span> <span class="nc">TestUrlValidate</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">):</span>
+<div class="viewcode-block" id="TestUrlValidate.test_url_validate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_misc.TestUrlValidate.test_url_validate">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_url_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">case</span><span class="p">,</span> <span class="n">truth</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="c1"># full URLs should be preserved</span>
+            <span class="p">(</span><span class="s1">&#39;http://example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;http://example.com/index.html&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com/index.html&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;http://example.com?debug=1&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com?debug=1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;http://example.com#h3&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com#h3&#39;</span><span class="p">),</span>
+
+            <span class="c1"># URLs with a domain should get a http scheme</span>
+            <span class="p">(</span><span class="s1">&#39;example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;example.com/index.html&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com/index.html&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;example.com?debug=1&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com?debug=1&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;example.com#h3&#39;</span><span class="p">,</span> <span class="s1">&#39;http://example.com#h3&#39;</span><span class="p">),</span>
+        <span class="p">]:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">validate_url</span><span class="p">(</span><span class="n">case</span><span class="p">),</span> <span class="n">truth</span><span class="p">)</span>
+
+        <span class="c1"># broken cases, do we really want that?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">validate_url</span><span class="p">(</span><span class="s1">&#39;/index.html&#39;</span><span class="p">),</span> <span class="s1">&#39;http:///index.html&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">validate_url</span><span class="p">(</span><span class="s1">&#39;?debug=1&#39;</span><span class="p">),</span> <span class="s1">&#39;http://?debug=1&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">validate_url</span><span class="p">(</span><span class="s1">&#39;#model=project.task&amp;id=3603607&#39;</span><span class="p">),</span> <span class="s1">&#39;http://#model=project.task&amp;id=3603607&#39;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.osutil &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.osutil</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.osutil</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Some functions related to the os and os.path module</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">zipfile</span>
+
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span> <span class="k">as</span> <span class="n">opj</span>
+
+
+<span class="n">WINDOWS_RESERVED</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">    ^</span>
+<span class="s1">    # forbidden stems: reserved keywords</span>
+<span class="s1">    (:?CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])</span>
+<span class="s1">    # even with an extension this is recommended against</span>
+<span class="s1">    (:?\..*)?</span>
+<span class="s1">    $</span>
+<span class="s1">&#39;&#39;&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+<div class="viewcode-block" id="clean_filename">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.osutil.clean_filename">[docs]</a>
+<span class="k">def</span> <span class="nf">clean_filename</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">replacement</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Strips or replaces possibly problematic or annoying characters our of</span>
+<span class="sd">    the input string, in order to make it a valid filename in most operating</span>
+<span class="sd">    systems (including dropping reserved Windows filenames).</span>
+
+<span class="sd">    If this results in an empty string, results in &quot;Untitled&quot; (localized).</span>
+
+<span class="sd">    Allows:</span>
+
+<span class="sd">    * any alphanumeric character (unicode)</span>
+<span class="sd">    * underscore (_) as that&#39;s innocuous</span>
+<span class="sd">    * dot (.) except in leading position to avoid creating dotfiles</span>
+<span class="sd">    * dash (-) except in leading position to avoid annoyance / confusion with</span>
+<span class="sd">      command options</span>
+<span class="sd">    * brackets ([ and ]), while they correspond to shell *character class*</span>
+<span class="sd">      they&#39;re a common way to mark / tag files especially on windows</span>
+<span class="sd">    * parenthesis (&quot;(&quot; and &quot;)&quot;), a more natural though less common version of</span>
+<span class="sd">      the former</span>
+<span class="sd">    * space (&quot; &quot;)</span>
+
+<span class="sd">    :param str name: file name to clean up</span>
+<span class="sd">    :param str replacement:</span>
+<span class="sd">        replacement string to use for sequences of problematic input, by default</span>
+<span class="sd">        an empty string to remove them entirely, each contiguous sequence of</span>
+<span class="sd">        problems is replaced by a single replacement</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">WINDOWS_RESERVED</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;Untitled&quot;</span>
+    <span class="k">return</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[^\w_.()\[\] -]+&#39;</span><span class="p">,</span> <span class="n">replacement</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s1">&#39;.-&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;Untitled&quot;</span></div>
+
+
+<div class="viewcode-block" id="listdir">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.osutil.listdir">[docs]</a>
+<span class="k">def</span> <span class="nf">listdir</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Allow to recursively get the file listing following symlinks, returns</span>
+<span class="sd">    paths relative to the provided `dir` except completely broken if the symlink</span>
+<span class="sd">    it follows leaves `dir`...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">recursive</span><span class="p">,</span> <span class="s2">&quot;use `os.listdir` or `pathlib.Path.iterdir`&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Since 16.0, use os.walk or a recursive glob&quot;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="nb">dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="nb">dir</span><span class="p">)</span>
+
+    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">followlinks</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">relpath</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="nb">dir</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="zip_dir">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.osutil.zip_dir">[docs]</a>
+<span class="k">def</span> <span class="nf">zip_dir</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">include_dir</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fnct_sort</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>      <span class="c1"># TODO add ignore list</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    : param fnct_sort : Function to be passed to &quot;key&quot; parameter of built-in</span>
+<span class="sd">                        python sorted() to provide flexibility of sorting files</span>
+<span class="sd">                        inside ZIP archive according to specific requirements.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">len_prefix</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">path</span><span class="p">))</span> <span class="k">if</span> <span class="n">include_dir</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">len_prefix</span><span class="p">:</span>
+        <span class="n">len_prefix</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="n">zipfile</span><span class="o">.</span><span class="n">ZIP_DEFLATED</span><span class="p">,</span> <span class="n">allowZip64</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">zipf</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">dirnames</span><span class="p">,</span> <span class="n">filenames</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">filenames</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">fnct_sort</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+                <span class="n">bname</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="n">ext</span> <span class="ow">or</span> <span class="n">bname</span>
+                <span class="k">if</span> <span class="n">ext</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;.pyc&#39;</span><span class="p">,</span> <span class="s1">&#39;.pyo&#39;</span><span class="p">,</span> <span class="s1">&#39;.swp&#39;</span><span class="p">,</span> <span class="s1">&#39;.DS_Store&#39;</span><span class="p">]:</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirpath</span><span class="p">,</span> <span class="n">fname</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                        <span class="n">zipf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">path</span><span class="p">[</span><span class="n">len_prefix</span><span class="p">:])</span></div>
+
+
+
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;nt&#39;</span><span class="p">:</span>
+    <span class="n">is_running_as_nt_service</span> <span class="o">=</span> <span class="k">lambda</span><span class="p">:</span> <span class="kc">False</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">win32service</span> <span class="k">as</span> <span class="nn">ws</span>
+    <span class="kn">import</span> <span class="nn">win32serviceutil</span> <span class="k">as</span> <span class="nn">wsu</span>
+
+    <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+    <span class="kn">from</span> <span class="nn">odoo.release</span> <span class="kn">import</span> <span class="n">nt_service_name</span>
+
+<div class="viewcode-block" id="is_running_as_nt_service">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.osutil.is_running_as_nt_service">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_running_as_nt_service</span><span class="p">():</span>
+        <span class="nd">@contextmanager</span>
+        <span class="k">def</span> <span class="nf">close_srv</span><span class="p">(</span><span class="n">srv</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">srv</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">ws</span><span class="o">.</span><span class="n">CloseServiceHandle</span><span class="p">(</span><span class="n">srv</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">close_srv</span><span class="p">(</span><span class="n">ws</span><span class="o">.</span><span class="n">OpenSCManager</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ws</span><span class="o">.</span><span class="n">SC_MANAGER_ALL_ACCESS</span><span class="p">))</span> <span class="k">as</span> <span class="n">hscm</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">close_srv</span><span class="p">(</span><span class="n">wsu</span><span class="o">.</span><span class="n">SmartOpenService</span><span class="p">(</span><span class="n">hscm</span><span class="p">,</span> <span class="n">nt_service_name</span><span class="p">,</span> <span class="n">ws</span><span class="o">.</span><span class="n">SERVICE_ALL_ACCESS</span><span class="p">))</span> <span class="k">as</span> <span class="n">hs</span><span class="p">:</span>
+                    <span class="n">info</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">QueryServiceStatusEx</span><span class="p">(</span><span class="n">hs</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;ProcessId&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getppid</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

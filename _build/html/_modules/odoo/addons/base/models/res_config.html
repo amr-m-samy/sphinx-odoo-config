@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.models.res_config &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.models.res_config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.models.res_config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">from</span> <span class="nn">ast</span> <span class="kn">import</span> <span class="n">literal_eval</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span>
+
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">models</span><span class="p">,</span> <span class="n">_</span>
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">AccessError</span><span class="p">,</span> <span class="n">RedirectWarning</span><span class="p">,</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">ustr</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ResConfigModuleInstallationMixin">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigModuleInstallationMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">ResConfigModuleInstallationMixin</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">()</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_install_modules</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">modules</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Install the requested modules.</span>
+
+<span class="sd">        :param modules: a recordset of ir.module.module records</span>
+<span class="sd">        :return: the next action to execute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">to_install_modules</span> <span class="o">=</span> <span class="n">modules</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">module</span><span class="p">:</span> <span class="n">module</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="s1">&#39;uninstalled&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">to_install_modules</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">to_install_modules</span><span class="o">.</span><span class="n">button_immediate_install</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="ResConfigConfigurable">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable">[docs]</a>
+<span class="k">class</span> <span class="nc">ResConfigConfigurable</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39; Base classes for new-style configuration items</span>
+
+<span class="sd">    Configuration items should inherit from this class, implement</span>
+<span class="sd">    the execute method (and optionally the cancel one) and have</span>
+<span class="sd">    their view inherit from the related res_config_view_base view.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;res.config&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Config&#39;</span>
+
+<div class="viewcode-block" id="ResConfigConfigurable.start">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># pylint: disable=next-method-called</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">next</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.next">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.next">[docs]</a>
+    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reload the settings page</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.client&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tag&#39;</span><span class="p">:</span> <span class="s1">&#39;reload&#39;</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.execute">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.execute">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Method called when the user clicks on the ``Next`` button.</span>
+
+<span class="sd">        Execute *must* be overloaded unless ``action_next`` is overloaded</span>
+<span class="sd">        (which is something you generally don&#39;t need to do).</span>
+
+<span class="sd">        If ``execute`` returns an action dictionary, that action is executed</span>
+<span class="sd">        rather than just going to the next configuration item.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s1">&#39;Configuration items need to implement execute&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.cancel">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.cancel">[docs]</a>
+    <span class="k">def</span> <span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Method called when the user click on the ``Skip`` button.</span>
+
+<span class="sd">        ``cancel`` should be overloaded instead of ``action_skip``. As with</span>
+<span class="sd">        ``execute``, if it returns an action dictionary that action is</span>
+<span class="sd">        executed in stead of the default (going to the next configuration item)</span>
+
+<span class="sd">        The default implementation is a NOOP.</span>
+
+<span class="sd">        ``cancel`` is also called by the default implementation of</span>
+<span class="sd">        ``action_cancel``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.action_next">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.action_next">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Action handler for the ``next`` event.</span>
+
+<span class="sd">        Sets the status of the todo the event was sent from to</span>
+<span class="sd">        ``done``, calls ``execute`` and -- unless ``execute`` returned</span>
+<span class="sd">        an action dictionary -- executes the action provided by calling</span>
+<span class="sd">        ``next``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># pylint: disable=next-method-called</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">next</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.action_skip">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.action_skip">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_skip</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Action handler for the ``skip`` event.</span>
+
+<span class="sd">        Sets the status of the todo the event was sent from to</span>
+<span class="sd">        ``skip``, calls ``cancel`` and -- unless ``cancel`` returned</span>
+<span class="sd">        an action dictionary -- executes the action provided by calling</span>
+<span class="sd">        ``next``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># pylint: disable=next-method-called</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">next</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ResConfigConfigurable.action_cancel">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigConfigurable.action_cancel">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Action handler for the ``cancel`` event. That event isn&#39;t</span>
+<span class="sd">        generated by the res.config.view.base inheritable view, the</span>
+<span class="sd">        inherited view has to overload one of the buttons (or add one</span>
+<span class="sd">        more).</span>
+
+<span class="sd">        Sets the status of the todo the event was sent from to</span>
+<span class="sd">        ``cancel``, calls ``cancel`` and -- unless ``cancel`` returned</span>
+<span class="sd">        an action dictionary -- executes the action provided by calling</span>
+<span class="sd">        ``next``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># pylint: disable=next-method-called</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">next</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ResConfigInstaller">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller">[docs]</a>
+<span class="k">class</span> <span class="nc">ResConfigInstaller</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">,</span> <span class="n">ResConfigModuleInstallationMixin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; New-style configuration base specialized for addons selection</span>
+<span class="sd">    and installation.</span>
+
+<span class="sd">    Basic usage</span>
+<span class="sd">    -----------</span>
+
+<span class="sd">    Subclasses can simply define a number of boolean fields. The field names</span>
+<span class="sd">    should be the names of the addons to install (when selected). Upon action</span>
+<span class="sd">    execution, selected boolean fields (and those only) will be interpreted as</span>
+<span class="sd">    addons to install, and batch-installed.</span>
+
+<span class="sd">    Additional addons</span>
+<span class="sd">    -----------------</span>
+
+<span class="sd">    It is also possible to require the installation of an additional</span>
+<span class="sd">    addon set when a specific preset of addons has been marked for</span>
+<span class="sd">    installation (in the basic usage only, additionals can&#39;t depend on</span>
+<span class="sd">    one another).</span>
+
+<span class="sd">    These additionals are defined through the ``_install_if``</span>
+<span class="sd">    property. This property is a mapping of a collection of addons (by</span>
+<span class="sd">    name) to a collection of addons (by name) [#]_, and if all the *key*</span>
+<span class="sd">    addons are selected for installation, then the *value* ones will</span>
+<span class="sd">    be selected as well. For example::</span>
+
+<span class="sd">        _install_if = {</span>
+<span class="sd">            (&#39;sale&#39;,&#39;crm&#39;): [&#39;sale_crm&#39;],</span>
+<span class="sd">        }</span>
+
+<span class="sd">    This will install the ``sale_crm`` addon if and only if both the</span>
+<span class="sd">    ``sale`` and ``crm`` addons are selected for installation.</span>
+
+<span class="sd">    You can define as many additionals as you wish, and additionals</span>
+<span class="sd">    can overlap in key and value. For instance::</span>
+
+<span class="sd">        _install_if = {</span>
+<span class="sd">            (&#39;sale&#39;,&#39;crm&#39;): [&#39;sale_crm&#39;],</span>
+<span class="sd">            (&#39;sale&#39;,&#39;project&#39;): [&#39;sale_service&#39;],</span>
+<span class="sd">        }</span>
+
+<span class="sd">    will install both ``sale_crm`` and ``sale_service`` if all of</span>
+<span class="sd">    ``sale``, ``crm`` and ``project`` are selected for installation.</span>
+
+<span class="sd">    Hook methods</span>
+<span class="sd">    ------------</span>
+
+<span class="sd">    Subclasses might also need to express dependencies more complex</span>
+<span class="sd">    than that provided by additionals. In this case, it&#39;s possible to</span>
+<span class="sd">    define methods of the form ``_if_%(name)s`` where ``name`` is the</span>
+<span class="sd">    name of a boolean field. If the field is selected, then the</span>
+<span class="sd">    corresponding module will be marked for installation *and* the</span>
+<span class="sd">    hook method will be executed.</span>
+
+<span class="sd">    Hook methods take the usual set of parameters (cr, uid, ids,</span>
+<span class="sd">    context) and can return a collection of additional addons to</span>
+<span class="sd">    install (if they return anything, otherwise they should not return</span>
+<span class="sd">    anything, though returning any &quot;falsy&quot; value such as None or an</span>
+<span class="sd">    empty collection will have the same effect).</span>
+
+<span class="sd">    Complete control</span>
+<span class="sd">    ----------------</span>
+
+<span class="sd">    The last hook is to simply overload the ``modules_to_install``</span>
+<span class="sd">    method, which implements all the mechanisms above. This method</span>
+<span class="sd">    takes the usual set of parameters (cr, uid, ids, context) and</span>
+<span class="sd">    returns a ``set`` of addons to install (addons selected by the</span>
+<span class="sd">    above methods minus addons from the *basic* set which are already</span>
+<span class="sd">    installed) [#]_ so an overloader can simply manipulate the ``set``</span>
+<span class="sd">    returned by ``ResConfigInstaller.modules_to_install`` to add or</span>
+<span class="sd">    remove addons.</span>
+
+<span class="sd">    Skipping the installer</span>
+<span class="sd">    ----------------------</span>
+
+<span class="sd">    Unless it is removed from the view, installers have a *skip*</span>
+<span class="sd">    button which invokes ``action_skip`` (and the ``cancel`` hook from</span>
+<span class="sd">    ``res.config``). Hooks and additionals *are not run* when skipping</span>
+<span class="sd">    installation, even for already installed addons.</span>
+
+<span class="sd">    Again, setup your hooks accordingly.</span>
+
+<span class="sd">    .. [#] note that since a mapping key needs to be hashable, it&#39;s</span>
+<span class="sd">           possible to use a tuple or a frozenset, but not a list or a</span>
+<span class="sd">           regular set</span>
+
+<span class="sd">    .. [#] because the already-installed modules are only pruned at</span>
+<span class="sd">           the very end of ``modules_to_install``, additionals and</span>
+<span class="sd">           hooks depending on them *are guaranteed to execute*. Setup</span>
+<span class="sd">           your hooks accordingly.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;res.config.installer&#39;</span>
+    <span class="n">_inherit</span> <span class="o">=</span> <span class="s1">&#39;res.config&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Config Installer&#39;</span>
+
+    <span class="n">_install_if</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ResConfigInstaller.already_installed">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller.already_installed">[docs]</a>
+    <span class="k">def</span> <span class="nf">already_installed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; For each module, check if it&#39;s already installed and if it</span>
+<span class="sd">        is return its name</span>
+
+<span class="sd">        :returns: a list of the already installed modules in this</span>
+<span class="sd">                  installer</span>
+<span class="sd">        :rtype: [str]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_already_installed</span><span class="p">()]</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_already_installed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; For each module (boolean fields in a res.config.installer),</span>
+<span class="sd">        check if it&#39;s already installed (either &#39;to install&#39;, &#39;to upgrade&#39;</span>
+<span class="sd">        or &#39;installed&#39;) and if it is return the module&#39;s record</span>
+
+<span class="sd">        :returns: a list of all installed modules in this installer</span>
+<span class="sd">        :rtype: recordset (collection of Record)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">selectable</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                      <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">selectable</span><span class="p">),</span>
+                            <span class="p">(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;to install&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">])])</span>
+
+<div class="viewcode-block" id="ResConfigInstaller.modules_to_install">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller.modules_to_install">[docs]</a>
+    <span class="k">def</span> <span class="nf">modules_to_install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; selects all modules to install:</span>
+
+<span class="sd">        * checked boolean fields</span>
+<span class="sd">        * return values of hook methods. Hook methods are of the form</span>
+<span class="sd">          ``_if_%(addon_name)s``, and are called if the corresponding</span>
+<span class="sd">          addon is marked for installation. They take the arguments</span>
+<span class="sd">          cr, uid, ids and context, and return an iterable of addon</span>
+<span class="sd">          names</span>
+<span class="sd">        * additionals, additionals are setup through the ``_install_if``</span>
+<span class="sd">          class variable. ``_install_if`` is a dict of {iterable:iterable}</span>
+<span class="sd">          where key and value are iterables of addon names.</span>
+
+<span class="sd">          If all the addons in the key are selected for installation</span>
+<span class="sd">          (warning: addons added through hooks don&#39;t count), then the</span>
+<span class="sd">          addons in the value are added to the set of modules to install</span>
+<span class="sd">        * not already installed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">base</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">module_name</span>
+                   <span class="k">for</span> <span class="n">installer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                   <span class="k">for</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">to_install</span> <span class="ow">in</span> <span class="n">installer</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                   <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">module_name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span> <span class="ow">and</span> <span class="n">to_install</span><span class="p">)</span>
+
+        <span class="n">hooks_results</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">base</span><span class="p">:</span>
+            <span class="n">hook</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_if_</span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">module</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">hook</span><span class="p">:</span>
+                <span class="n">hooks_results</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">hook</span><span class="p">()</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">())</span>
+
+        <span class="n">additionals</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">module</span>
+                          <span class="k">for</span> <span class="n">requirements</span><span class="p">,</span> <span class="n">consequences</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_install_if</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                          <span class="k">if</span> <span class="n">base</span><span class="o">.</span><span class="n">issuperset</span><span class="p">(</span><span class="n">requirements</span><span class="p">)</span>
+                          <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">consequences</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">base</span> <span class="o">|</span> <span class="n">hooks_results</span> <span class="o">|</span> <span class="n">additionals</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">already_installed</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="ResConfigInstaller.default_get">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller.default_get">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">default_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields_list</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39; If an addon is already installed, check it by default</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">ResConfigInstaller</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">default_get</span><span class="p">(</span><span class="n">fields_list</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">defaults</span><span class="p">,</span> <span class="o">**</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">already_installed</span><span class="p">(),</span> <span class="kc">True</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="ResConfigInstaller.fields_get">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller.fields_get">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">fields_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allfields</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attributes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; If an addon is already installed, set it to readonly as</span>
+<span class="sd">        res.config.installer doesn&#39;t handle uninstallations of already</span>
+<span class="sd">        installed addons</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fields_get</span><span class="p">(</span><span class="n">allfields</span><span class="o">=</span><span class="n">allfields</span><span class="p">,</span> <span class="n">attributes</span><span class="o">=</span><span class="n">attributes</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">already_installed</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="n">readonly</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">help</span><span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;help&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span> <span class="o">+</span>
+                     <span class="n">_</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\n</span><span class="s1">This addon is already installed on your system&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">fields</span></div>
+
+
+<div class="viewcode-block" id="ResConfigInstaller.execute">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigInstaller.execute">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">to_install</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">modules_to_install</span><span class="p">())</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Selecting addons </span><span class="si">%s</span><span class="s1"> to install&#39;</span><span class="p">,</span> <span class="n">to_install</span><span class="p">)</span>
+
+        <span class="n">IrModule</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+        <span class="n">modules</span> <span class="o">=</span> <span class="n">IrModule</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">,</span> <span class="n">to_install</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_install_modules</span><span class="p">(</span><span class="n">modules</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ResConfigSettings">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings">[docs]</a>
+<span class="k">class</span> <span class="nc">ResConfigSettings</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TransientModel</span><span class="p">,</span> <span class="n">ResConfigModuleInstallationMixin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Base configuration wizard for application settings.  It provides support for setting</span>
+<span class="sd">        default values, assigning groups to employee users, and installing modules.</span>
+<span class="sd">        To make such a &#39;settings&#39; wizard, define a model like::</span>
+
+<span class="sd">            class MyConfigWizard(models.TransientModel):</span>
+<span class="sd">                _name = &#39;my.settings&#39;</span>
+<span class="sd">                _inherit = &#39;res.config.settings&#39;</span>
+
+<span class="sd">                default_foo = fields.type(..., default_model=&#39;my.model&#39;),</span>
+<span class="sd">                group_bar = fields.Boolean(..., group=&#39;base.group_user&#39;, implied_group=&#39;my.group&#39;),</span>
+<span class="sd">                module_baz = fields.Boolean(...),</span>
+<span class="sd">                config_qux = fields.Char(..., config_parameter=&#39;my.parameter&#39;)</span>
+<span class="sd">                other_field = fields.type(...),</span>
+
+<span class="sd">        The method ``execute`` provides some support based on a naming convention:</span>
+
+<span class="sd">        *   For a field like &#39;default_XXX&#39;, ``execute`` sets the (global) default value of</span>
+<span class="sd">            the field &#39;XXX&#39; in the model named by ``default_model`` to the field&#39;s value.</span>
+
+<span class="sd">        *   For a boolean field like &#39;group_XXX&#39;, ``execute`` adds/removes &#39;implied_group&#39;</span>
+<span class="sd">            to/from the implied groups of &#39;group&#39;, depending on the field&#39;s value.</span>
+<span class="sd">            By default &#39;group&#39; is the group Employee.  Groups are given by their xml id.</span>
+<span class="sd">            The attribute &#39;group&#39; may contain several xml ids, separated by commas.</span>
+
+<span class="sd">        *   For a selection field like &#39;group_XXX&#39; composed of 2 string values (&#39;0&#39; and &#39;1&#39;),</span>
+<span class="sd">            ``execute`` adds/removes &#39;implied_group&#39; to/from the implied groups of &#39;group&#39;,</span>
+<span class="sd">            depending on the field&#39;s value.</span>
+<span class="sd">            By default &#39;group&#39; is the group Employee.  Groups are given by their xml id.</span>
+<span class="sd">            The attribute &#39;group&#39; may contain several xml ids, separated by commas.</span>
+
+<span class="sd">        *   For a boolean field like &#39;module_XXX&#39;, ``execute`` triggers the immediate</span>
+<span class="sd">            installation of the module named &#39;XXX&#39; if the field has value ``True``.</span>
+
+<span class="sd">        *   For a selection field like &#39;module_XXX&#39; composed of 2 string values (&#39;0&#39; and &#39;1&#39;),</span>
+<span class="sd">            ``execute`` triggers the immediate installation of the module named &#39;XXX&#39;</span>
+<span class="sd">            if the field has the value ``&#39;1&#39;``.</span>
+
+<span class="sd">        *   For a field with no specific prefix BUT an attribute &#39;config_parameter&#39;,</span>
+<span class="sd">            ``execute``` will save its value in an ir.config.parameter (global setting for the</span>
+<span class="sd">            database).</span>
+
+<span class="sd">        *   For the other fields, the method ``execute`` invokes `set_values`.</span>
+<span class="sd">            Override it to implement the effect of those fields.</span>
+
+<span class="sd">        The method ``default_get`` retrieves values that reflect the current status of the</span>
+<span class="sd">        fields like &#39;default_XXX&#39;, &#39;group_XXX&#39;, &#39;module_XXX&#39; and config_XXX.</span>
+<span class="sd">        It also invokes all methods with a name that starts with &#39;get_default_&#39;;</span>
+<span class="sd">        such methods can be defined to provide current values for other fields.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_name</span> <span class="o">=</span> <span class="s1">&#39;res.config.settings&#39;</span>
+    <span class="n">_description</span> <span class="o">=</span> <span class="s1">&#39;Config Settings&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_valid_field_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;default_model&#39;</span><span class="p">,</span> <span class="s1">&#39;config_parameter&#39;</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="s1">&#39;implied_group&#39;</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_valid_field_parameter</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="ResConfigSettings.copy">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.copy">[docs]</a>
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Cannot duplicate configuration!&quot;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.onchange_module">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.onchange_module">[docs]</a>
+    <span class="k">def</span> <span class="nf">onchange_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_value</span><span class="p">,</span> <span class="n">module_name</span><span class="p">):</span>
+        <span class="n">module_sudo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">module_name</span><span class="p">[</span><span class="mi">7</span><span class="p">:])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">int</span><span class="p">(</span><span class="n">field_value</span><span class="p">)</span> <span class="ow">and</span> <span class="n">module_sudo</span><span class="o">.</span><span class="n">state</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;to install&#39;</span><span class="p">,</span> <span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">):</span>
+            <span class="n">deps</span> <span class="o">=</span> <span class="n">module_sudo</span><span class="o">.</span><span class="n">downstream_dependencies</span><span class="p">()</span>
+            <span class="n">dep_names</span> <span class="o">=</span> <span class="p">(</span><span class="n">deps</span> <span class="o">|</span> <span class="n">module_sudo</span><span class="p">)</span><span class="o">.</span><span class="n">mapped</span><span class="p">(</span><span class="s1">&#39;shortdesc&#39;</span><span class="p">)</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dep_names</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="s1">&#39;warning&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Warning!&#39;</span><span class="p">),</span>
+                    <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Disabling this option will also uninstall the following modules </span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">message</span><span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_register_hook</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add an onchange method for each module field. &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">make_method</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">onchange_module</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">name</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;module_&#39;</span><span class="p">):</span>
+                <span class="n">method</span> <span class="o">=</span> <span class="n">make_method</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_onchange_methods</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">_get_classified_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fnames</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; return a dictionary with the fields classified by category::</span>
+
+<span class="sd">                {   &#39;default&#39;: [(&#39;default_foo&#39;, &#39;model&#39;, &#39;foo&#39;), ...],</span>
+<span class="sd">                    &#39;group&#39;:   [(&#39;group_bar&#39;, [browse_group], browse_implied_group), ...],</span>
+<span class="sd">                    &#39;module&#39;:  [(&#39;module_baz&#39;, browse_module), ...],</span>
+<span class="sd">                    &#39;config&#39;:  [(&#39;config_qux&#39;, &#39;my.parameter&#39;), ...],</span>
+<span class="sd">                    &#39;other&#39;:   [&#39;other_field&#39;, ...],</span>
+<span class="sd">                }</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">IrModule</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.module.module&#39;</span><span class="p">]</span>
+        <span class="n">IrModelData</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.model.data&#39;</span><span class="p">]</span>
+        <span class="n">Groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.groups&#39;</span><span class="p">]</span>
+
+        <span class="k">def</span> <span class="nf">ref</span><span class="p">(</span><span class="n">xml_id</span><span class="p">):</span>
+            <span class="n">res_model</span><span class="p">,</span> <span class="n">res_id</span> <span class="o">=</span> <span class="n">IrModelData</span><span class="o">.</span><span class="n">_xmlid_to_res_model_res_id</span><span class="p">(</span><span class="n">xml_id</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">res_model</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">res_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">fnames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">fnames</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+        <span class="n">defaults</span><span class="p">,</span> <span class="n">groups</span><span class="p">,</span> <span class="n">configs</span><span class="p">,</span> <span class="n">others</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="n">modules</span> <span class="o">=</span> <span class="n">IrModule</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">fnames</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;default_&#39;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;default_model&#39;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Field </span><span class="si">%s</span><span class="s2"> without attribute &#39;default_model&#39;&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="n">defaults</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">default_model</span><span class="p">,</span> <span class="n">name</span><span class="p">[</span><span class="mi">8</span><span class="p">:]))</span>
+            <span class="k">elif</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;group_&#39;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Field </span><span class="si">%s</span><span class="s2"> must have type &#39;boolean&#39; or &#39;selection&#39;&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;implied_group&#39;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Field </span><span class="si">%s</span><span class="s2"> without attribute &#39;implied_group&#39;&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="n">field_group_xmlids</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+                <span class="n">field_groups</span> <span class="o">=</span> <span class="n">Groups</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">ref</span><span class="p">(</span><span class="n">it</span><span class="p">)</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">field_group_xmlids</span><span class="p">))</span>
+                <span class="n">groups</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">field_groups</span><span class="p">,</span> <span class="n">ref</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">implied_group</span><span class="p">)))</span>
+            <span class="k">elif</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;module_&#39;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Field </span><span class="si">%s</span><span class="s2"> must have type &#39;boolean&#39; or &#39;selection&#39;&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="n">modules</span> <span class="o">+=</span> <span class="n">IrModule</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">name</span><span class="p">[</span><span class="mi">7</span><span class="p">:])</span>
+            <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s1">&#39;config_parameter&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">config_parameter</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;boolean&#39;</span><span class="p">,</span> <span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="s1">&#39;char&#39;</span><span class="p">,</span> <span class="s1">&#39;selection&#39;</span><span class="p">,</span> <span class="s1">&#39;many2one&#39;</span><span class="p">,</span> <span class="s1">&#39;datetime&#39;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Field </span><span class="si">%s</span><span class="s2"> must have type &#39;boolean&#39;, &#39;integer&#39;, &#39;float&#39;, &#39;char&#39;, &#39;selection&#39;, &#39;many2one&#39; or &#39;datetime&#39;&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="n">configs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">config_parameter</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">others</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="n">defaults</span><span class="p">,</span> <span class="s1">&#39;group&#39;</span><span class="p">:</span> <span class="n">groups</span><span class="p">,</span> <span class="s1">&#39;module&#39;</span><span class="p">:</span> <span class="n">modules</span><span class="p">,</span> <span class="s1">&#39;config&#39;</span><span class="p">:</span> <span class="n">configs</span><span class="p">,</span> <span class="s1">&#39;other&#39;</span><span class="p">:</span> <span class="n">others</span><span class="p">}</span>
+
+<div class="viewcode-block" id="ResConfigSettings.get_values">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.get_values">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return values for the fields other that `default`, `group` and `module`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.default_get">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.default_get">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">default_get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">default_get</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">fields</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">res</span>
+
+        <span class="n">IrDefault</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.default&#39;</span><span class="p">]</span>
+        <span class="n">IrConfigParameter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="n">classified</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_classified_fields</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+
+        <span class="c1"># defaults: take the corresponding default value they set</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">IrDefault</span><span class="o">.</span><span class="n">_get</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="c1"># groups: which groups are implied by the group Employee</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">groups</span><span class="p">,</span> <span class="n">implied_group</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;group&#39;</span><span class="p">]:</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="n">implied_group</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">implied_ids</span> <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;selection&#39;</span><span class="p">:</span>
+                <span class="n">res</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="n">name</span><span class="p">]))</span>     <span class="c1"># True, False -&gt; &#39;1&#39;, &#39;0&#39;</span>
+
+        <span class="c1"># modules: which modules are installed/to install</span>
+        <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">]:</span>
+            <span class="n">res</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;module_</span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">state</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to install&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">)</span>
+
+        <span class="c1"># config: get &amp; convert stored ir.config_parameter (or default)</span>
+        <span class="n">WARNING_MESSAGE</span> <span class="o">=</span> <span class="s2">&quot;Error when converting value </span><span class="si">%r</span><span class="s2"> of field </span><span class="si">%s</span><span class="s2"> for ir.config.parameter </span><span class="si">%r</span><span class="s2">&quot;</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">icp</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">IrConfigParameter</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="n">icp</span><span class="p">,</span> <span class="n">field</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">default</span> <span class="k">else</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># Special case when value is the id of a deleted record, we do not want to</span>
+                        <span class="c1"># block the settings screen</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">comodel_name</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span><span class="o">.</span><span class="n">id</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">WARNING_MESSAGE</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">icp</span><span class="p">)</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;integer&#39;</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">WARNING_MESSAGE</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">icp</span><span class="p">)</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;float&#39;</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">WARNING_MESSAGE</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">icp</span><span class="p">)</span>
+                        <span class="n">value</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;boolean&#39;</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="n">res</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_values</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.set_values">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.set_values">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set values for the fields other that `default`, `group` and `module`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">classified</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_classified_fields</span><span class="p">()</span>
+        <span class="n">current_settings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_get</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields_get</span><span class="p">()))</span>
+
+        <span class="c1"># default values fields</span>
+        <span class="n">IrDefault</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.default&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">models</span><span class="o">.</span><span class="n">BaseModel</span><span class="p">):</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">id</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">ids</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">current_settings</span> <span class="ow">or</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">current_settings</span><span class="p">[</span><span class="n">name</span><span class="p">]:</span>
+                <span class="n">IrDefault</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="c1"># group fields: modify group / implied groups</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">groups</span><span class="p">,</span> <span class="n">implied_group</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">classified</span><span class="p">[</span><span class="s1">&#39;group&#39;</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="p">[</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">]]):</span>
+            <span class="n">groups</span> <span class="o">=</span> <span class="n">groups</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+            <span class="n">implied_group</span> <span class="o">=</span> <span class="n">implied_group</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">==</span> <span class="n">current_settings</span><span class="p">[</span><span class="n">name</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]):</span>
+                <span class="n">groups</span><span class="o">.</span><span class="n">_apply_group</span><span class="p">(</span><span class="n">implied_group</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">groups</span><span class="o">.</span><span class="n">_remove_group</span><span class="p">(</span><span class="n">implied_group</span><span class="p">)</span>
+
+        <span class="c1"># config fields: store ir.config_parameters</span>
+        <span class="n">IrConfigParameter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">icp</span> <span class="ow">in</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">current_value</span> <span class="o">=</span> <span class="n">IrConfigParameter</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="n">icp</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;char&#39;</span><span class="p">:</span>
+                <span class="c1"># storing developer keys as ir.config_parameter may lead to nasty</span>
+                <span class="c1"># bugs when users leave spaces around them</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;integer&#39;</span><span class="p">,</span> <span class="s1">&#39;float&#39;</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="k">else</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">field</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;many2one&#39;</span><span class="p">:</span>
+                <span class="c1"># value is a (possibly empty) recordset</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">id</span>
+
+            <span class="k">if</span> <span class="n">current_value</span> <span class="o">==</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">or</span> <span class="n">current_value</span> <span class="o">==</span> <span class="n">value</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">IrConfigParameter</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="n">icp</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.execute">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.execute">[docs]</a>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called when settings are saved.</span>
+
+<span class="sd">        This method will call `set_values` and will install/uninstall any modules defined by</span>
+<span class="sd">        `module_` Boolean fields and then trigger a web client reload.</span>
+
+<span class="sd">        .. warning::</span>
+
+<span class="sd">            This method **SHOULD NOT** be overridden, in most cases what you want to override is</span>
+<span class="sd">            `~set_values()` since `~execute()` does little more than simply call `~set_values()`.</span>
+
+<span class="sd">            The part that installs/uninstalls modules **MUST ALWAYS** be at the end of the</span>
+<span class="sd">            transaction, otherwise there&#39;s a big risk of registry &lt;-&gt; database desynchronisation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_one</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">is_admin</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">AccessError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s2">&quot;Only administrators can change the settings&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">classified</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_classified_fields</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_values</span><span class="p">()</span>
+
+        <span class="c1"># module fields: install/uninstall the selected modules</span>
+        <span class="n">to_install</span> <span class="o">=</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="bp">self</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;module_</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">m</span><span class="o">.</span><span class="n">state</span> <span class="o">!=</span> <span class="s1">&#39;installed&#39;</span><span class="p">)</span>
+        <span class="n">to_uninstall</span> <span class="o">=</span> <span class="n">classified</span><span class="p">[</span><span class="s1">&#39;module&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">filtered</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;module_</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">m</span><span class="o">.</span><span class="n">state</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;installed&#39;</span><span class="p">,</span> <span class="s1">&#39;to upgrade&#39;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">to_install</span> <span class="ow">or</span> <span class="n">to_uninstall</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">flush_all</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">to_uninstall</span><span class="p">:</span>
+            <span class="n">to_uninstall</span><span class="o">.</span><span class="n">button_immediate_uninstall</span><span class="p">()</span>
+
+        <span class="n">installation_status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_install_modules</span><span class="p">(</span><span class="n">to_install</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">installation_status</span> <span class="ow">or</span> <span class="n">to_uninstall</span><span class="p">:</span>
+            <span class="c1"># After the uninstall/install calls, the registry and environments</span>
+            <span class="c1"># are no longer valid. So we reset the environment.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+
+        <span class="c1"># pylint: disable=next-method-called</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.config&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">next</span><span class="p">()</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;ir.actions.act_window_close&#39;</span><span class="p">,):</span>
+            <span class="k">return</span> <span class="n">config</span>
+
+        <span class="c1"># force client-side reload (update user menu and current view)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ir.actions.client&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tag&#39;</span><span class="p">:</span> <span class="s1">&#39;reload&#39;</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.cancel">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.cancel">[docs]</a>
+    <span class="k">def</span> <span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># ignore the current record, and send the action to reopen the view</span>
+        <span class="n">actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">actions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">actions</span><span class="o">.</span><span class="n">read</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compute_display_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Override display_name method to return an appropriate configuration wizard</span>
+<span class="sd">        name, and not the generated name.&quot;&quot;&quot;</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.actions.act_window&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;res_model&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">display_name</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+
+<div class="viewcode-block" id="ResConfigSettings.get_option_path">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.get_option_path">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_option_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">menu_xml_id</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetch the path to a specified configuration view and the action id to access it.</span>
+
+<span class="sd">        :param string menu_xml_id: the xml id of the menuitem where the view is located,</span>
+<span class="sd">            structured as follows: module_name.menuitem_xml_id (e.g.: &quot;sales_team.menu_sale_config&quot;)</span>
+<span class="sd">        :return tuple:</span>
+<span class="sd">            - t[0]: string: full path to the menuitem (e.g.: &quot;Settings/Configuration/Sales&quot;)</span>
+<span class="sd">            - t[1]: int or long: id of the menuitem&#39;s action</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ir_ui_menu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">menu_xml_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">ir_ui_menu</span><span class="o">.</span><span class="n">complete_name</span><span class="p">,</span> <span class="n">ir_ui_menu</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.get_option_name">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.get_option_name">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_option_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">full_field_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetch the human readable name of a specified configuration option.</span>
+
+<span class="sd">        :param string full_field_name: the full name of the field, structured as follows:</span>
+<span class="sd">            model_name.field_name (e.g.: &quot;sale.config.settings.fetchmail_lead&quot;)</span>
+<span class="sd">        :return string: human readable name of the field (e.g.: &quot;Create leads from incoming mails&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">model_name</span><span class="p">,</span> <span class="n">field_name</span> <span class="o">=</span> <span class="n">full_field_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span><span class="o">.</span><span class="n">fields_get</span><span class="p">([</span><span class="n">field_name</span><span class="p">])[</span><span class="n">field_name</span><span class="p">][</span><span class="s1">&#39;string&#39;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.get_config_warning">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.get_config_warning">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model</span>
+    <span class="k">def</span> <span class="nf">get_config_warning</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper: return a Warning exception with the given message where the %(field:xxx)s</span>
+<span class="sd">        and/or %(menu:yyy)s are replaced by the human readable field&#39;s name and/or menuitem&#39;s</span>
+<span class="sd">        full path.</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">        ------</span>
+<span class="sd">        Just include in your error message %(field:model_name.field_name)s to obtain the human</span>
+<span class="sd">        readable field&#39;s name, and/or %(menu:module_name.menuitem_xml_id)s to obtain the menuitem&#39;s</span>
+<span class="sd">        full path.</span>
+
+<span class="sd">        Example of use:</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        from odoo.addons.base.models.res_config import get_warning_config</span>
+<span class="sd">        raise get_warning_config(cr, _(&quot;Error: this action is prohibited. You should check the field %(field:sale.config.settings.fetchmail_lead)s in %(menu:sales_team.menu_sale_config)s.&quot;), context=context)</span>
+
+<span class="sd">        This will return an exception containing the following message:</span>
+<span class="sd">            Error: this action is prohibited. You should check the field Create leads from incoming mails in Settings/Configuration/Sales.</span>
+
+<span class="sd">        What if there is another substitution in the message already?</span>
+<span class="sd">        -------------------------------------------------------------</span>
+<span class="sd">        You could have a situation where the error message you want to upgrade already contains a substitution. Example:</span>
+<span class="sd">            Cannot find any account journal of %s type for this company.\n\nYou can create one in the menu: \nConfiguration\\Journals\\Journals.</span>
+<span class="sd">        What you want to do here is simply to replace the path by %menu:account.menu_account_config)s, and leave the rest alone.</span>
+<span class="sd">        In order to do that, you can use the double percent (%%) to escape your new substitution, like so:</span>
+<span class="sd">            Cannot find any account journal of %s type for this company.\n\nYou can create one in the %%(menu:account.menu_account_config)s.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span>
+
+        <span class="c1"># Process the message</span>
+        <span class="c1"># 1/ find the menu and/or field references, put them in a list</span>
+        <span class="n">regex_path</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;%\(((?:menu|field):[a-z_\.]*)\)s&#39;</span>
+        <span class="n">references</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">regex_path</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+
+        <span class="c1"># 2/ fetch the menu and/or field replacement values (full path and</span>
+        <span class="c1">#    human readable field&#39;s name) and the action_id if any</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">action_id</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">references</span><span class="p">:</span>
+            <span class="n">ref_type</span><span class="p">,</span> <span class="n">ref</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ref_type</span> <span class="o">==</span> <span class="s1">&#39;menu&#39;</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">item</span><span class="p">],</span> <span class="n">action_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_option_path</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">ref_type</span> <span class="o">==</span> <span class="s1">&#39;field&#39;</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_option_name</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+
+        <span class="c1"># 3/ substitute and return the result</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">action_id</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">RedirectWarning</span><span class="p">(</span><span class="n">msg</span> <span class="o">%</span> <span class="n">values</span><span class="p">,</span> <span class="n">action_id</span><span class="p">,</span> <span class="n">_</span><span class="p">(</span><span class="s1">&#39;Go to the configuration panel&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">UserError</span><span class="p">(</span><span class="n">msg</span> <span class="o">%</span> <span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.create">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.create">[docs]</a>
+    <span class="nd">@api</span><span class="o">.</span><span class="n">model_create_multi</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals_list</span><span class="p">):</span>
+        <span class="c1"># Optimisation: saving a res.config.settings even without changing any</span>
+        <span class="c1"># values will trigger the write of all related values. This in turn may</span>
+        <span class="c1"># trigger chain of further recomputation. To avoid it, delete values</span>
+        <span class="c1"># that were not changed.</span>
+        <span class="k">for</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">vals_list</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">vals</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">related</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">field</span><span class="o">.</span><span class="n">readonly</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="c1"># we write on a related field like</span>
+                <span class="c1"># qr_code = fields.Boolean(related=&#39;company_id.qr_code&#39;, readonly=False)</span>
+                <span class="n">fname0</span><span class="p">,</span> <span class="o">*</span><span class="n">fnames</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">related</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">fname0</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="c1"># determine the current value</span>
+                <span class="n">field0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">[</span><span class="n">fname0</span><span class="p">]</span>
+                <span class="n">old_value</span> <span class="o">=</span> <span class="n">field0</span><span class="o">.</span><span class="n">convert_to_record</span><span class="p">(</span>
+                    <span class="n">field0</span><span class="o">.</span><span class="n">convert_to_cache</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">fname0</span><span class="p">],</span> <span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">fnames</span><span class="p">:</span>
+                    <span class="n">old_value</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">old_value</span><span class="p">),</span> <span class="n">old_value</span><span class="p">)[</span><span class="n">fname</span><span class="p">]</span>
+
+                <span class="c1"># determine the new value</span>
+                <span class="n">new_value</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">convert_to_record</span><span class="p">(</span>
+                    <span class="n">field</span><span class="o">.</span><span class="n">convert_to_cache</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">],</span> <span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
+
+                <span class="c1"># drop if the value is the same</span>
+                <span class="k">if</span> <span class="n">old_value</span> <span class="o">==</span> <span class="n">new_value</span><span class="p">:</span>
+                    <span class="n">vals</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">vals_list</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResConfigSettings.action_open_template_user">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.models.html#odoo.addons.base.models.res_config.ResConfigSettings.action_open_template_user">[docs]</a>
+    <span class="k">def</span> <span class="nf">action_open_template_user</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s2">&quot;ir.actions.actions&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">_for_xml_id</span><span class="p">(</span><span class="s2">&quot;base.action_res_users&quot;</span><span class="p">)</span>
+        <span class="n">template_user_id</span> <span class="o">=</span> <span class="n">literal_eval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;base.template_portal_user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">))</span>
+        <span class="n">template_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="n">template_user_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">template_user</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">UserError</span><span class="p">(</span><span class="n">_</span><span class="p">(</span><span class="s1">&#39;Invalid template user. It seems it has been deleted.&#39;</span><span class="p">))</span>
+        <span class="n">action</span><span class="p">[</span><span class="s1">&#39;res_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">template_user_id</span>
+        <span class="n">action</span><span class="p">[</span><span class="s1">&#39;views&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[[</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.view_users_form&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;form&#39;</span><span class="p">]]</span>
+        <span class="k">return</span> <span class="n">action</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

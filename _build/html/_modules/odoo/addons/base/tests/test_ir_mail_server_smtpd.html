@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_ir_mail_server_smtpd &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_ir_mail_server_smtpd</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_ir_mail_server_smtpd</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">smtplib</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+<span class="kn">import</span> <span class="nn">ssl</span>
+<span class="kn">import</span> <span class="nn">unittest</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">base64</span> <span class="kn">import</span> <span class="n">b64encode</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">getaddrinfo</span>  <span class="c1"># keep a reference on the non-patched function</span>
+
+<span class="kn">from</span> <span class="nn">odoo.exceptions</span> <span class="kn">import</span> <span class="n">UserError</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">mute_logger</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">TransactionCaseWithUserDemo</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">aiosmtpd</span>
+    <span class="kn">import</span> <span class="nn">aiosmtpd.controller</span>
+    <span class="kn">import</span> <span class="nn">aiosmtpd.smtp</span>
+    <span class="kn">import</span> <span class="nn">aiosmtpd.handlers</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">aiosmtpd</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="n">PASSWORD</span> <span class="o">=</span> <span class="s1">&#39;secretpassword&#39;</span>
+<span class="n">_openssl</span> <span class="o">=</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s1">&#39;openssl&#39;</span><span class="p">)</span>
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_find_free_local_address</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Get a triple (family, address, port) on which it possible to bind</span>
+<span class="sd">    a local tcp service. &quot;&quot;&quot;</span>
+    <span class="n">addr</span> <span class="o">=</span> <span class="n">aiosmtpd</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">get_localhost</span><span class="p">()</span>  <span class="c1"># it returns 127.0.0.1 or ::1</span>
+    <span class="n">family</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">AF_INET</span> <span class="k">if</span> <span class="n">addr</span> <span class="o">==</span> <span class="s1">&#39;127.0.0.1&#39;</span> <span class="k">else</span> <span class="n">socket</span><span class="o">.</span><span class="n">AF_INET6</span>
+    <span class="k">with</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="n">family</span><span class="p">,</span> <span class="n">socket</span><span class="o">.</span><span class="n">SOCK_STREAM</span><span class="p">)</span> <span class="k">as</span> <span class="n">sock</span><span class="p">:</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">addr</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="n">sock</span><span class="o">.</span><span class="n">getsockname</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">family</span><span class="p">,</span> <span class="n">addr</span><span class="p">,</span> <span class="n">port</span>
+
+
+<span class="k">def</span> <span class="nf">_smtp_authenticate</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="n">enveloppe</span><span class="p">,</span> <span class="n">mechanism</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Callback method used by aiosmtpd to validate a login/password pair. &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">aiosmtpd</span><span class="o">.</span><span class="n">smtp</span><span class="o">.</span><span class="n">AuthResult</span><span class="p">(</span><span class="n">success</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">password</span> <span class="o">==</span> <span class="n">PASSWORD</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;AUTH </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;successfull&quot;</span> <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span> <span class="k">else</span> <span class="s2">&quot;failed&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="Certificate">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.Certificate">[docs]</a>
+<span class="k">class</span> <span class="nc">Certificate</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">cert</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">key</span> <span class="ow">and</span> <span class="n">Path</span><span class="p">(</span><span class="n">file_path</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="s1">&#39;.pem&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cert</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">file_path</span><span class="p">(</span><span class="n">cert</span><span class="p">,</span> <span class="n">filter_ext</span><span class="o">=</span><span class="s1">&#39;.pem&#39;</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Certificate(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">key</span><span class="si">=}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cert</span><span class="si">=}</span><span class="s2">)&quot;</span></div>
+
+
+
+<span class="c1"># skip when optional dependencies are not found</span>
+<div class="viewcode-block" id="TestIrMailServerSMTPD">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD">[docs]</a>
+<span class="nd">@unittest</span><span class="o">.</span><span class="n">skipUnless</span><span class="p">(</span><span class="n">aiosmtpd</span><span class="p">,</span> <span class="s2">&quot;aiosmtpd couldn&#39;t be imported&quot;</span><span class="p">)</span>
+<span class="nd">@unittest</span><span class="o">.</span><span class="n">skipUnless</span><span class="p">(</span><span class="n">_openssl</span><span class="p">,</span> <span class="s2">&quot;openssl not found in path&quot;</span><span class="p">)</span>
+<span class="c1"># fail fast for timeout errors</span>
+<span class="nd">@patch</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_mail_server.SMTP_TIMEOUT&#39;</span><span class="p">,</span> <span class="mf">.1</span><span class="p">)</span>
+<span class="c1"># prevent the CLI from interfering with the tests</span>
+<span class="nd">@patch</span><span class="o">.</span><span class="n">dict</span><span class="p">(</span><span class="s1">&#39;odoo.tools.config.options&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;smtp_server&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">})</span>
+<span class="k">class</span> <span class="nc">TestIrMailServerSMTPD</span><span class="p">(</span><span class="n">TransactionCaseWithUserDemo</span><span class="p">):</span>
+<div class="viewcode-block" id="TestIrMailServerSMTPD.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="c1"># aiosmtpd emits deprecation warnings because it uses its own</span>
+        <span class="c1"># deprecated features, mute those logs.</span>
+        <span class="c1"># https://github.com/aio-libs/aiosmtpd/issues/347</span>
+        <span class="k">class</span> <span class="nc">Session</span><span class="p">(</span><span class="n">aiosmtpd</span><span class="o">.</span><span class="n">smtp</span><span class="o">.</span><span class="n">Session</span><span class="p">):</span>
+            <span class="nd">@property</span>
+            <span class="k">def</span> <span class="nf">login_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_login_data</span>
+            <span class="nd">@login_data</span><span class="o">.</span><span class="n">setter</span>
+            <span class="k">def</span> <span class="nf">login_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_login_data</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">patcher</span> <span class="o">=</span> <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;aiosmtpd.smtp.Session&#39;</span><span class="p">,</span> <span class="n">Session</span><span class="p">)</span>
+        <span class="n">patcher</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">addClassCleanup</span><span class="p">(</span><span class="n">patcher</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+
+        <span class="c1"># aiosmtpd emits warnings for some unusual configuration, like</span>
+        <span class="c1"># requiring AUTH on a clear-text transport. Mute those logs</span>
+        <span class="c1"># since we also test those unusual configurations.</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span>
+            <span class="s1">&#39;ignore&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;Requiring AUTH while not requiring TLS can lead to security vulnerabilities!&quot;</span><span class="p">,</span>
+            <span class="n">category</span><span class="o">=</span><span class="ne">UserWarning</span>
+        <span class="p">)</span>
+        <span class="k">class</span> <span class="nc">CustomFilter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Filter</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span> <span class="o">==</span> <span class="s2">&quot;auth_required == True but auth_require_tls == False&quot;</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span> <span class="o">==</span> <span class="s2">&quot;tls_context.verify_mode not in {CERT_NONE, CERT_OPTIONAL}; this might cause client connection problems&quot;</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;mail.log&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">addFilter</span><span class="p">(</span><span class="n">CustomFilter</span><span class="p">())</span>
+
+        <span class="c1"># decrease aiosmtpd verbosity, odoo INFO = aiosmtpd WARNING</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;mail.log&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">_logger</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="c1"># Get various TLS keys and certificates. CA was used to sign</span>
+        <span class="c1"># both client and server. self_signed is... self signed.</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">ssl_ca</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ssl_client</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ssl_server</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ssl_self_signed</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">Certificate</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;base/tests/ssl/ca.cert.pem&#39;</span><span class="p">),</span>
+            <span class="n">Certificate</span><span class="p">(</span><span class="s1">&#39;base/tests/ssl/client.key.pem&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;base/tests/ssl/client.cert.pem&#39;</span><span class="p">),</span>
+            <span class="n">Certificate</span><span class="p">(</span><span class="s1">&#39;base/tests/ssl/server.key.pem&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;base/tests/ssl/server.cert.pem&#39;</span><span class="p">),</span>
+            <span class="n">Certificate</span><span class="p">(</span><span class="s1">&#39;base/tests/ssl/self_signed.key.pem&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;base/tests/ssl/self_signed.cert.pem&#39;</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="c1"># Patch the two SMTP client classes into trusting the above CA</span>
+        <span class="k">class</span> <span class="nc">TEST_SMTP</span><span class="p">(</span><span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">starttls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">_create_stdlib_context</span><span class="p">()</span>  <span class="c1"># what SMTP_SSL does</span>
+                    <span class="c1"># context = ssl.create_default_context()  # what it should do</span>
+                <span class="n">context</span><span class="o">.</span><span class="n">load_verify_locations</span><span class="p">(</span><span class="n">cafile</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">ssl_ca</span><span class="o">.</span><span class="n">cert</span><span class="p">))</span>
+                <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">starttls</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="n">context</span><span class="p">)</span>
+        <span class="k">class</span> <span class="nc">TEST_SMTP_SSL</span><span class="p">(</span><span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP_SSL</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">_get_socket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="c1"># self.context = ssl.create_default_context()  # what it should do</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">load_verify_locations</span><span class="p">(</span><span class="n">cafile</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">ssl_ca</span><span class="o">.</span><span class="n">cert</span><span class="p">))</span>
+                <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_socket</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">patcher</span> <span class="o">=</span> <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;smtplib.SMTP&#39;</span><span class="p">,</span> <span class="n">TEST_SMTP</span><span class="p">)</span>
+        <span class="n">patcher</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">addClassCleanup</span><span class="p">(</span><span class="n">patcher</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+        <span class="n">patcher</span> <span class="o">=</span> <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;smtplib.SMTP_SSL&#39;</span><span class="p">,</span> <span class="n">TEST_SMTP_SSL</span><span class="p">)</span>
+        <span class="n">patcher</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">addClassCleanup</span><span class="p">(</span><span class="n">patcher</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+
+        <span class="c1"># reactivate sending emails during this test suite, make sure</span>
+        <span class="c1"># NOT TO send emails using another ir.mail_server than the one</span>
+        <span class="c1"># created in setUp!</span>
+        <span class="n">patcher</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">],</span> <span class="s1">&#39;_is_test_mode&#39;</span><span class="p">)</span>
+        <span class="n">mock</span> <span class="o">=</span> <span class="n">patcher</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="n">mock</span><span class="o">.</span><span class="n">return_value</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">addClassCleanup</span><span class="p">(</span><span class="n">patcher</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+
+        <span class="c1"># fix runbot, docker uses a single ipv4 stack but it gives ::1</span>
+        <span class="c1"># when resolving &quot;localhost&quot; (so stupid), use the following to</span>
+        <span class="c1"># force aiosmtpd/odoo to bind/connect to a fixed ipv4 OR ipv6</span>
+        <span class="c1"># address.</span>
+        <span class="n">family</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">_find_free_local_address</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">localhost</span> <span class="o">=</span> <span class="n">getaddrinfo</span><span class="p">(</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">family</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">startClassPatcher</span><span class="p">(</span><span class="n">patch</span><span class="p">(</span><span class="s1">&#39;socket.getaddrinfo&#39;</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">getaddrinfo</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.getaddrinfo">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.getaddrinfo">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">getaddrinfo</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Resolve both &quot;localhost&quot; and &quot;notlocalhost&quot; on the ip address</span>
+<span class="sd">        bound by aiosmtpd inside `start_smtpd`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">host</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span> <span class="s1">&#39;notlocalhost&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">port</span> <span class="o">==</span> <span class="bp">cls</span><span class="o">.</span><span class="n">port</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">localhost</span>
+        <span class="k">return</span> <span class="n">getaddrinfo</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">family</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">proto</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.start_smtpd">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.start_smtpd">[docs]</a>
+    <span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+    <span class="k">def</span> <span class="nf">start_smtpd</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">encryption</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">auth_required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stop_on_cleanup</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start a smtp daemon in a background thread, stop it upon exiting</span>
+<span class="sd">        the context manager.</span>
+
+<span class="sd">        :param encryption: &#39;none&#39;, &#39;ssl&#39; or &#39;starttls&#39;, the kind of</span>
+<span class="sd">            server to start.</span>
+<span class="sd">        :param ssl_context: the ``ssl.SSLContext`` object to use with</span>
+<span class="sd">            &#39;ssl&#39; or &#39;starttls&#39;.</span>
+<span class="sd">        :param auth_required: whether the server enforces password</span>
+<span class="sd">            authentication or not.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">encryption</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;starttls&#39;</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">encryption</span> <span class="o">==</span> <span class="s1">&#39;none&#39;</span> <span class="ow">or</span> <span class="n">ssl_context</span>
+
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">encryption</span> <span class="o">==</span> <span class="s1">&#39;starttls&#39;</span><span class="p">:</span>
+            <span class="c1"># for aiosmtpd.smtp.SMTP</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;require_starttls&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s1">&#39;tls_context&#39;</span><span class="p">:</span> <span class="n">ssl_context</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">elif</span> <span class="n">encryption</span> <span class="o">==</span> <span class="s1">&#39;ssl&#39;</span><span class="p">:</span>
+            <span class="c1"># for aiosmtpd.controller.InetMixin</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;ssl_context&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ssl_context</span>
+        <span class="k">if</span> <span class="n">auth_required</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;authenticator&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_smtp_authenticate</span>
+
+        <span class="n">smtpd_thread</span> <span class="o">=</span> <span class="n">aiosmtpd</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">Controller</span><span class="p">(</span>
+            <span class="n">aiosmtpd</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">Debugging</span><span class="p">(),</span>
+            <span class="n">hostname</span><span class="o">=</span><span class="n">aiosmtpd</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">get_localhost</span><span class="p">(),</span>
+            <span class="n">server_hostname</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="n">port</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="n">auth_required</span><span class="o">=</span><span class="n">auth_required</span><span class="p">,</span>
+            <span class="n">auth_require_tls</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">enable_SMTPUTF8</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">smtpd_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+            <span class="k">yield</span> <span class="n">smtpd_thread</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">smtpd_thread</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.test_authentication_certificate_matrix">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.test_authentication_certificate_matrix">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;mail.log&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_authentication_certificate_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Connect to a server that is authenticating users via a TLS</span>
+<span class="sd">        certificate. Test the various possible configurations (missing</span>
+<span class="sd">        cert, invalid cert and valid cert) against both a STARTTLS and</span>
+<span class="sd">        a SSL/TLS SMTP server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test smtpd&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_port&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="s1">&#39;login&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_user&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_pass&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
+        <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">cert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_verify_locations</span><span class="p">(</span><span class="n">cafile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_ca</span><span class="o">.</span><span class="n">cert</span><span class="p">)</span>
+        <span class="n">ssl_context</span><span class="o">.</span><span class="n">verify_mode</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">CERT_REQUIRED</span>
+
+        <span class="n">self_signed_key</span> <span class="o">=</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_self_signed</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span>
+        <span class="n">self_signed_cert</span> <span class="o">=</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_self_signed</span><span class="o">.</span><span class="n">cert</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span>
+        <span class="n">client_key</span> <span class="o">=</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_client</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span>
+        <span class="n">client_cert</span> <span class="o">=</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_client</span><span class="o">.</span><span class="n">cert</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># authentication, name, certificate, private key, error pattern</span>
+            <span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s2">&quot;missing&quot;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server has closed the connection unexpectedly\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check configuration served on this port number\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Connection unexpectedly closed&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;certificate&#39;</span><span class="p">,</span> <span class="s2">&quot;self signed&quot;</span><span class="p">,</span> <span class="n">self_signed_cert</span><span class="p">,</span> <span class="n">self_signed_key</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server has closed the connection unexpectedly\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check configuration served on this port number\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Connection unexpectedly closed&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;certificate&#39;</span><span class="p">,</span> <span class="s2">&quot;valid client&quot;</span><span class="p">,</span> <span class="n">client_cert</span><span class="p">,</span> <span class="n">client_key</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">encryption</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">):</span>
+            <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">encryption</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_smtpd</span><span class="p">(</span><span class="n">encryption</span><span class="p">,</span> <span class="n">ssl_context</span><span class="p">,</span> <span class="n">auth_required</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">authentication</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">certificate</span><span class="p">,</span> <span class="n">private_key</span><span class="p">,</span> <span class="n">error_pattern</span> <span class="ow">in</span> <span class="n">matrix</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">encryption</span><span class="o">=</span><span class="n">encryption</span><span class="p">,</span> <span class="n">certificate</span><span class="o">=</span><span class="n">name</span><span class="p">):</span>
+                        <span class="n">mail_server</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="n">authentication</span><span class="p">,</span>
+                            <span class="s1">&#39;smtp_ssl_certificate&#39;</span><span class="p">:</span> <span class="n">certificate</span><span class="p">,</span>
+                            <span class="s1">&#39;smtp_ssl_private_key&#39;</span><span class="p">:</span> <span class="n">private_key</span><span class="p">,</span>
+                        <span class="p">})</span>
+                        <span class="k">if</span> <span class="n">error_pattern</span><span class="p">:</span>
+                            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error_capture</span><span class="p">:</span>
+                                <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">assertRegex</span><span class="p">(</span><span class="n">error_capture</span><span class="o">.</span><span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">error_pattern</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.test_authentication_login_matrix">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.test_authentication_login_matrix">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_authentication_login_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Connect to a server that is authenticating users via a login/pwd</span>
+<span class="sd">        pair. Test the various possible configurations (missing pair,</span>
+<span class="sd">        invalid pair and valid pair) against both a SMTP server without</span>
+<span class="sd">        encryption, a STARTTLS and a SSL/TLS SMTP server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test smtpd&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_port&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="s1">&#39;login&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_user&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_pass&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
+        <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">cert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="n">MISSING</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">INVALID</span> <span class="o">=</span> <span class="s1">&#39;bad password&#39;</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># auth_required, password, error_pattern</span>
+            <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="n">MISSING</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">MISSING</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server refused the sender address \(noreply@localhost\) &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;with error b&#39;5\.7\.0 Authentication required&#39;&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">INVALID</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server has closed the connection unexpectedly\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check configuration served on this port number\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Connection unexpectedly closed:.* timed out&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">PASSWORD</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">encryption</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">):</span>
+            <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">encryption</span>
+            <span class="k">for</span> <span class="n">auth_required</span><span class="p">,</span> <span class="n">password</span><span class="p">,</span> <span class="n">error_pattern</span> <span class="ow">in</span> <span class="n">matrix</span><span class="p">:</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_user</span> <span class="o">=</span> <span class="n">password</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">email</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_pass</span> <span class="o">=</span> <span class="n">password</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">encryption</span><span class="o">=</span><span class="n">encryption</span><span class="p">,</span>
+                                  <span class="n">auth_required</span><span class="o">=</span><span class="n">auth_required</span><span class="p">,</span>
+                                  <span class="n">password</span><span class="o">=</span><span class="n">password</span><span class="p">):</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_smtpd</span><span class="p">(</span><span class="n">encryption</span><span class="p">,</span> <span class="n">ssl_context</span><span class="p">,</span> <span class="n">auth_required</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">error_pattern</span><span class="p">:</span>
+                            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">)</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+                                <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">assertRegex</span><span class="p">(</span><span class="n">capture</span><span class="o">.</span><span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">error_pattern</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.test_encryption_matrix">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.test_encryption_matrix">[docs]</a>
+    <span class="nd">@mute_logger</span><span class="p">(</span><span class="s1">&#39;mail.log&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_encryption_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Connect to a server on a different encryption configuration than</span>
+<span class="sd">        the server is configured. Verify that it crashes with a good</span>
+<span class="sd">        error message.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test smtpd&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_port&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="s1">&#39;login&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_user&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_pass&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
+        <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">cert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span><span class="o">.</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="n">matrix</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># client, server, error_pattern</span>
+            <span class="p">(</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server has closed the connection unexpectedly\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check configuration served on this port number\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Connection unexpectedly closed: timed out&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;starttls&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server refused the sender address \(noreply@localhost\) with error &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;b&#39;Must issue a STARTTLS command first&#39;&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;An option is not supported by the server:\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;STARTTLS extension not supported by server\.&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;The server has closed the connection unexpectedly\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check configuration served on this port number\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Connection unexpectedly closed: timed out&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;An SSL exception occurred\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check connection security type\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;.*?wrong version number&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;starttls&#39;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;An SSL exception occurred\. &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;Check connection security type\.\n &quot;</span>
+                <span class="sa">r</span><span class="s2">&quot;.*?wrong version number&quot;</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">client_encryption</span><span class="p">,</span> <span class="n">server_encryption</span><span class="p">,</span> <span class="n">error_pattern</span> <span class="ow">in</span> <span class="n">matrix</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">server_encryption</span><span class="o">=</span><span class="n">server_encryption</span><span class="p">,</span>
+                              <span class="n">client_encryption</span><span class="o">=</span><span class="n">client_encryption</span><span class="p">):</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">client_encryption</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_smtpd</span><span class="p">(</span><span class="n">server_encryption</span><span class="p">,</span> <span class="n">ssl_context</span><span class="p">,</span> <span class="n">auth_required</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">)</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+                        <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">assertRegex</span><span class="p">(</span><span class="n">capture</span><span class="o">.</span><span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">error_pattern</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrMailServerSMTPD.test_man_in_the_middle_matrix">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_mail_server_smtpd.TestIrMailServerSMTPD.test_man_in_the_middle_matrix">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_man_in_the_middle_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simulate that a pirate was successful at intercepting the live</span>
+<span class="sd">        traffic in between the Odoo server and the legitimate SMTP</span>
+<span class="sd">        server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;test smtpd&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_port&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_authentication&#39;</span><span class="p">:</span> <span class="s1">&#39;login&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_user&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">email</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_pass&#39;</span><span class="p">:</span> <span class="n">PASSWORD</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_ssl_certificate&#39;</span><span class="p">:</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_client</span><span class="o">.</span><span class="n">cert</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">()),</span>
+            <span class="s1">&#39;smtp_ssl_private_key&#39;</span><span class="p">:</span> <span class="n">b64encode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_client</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">()),</span>
+        <span class="p">})</span>
+
+        <span class="n">cert_good</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssl_server</span>
+        <span class="n">cert_bad</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssl_self_signed</span>
+        <span class="n">host_good</span> <span class="o">=</span> <span class="s1">&#39;localhost&#39;</span>
+        <span class="n">host_bad</span> <span class="o">=</span> <span class="s1">&#39;notlocalhost&#39;</span>
+
+        <span class="c1"># for now it doesn&#39;t raise any error for bad cert/host</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># authentication, certificate, hostname, error_pattern</span>
+            <span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="n">cert_bad</span><span class="p">,</span> <span class="n">host_good</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="n">cert_good</span><span class="p">,</span> <span class="n">host_bad</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;certificate&#39;</span><span class="p">,</span> <span class="n">cert_bad</span><span class="p">,</span> <span class="n">host_good</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">&#39;certificate&#39;</span><span class="p">,</span> <span class="n">cert_good</span><span class="p">,</span> <span class="n">host_bad</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">encryption</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;starttls&#39;</span><span class="p">,</span> <span class="s1">&#39;ssl&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">authentication</span><span class="p">,</span> <span class="n">certificate</span><span class="p">,</span> <span class="n">hostname</span><span class="p">,</span> <span class="n">error_pattern</span> <span class="ow">in</span> <span class="n">matrix</span><span class="p">:</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_host</span> <span class="o">=</span> <span class="n">hostname</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_authentication</span> <span class="o">=</span> <span class="n">authentication</span>
+                <span class="n">mail_server</span><span class="o">.</span><span class="n">smtp_encryption</span> <span class="o">=</span> <span class="n">encryption</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span>
+                    <span class="n">encryption</span><span class="o">=</span><span class="n">encryption</span><span class="p">,</span>
+                    <span class="n">authentication</span><span class="o">=</span><span class="n">authentication</span><span class="p">,</span>
+                    <span class="n">cert_good</span><span class="o">=</span><span class="n">certificate</span> <span class="o">==</span> <span class="n">cert_good</span><span class="p">,</span>
+                    <span class="n">host_good</span><span class="o">=</span><span class="n">hostname</span> <span class="o">==</span> <span class="n">host_good</span><span class="p">,</span>
+                <span class="p">):</span>
+                    <span class="n">mitm_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
+                    <span class="n">mitm_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">certificate</span><span class="o">.</span><span class="n">cert</span><span class="p">,</span> <span class="n">certificate</span><span class="o">.</span><span class="n">key</span><span class="p">)</span>
+                    <span class="n">auth_required</span> <span class="o">=</span> <span class="n">authentication</span> <span class="o">==</span> <span class="s1">&#39;login&#39;</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_smtpd</span><span class="p">(</span><span class="n">encryption</span><span class="p">,</span> <span class="n">mitm_context</span><span class="p">,</span> <span class="n">auth_required</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">error_pattern</span><span class="p">:</span>
+                            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertRaises</span><span class="p">(</span><span class="n">UserError</span><span class="p">)</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+                                <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">assertRegex</span><span class="p">(</span><span class="n">capture</span><span class="o">.</span><span class="n">exception</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">error_pattern</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">mail_server</span><span class="o">.</span><span class="n">test_smtp_connection</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

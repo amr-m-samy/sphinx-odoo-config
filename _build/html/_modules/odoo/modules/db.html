@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.modules.db &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.modules.db</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.modules.db</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">from</span> <span class="nn">psycopg2.extras</span> <span class="kn">import</span> <span class="n">Json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">IntEnum</span>
+
+<span class="kn">import</span> <span class="nn">odoo.modules</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="is_initialized">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.is_initialized">[docs]</a>
+<span class="k">def</span> <span class="nf">is_initialized</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Check if a database has been initialized for the ORM.</span>
+
+<span class="sd">    The database can be initialized with the &#39;initialize&#39; function below.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">table_exists</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="s1">&#39;ir_module_module&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="initialize">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.initialize">[docs]</a>
+<span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Initialize a database with for the ORM.</span>
+
+<span class="sd">    This executes base/data/base_data.sql, creates the ir_module_categories</span>
+<span class="sd">    (taken from each module descriptor file), and creates the ir_module_module</span>
+<span class="sd">    and ir_model_data entries.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">file_path</span><span class="p">(</span><span class="s1">&#39;base/data/base_data.sql&#39;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="s2">&quot;File not found: &#39;base.sql&#39; (provided by module &#39;base&#39;).&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">odoo</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">file_open</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">as</span> <span class="n">base_sql_file</span><span class="p">:</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">base_sql_file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>  <span class="c1"># pylint: disable=sql-injection</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get_modules</span><span class="p">():</span>
+        <span class="n">mod_path</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get_module_path</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mod_path</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># This will raise an exception if no/unreadable descriptor file.</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get_manifest</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">info</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">categories</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+        <span class="n">category_id</span> <span class="o">=</span> <span class="n">create_categories</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">categories</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;installable&#39;</span><span class="p">]:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="s1">&#39;uninstalled&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="s1">&#39;uninstallable&#39;</span>
+
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;INSERT INTO ir_module_module </span><span class="se">\</span>
+<span class="s1">                (author, website, name, shortdesc, description, </span><span class="se">\</span>
+<span class="s1">                    category_id, auto_install, state, web, license, application, icon, sequence, summary) </span><span class="se">\</span>
+<span class="s1">                VALUES (</span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">) RETURNING id&#39;</span><span class="p">,</span> <span class="p">(</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;author&#39;</span><span class="p">],</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;website&#39;</span><span class="p">],</span> <span class="n">i</span><span class="p">,</span> <span class="n">Json</span><span class="p">({</span><span class="s1">&#39;en_US&#39;</span><span class="p">:</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]}),</span>
+            <span class="n">Json</span><span class="p">({</span><span class="s1">&#39;en_US&#39;</span><span class="p">:</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]}),</span> <span class="n">category_id</span><span class="p">,</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;web&#39;</span><span class="p">],</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;license&#39;</span><span class="p">],</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;application&#39;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;icon&#39;</span><span class="p">],</span>
+            <span class="n">info</span><span class="p">[</span><span class="s1">&#39;sequence&#39;</span><span class="p">],</span> <span class="n">Json</span><span class="p">({</span><span class="s1">&#39;en_US&#39;</span><span class="p">:</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;summary&#39;</span><span class="p">]})))</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;INSERT INTO ir_model_data </span><span class="se">\</span>
+<span class="s1">            (name,model,module, res_id, noupdate) VALUES (</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="p">(</span>
+                <span class="s1">&#39;module_&#39;</span><span class="o">+</span><span class="n">i</span><span class="p">,</span> <span class="s1">&#39;ir.module.module&#39;</span><span class="p">,</span> <span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+        <span class="n">dependencies</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;depends&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s1">&#39;INSERT INTO ir_module_module_dependency (module_id, name, auto_install_required)&#39;</span>
+                <span class="s1">&#39; VALUES (</span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span>
+                <span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;auto_install&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="p">()))</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Install recursively all auto-installing modules</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="c1"># this selects all the auto_install modules whose auto_install_required</span>
+        <span class="c1"># deps are marked as to install</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT m.name FROM ir_module_module m</span>
+<span class="s2">        WHERE m.auto_install</span>
+<span class="s2">        AND state != &#39;to install&#39;</span>
+<span class="s2">        AND NOT EXISTS (</span>
+<span class="s2">            SELECT 1 FROM ir_module_module_dependency d</span>
+<span class="s2">            JOIN ir_module_module mdep ON (d.name = mdep.name)</span>
+<span class="s2">            WHERE d.module_id = m.id</span>
+<span class="s2">              AND d.auto_install_required</span>
+<span class="s2">              AND mdep.state != &#39;to install&#39;</span>
+<span class="s2">        )&quot;&quot;&quot;</span><span class="p">)</span>
+        <span class="n">to_auto_install</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+        <span class="c1"># however if the module has non-required deps we need to install</span>
+        <span class="c1"># those, so merge-in the modules which have a dependen*t* which is</span>
+        <span class="c1"># *either* to_install or in to_auto_install and merge it in?</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT d.name FROM ir_module_module_dependency d</span>
+<span class="s2">        JOIN ir_module_module m ON (d.module_id = m.id)</span>
+<span class="s2">        JOIN ir_module_module mdep ON (d.name = mdep.name)</span>
+<span class="s2">        WHERE (m.state = &#39;to install&#39; OR m.name = any(</span><span class="si">%s</span><span class="s2">))</span>
+<span class="s2">            -- don&#39;t re-mark marked modules</span>
+<span class="s2">        AND NOT (mdep.state = &#39;to install&#39; OR mdep.name = any(</span><span class="si">%s</span><span class="s2">))</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">to_auto_install</span><span class="p">,</span> <span class="n">to_auto_install</span><span class="p">])</span>
+        <span class="n">to_auto_install</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">to_auto_install</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;UPDATE ir_module_module SET state=&#39;to install&#39; WHERE name in </span><span class="si">%s</span><span class="s2">&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">to_auto_install</span><span class="p">),))</span></div>
+
+
+<div class="viewcode-block" id="create_categories">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.create_categories">[docs]</a>
+<span class="k">def</span> <span class="nf">create_categories</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">categories</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create the ir_module_category entries for some categories.</span>
+
+<span class="sd">    categories is a list of strings forming a single category with its</span>
+<span class="sd">    parent categories, like [&#39;Grand Parent&#39;, &#39;Parent&#39;, &#39;Child&#39;].</span>
+
+<span class="sd">    Return the database id of the (last) category.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">p_id</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">category</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">while</span> <span class="n">categories</span><span class="p">:</span>
+        <span class="n">category</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">categories</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">xml_id</span> <span class="o">=</span> <span class="s1">&#39;module_category_&#39;</span> <span class="o">+</span> <span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">category</span><span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;&#39;</span><span class="p">,</span> <span class="s1">&#39;and&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">)</span>
+        <span class="c1"># search via xml_id (because some categories are renamed)</span>
+        <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT res_id FROM ir_model_data WHERE name=</span><span class="si">%s</span><span class="s2"> AND module=</span><span class="si">%s</span><span class="s2"> AND model=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">xml_id</span><span class="p">,</span> <span class="s2">&quot;base&quot;</span><span class="p">,</span> <span class="s2">&quot;ir.module.category&quot;</span><span class="p">))</span>
+
+        <span class="n">c_id</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">c_id</span><span class="p">:</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;INSERT INTO ir_module_category </span><span class="se">\</span>
+<span class="s1">                    (name, parent_id) </span><span class="se">\</span>
+<span class="s1">                    VALUES (</span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">) RETURNING id&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">Json</span><span class="p">({</span><span class="s1">&#39;en_US&#39;</span><span class="p">:</span> <span class="n">categories</span><span class="p">[</span><span class="mi">0</span><span class="p">]}),</span> <span class="n">p_id</span><span class="p">))</span>
+            <span class="n">c_id</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;INSERT INTO ir_model_data (module, name, res_id, model, noupdate) </span><span class="se">\</span>
+<span class="s1">                       VALUES (</span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">, </span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="n">xml_id</span><span class="p">,</span> <span class="n">c_id</span><span class="p">,</span> <span class="s1">&#39;ir.module.category&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">c_id</span> <span class="o">=</span> <span class="n">c_id</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">p_id</span> <span class="o">=</span> <span class="n">c_id</span>
+        <span class="n">categories</span> <span class="o">=</span> <span class="n">categories</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">p_id</span></div>
+
+
+<div class="viewcode-block" id="FunctionStatus">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.FunctionStatus">[docs]</a>
+<span class="k">class</span> <span class="nc">FunctionStatus</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">MISSING</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># function is not present (falsy)</span>
+    <span class="n">PRESENT</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># function is present but not indexable (not immutable)</span>
+    <span class="n">INDEXABLE</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># function is present and indexable (immutable)</span></div>
+
+
+<div class="viewcode-block" id="has_unaccent">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.has_unaccent">[docs]</a>
+<span class="k">def</span> <span class="nf">has_unaccent</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test whether the database has function &#39;unaccent&#39; and return its status.</span>
+
+<span class="sd">    The unaccent is supposed to be provided by the PostgreSQL unaccent contrib</span>
+<span class="sd">    module but any similar function will be picked by OpenERP.</span>
+
+<span class="sd">    :rtype: FunctionStatus</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        SELECT p.provolatile</span>
+<span class="s2">        FROM pg_proc p</span>
+<span class="s2">            LEFT JOIN pg_catalog.pg_namespace ns ON p.pronamespace = ns.oid</span>
+<span class="s2">        WHERE p.proname = &#39;unaccent&#39;</span>
+<span class="s2">              AND p.pronargs = 1</span>
+<span class="s2">              AND ns.nspname = &#39;public&#39;</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">cr</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FunctionStatus</span><span class="o">.</span><span class="n">MISSING</span>
+    <span class="c1"># The `provolatile` of unaccent allows to know whether the unaccent function</span>
+    <span class="c1"># can be used to create index (it should be &#39;i&#39; - means immutable), see</span>
+    <span class="c1"># https://www.postgresql.org/docs/current/catalog-pg-proc.html.</span>
+    <span class="k">return</span> <span class="n">FunctionStatus</span><span class="o">.</span><span class="n">INDEXABLE</span> <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;i&#39;</span> <span class="k">else</span> <span class="n">FunctionStatus</span><span class="o">.</span><span class="n">PRESENT</span></div>
+
+
+<div class="viewcode-block" id="has_trigram">
+<a class="viewcode-back" href="../../../odoo.modules.html#odoo.modules.db.has_trigram">[docs]</a>
+<span class="k">def</span> <span class="nf">has_trigram</span><span class="p">(</span><span class="n">cr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Test if the database has the a word_similarity function.</span>
+
+<span class="sd">    The word_similarity is supposed to be provided by the PostgreSQL built-in</span>
+<span class="sd">    pg_trgm module but any similar function will be picked by Odoo.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cr</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT proname FROM pg_proc WHERE proname=&#39;word_similarity&#39;&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">cr</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">0</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

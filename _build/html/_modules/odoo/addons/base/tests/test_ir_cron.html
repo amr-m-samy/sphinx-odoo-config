@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.test_ir_cron &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.test_ir_cron</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.test_ir_cron</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">secrets</span>
+<span class="kn">import</span> <span class="nn">textwrap</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">call</span><span class="p">,</span> <span class="n">patch</span>
+<span class="kn">from</span> <span class="nn">freezegun</span> <span class="kn">import</span> <span class="n">freeze_time</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">api</span><span class="p">,</span> <span class="n">fields</span>
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">BaseCase</span><span class="p">,</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">RecordCapturer</span><span class="p">,</span> <span class="n">get_db_name</span><span class="p">,</span> <span class="n">tagged</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">mute_logger</span>
+
+
+<div class="viewcode-block" id="CronMixinCase">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.CronMixinCase">[docs]</a>
+<span class="k">class</span> <span class="nc">CronMixinCase</span><span class="p">:</span>
+<div class="viewcode-block" id="CronMixinCase.capture_triggers">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.CronMixinCase.capture_triggers">[docs]</a>
+    <span class="k">def</span> <span class="nf">capture_triggers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cron_id</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get a context manager to get all cron triggers created during</span>
+<span class="sd">        the context lifetime. While in the context, it exposes the</span>
+<span class="sd">        triggers created so far from the beginning of the context. When</span>
+<span class="sd">        the context exits, it doesn&#39;t capture new triggers anymore.</span>
+
+<span class="sd">        The triggers are accessible on the `records` attribute of the</span>
+<span class="sd">        returned object.</span>
+
+<span class="sd">        :param cron_id: An optional cron record id (int) or xmlid (str)</span>
+<span class="sd">                        to only capture triggers for that cron.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cron_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>  <span class="c1"># xmlid case</span>
+            <span class="n">cron_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">cron_id</span><span class="p">)</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="k">return</span> <span class="n">RecordCapturer</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">(),</span>
+            <span class="n">domain</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;cron_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">cron_id</span><span class="p">)]</span> <span class="k">if</span> <span class="n">cron_id</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_get_cron_data</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">priority</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="n">unique</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_urlsafe</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Dummy cron for TestIrCron </span><span class="si">{</span><span class="n">unique</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;model_id&#39;</span><span class="p">:</span> <span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.model_res_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;model_name&#39;</span><span class="p">:</span> <span class="s1">&#39;res.partner&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="n">env</span><span class="o">.</span><span class="n">uid</span><span class="p">,</span>
+            <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;interval_number&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s1">&#39;interval_type&#39;</span><span class="p">:</span> <span class="s1">&#39;days&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;numbercall&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s1">&#39;doall&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;nextcall&#39;</span><span class="p">:</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="s1">&#39;lastcall&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;priority&#39;</span><span class="p">:</span> <span class="n">priority</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_get_partner_data</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="n">unique</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_urlsafe</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Dummy partner for TestIrCron </span><span class="si">{</span><span class="n">unique</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="TestIrCron">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron">[docs]</a>
+<span class="k">class</span> <span class="nc">TestIrCron</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">,</span> <span class="n">CronMixinCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestIrCron.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="n">freezer</span> <span class="o">=</span> <span class="n">freeze_time</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">cr</span><span class="o">.</span><span class="n">now</span><span class="p">())</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">frozen_datetime</span> <span class="o">=</span> <span class="n">freezer</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">addClassCleanup</span><span class="p">(</span><span class="n">freezer</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_get_cron_data</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">))</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_get_partner_data</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">partner</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_partner_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_cron_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+            <span class="p">[(</span><span class="s1">&#39;cron_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">)]</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_direct_trigger">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_direct_trigger">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_direct_trigger</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="n">textwrap</span><span class="o">.</span><span class="n">dedent</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">            model.search(</span>
+<span class="s2">                [(&quot;id&quot;, &quot;=&quot;, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">partner</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">)]</span>
+<span class="s2">            ).write(</span>
+<span class="s2">                </span><span class="se">{{</span><span class="s2">&quot;name&quot;: &quot;You have been CRONWNED&quot;</span><span class="se">}}</span>
+<span class="s2">            )</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">method_direct_trigger</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">lastcall</span><span class="p">,</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">partner</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;You have been CRONWNED&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_no_job_ready">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_no_job_ready">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_no_job_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_ready_by_nextcall">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_ready_by_nextcall">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_ready_by_nextcall</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_ready_by_trigger">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_ready_by_trigger">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_ready_by_trigger</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_unactive_never_ready">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_unactive_never_ready">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_unactive_never_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_numbercall0_never_ready">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_numbercall0_never_ready">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_numbercall0_never_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">numbercall</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flush_model</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_ready_jobs_order">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_ready_jobs_order">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_ready_jobs_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cron_avg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">cron_avg</span><span class="o">.</span><span class="n">priority</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># average priority</span>
+
+        <span class="n">cron_high</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">cron_high</span><span class="o">.</span><span class="n">priority</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># highest priority</span>
+
+        <span class="n">cron_low</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">cron_low</span><span class="o">.</span><span class="n">priority</span> <span class="o">=</span> <span class="mi">10</span>  <span class="c1"># lowest priority</span>
+
+        <span class="n">crons</span> <span class="o">=</span> <span class="n">cron_high</span> <span class="o">|</span> <span class="n">cron_avg</span> <span class="o">|</span> <span class="n">cron_low</span>  <span class="c1"># order is important</span>
+        <span class="n">crons</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;nextcall&#39;</span><span class="p">:</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()})</span>
+        <span class="n">crons</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span> <span class="k">if</span> <span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">crons</span><span class="o">.</span><span class="n">_ids</span><span class="p">],</span>
+            <span class="nb">list</span><span class="p">(</span><span class="n">crons</span><span class="o">.</span><span class="n">_ids</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_skip_unactive_triggers">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_skip_unactive_triggers">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_skip_unactive_triggers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Situation: an admin disable the cron and another user triggers</span>
+        <span class="c1"># the cron to be executed *now*, the cron shouldn&#39;t be ready and</span>
+        <span class="c1"># the trigger should not be stored.</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_triggers</span><span class="p">()</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">()</span>
+
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertNotIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">],</span>
+            <span class="s2">&quot;the cron shouldn&#39;t be ready&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">capture</span><span class="o">.</span><span class="n">records</span><span class="p">,</span> <span class="s2">&quot;trigger should has been skipped&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_keep_future_triggers">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_keep_future_triggers">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_keep_future_triggers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Situation: yesterday an admin disabled the cron, while the</span>
+        <span class="c1"># cron was disabled, another user triggered it to run today.</span>
+        <span class="c1"># In case the cron as been re-enabled before &quot;today&quot;, it should</span>
+        <span class="c1"># run.</span>
+
+        <span class="c1"># go yesterday</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frozen_datetime</span><span class="o">.</span><span class="n">tick</span><span class="p">(</span><span class="n">delta</span><span class="o">=</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=-</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="c1"># admin disable the cron</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+
+        <span class="c1"># user triggers the cron to run *tomorrow of yesterday (=today)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_triggers</span><span class="p">()</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="c1"># admin re-enable the cron</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+
+        <span class="c1"># go today, check the cron should run</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frozen_datetime</span><span class="o">.</span><span class="n">tick</span><span class="p">(</span><span class="n">delta</span><span class="o">=</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">ready_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertIn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">ready_jobs</span><span class="p">],</span>
+            <span class="s2">&quot;cron should be ready&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">capture</span><span class="o">.</span><span class="n">records</span><span class="p">,</span> <span class="s2">&quot;trigger should has been kept&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_process_job">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_process_job">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_process_job</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="n">Setup</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;Setup&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;doall&#39;</span><span class="p">,</span> <span class="s1">&#39;numbercall&#39;</span><span class="p">,</span> <span class="s1">&#39;missedcall&#39;</span><span class="p">,</span> <span class="s1">&#39;trigger&#39;</span><span class="p">])</span>
+        <span class="n">Expect</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;Expect&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;call_count&#39;</span><span class="p">,</span> <span class="s1">&#39;call_left&#39;</span><span class="p">,</span> <span class="s1">&#39;active&#39;</span><span class="p">])</span>
+
+        <span class="n">matrix</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">False</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">Setup</span><span class="p">(</span><span class="n">doall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">numbercall</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">missedcall</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+             <span class="n">Expect</span><span class="p">(</span><span class="n">call_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">call_left</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">setup</span><span class="p">,</span> <span class="n">expect</span> <span class="ow">in</span> <span class="n">matrix</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">subTest</span><span class="p">(</span><span class="n">setup</span><span class="o">=</span><span class="n">setup</span><span class="p">,</span> <span class="n">expect</span><span class="o">=</span><span class="n">expect</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                    <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                    <span class="s1">&#39;doall&#39;</span><span class="p">:</span> <span class="n">setup</span><span class="o">.</span><span class="n">doall</span><span class="p">,</span>
+                    <span class="s1">&#39;numbercall&#39;</span><span class="p">:</span> <span class="n">setup</span><span class="o">.</span><span class="n">numbercall</span><span class="p">,</span>
+                    <span class="s1">&#39;nextcall&#39;</span><span class="p">:</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">setup</span><span class="o">.</span><span class="n">missedcall</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="p">})</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_triggers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">as</span> <span class="n">capture</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">setup</span><span class="o">.</span><span class="n">trigger</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_trigger</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+                <span class="n">capture</span><span class="o">.</span><span class="n">records</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">enter_test_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cr</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_callback&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">callback</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_job</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">db_name</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">(),</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">load</span><span class="o">=</span><span class="kc">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="p">)</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">leave_test_mode</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+                <span class="n">capture</span><span class="o">.</span><span class="n">records</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">callback</span><span class="o">.</span><span class="n">call_count</span><span class="p">,</span> <span class="n">expect</span><span class="o">.</span><span class="n">call_count</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">numbercall</span><span class="p">,</span> <span class="n">expect</span><span class="o">.</span><span class="n">call_left</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span><span class="p">,</span> <span class="n">expect</span><span class="o">.</span><span class="n">active</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">lastcall</span><span class="p">,</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">())</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">nextcall</span><span class="p">,</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search_count</span><span class="p">([</span>
+                    <span class="p">(</span><span class="s1">&#39;cron_id&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s1">&#39;call_at&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;=&#39;</span><span class="p">,</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">())]</span>
+                <span class="p">),</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TestIrCron.test_cron_null_interval">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCron.test_cron_null_interval">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_null_interval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">interval_number</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">flush_recordset</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">assertLogs</span><span class="p">(</span><span class="s1">&#39;odoo.addons.base.models.ir_cron&#39;</span><span class="p">,</span> <span class="s1">&#39;ERROR&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">_process_job</span><span class="p">(</span><span class="n">get_db_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">cr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">load</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">invalidate_recordset</span><span class="p">([</span><span class="s1">&#39;active&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron</span><span class="o">.</span><span class="n">active</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TestIrCronConcurrent">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCronConcurrent">[docs]</a>
+<span class="nd">@tagged</span><span class="p">(</span><span class="s1">&#39;-standard&#39;</span><span class="p">,</span> <span class="s1">&#39;-at_install&#39;</span><span class="p">,</span> <span class="s1">&#39;post_install&#39;</span><span class="p">,</span> <span class="s1">&#39;database_breaking&#39;</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TestIrCronConcurrent</span><span class="p">(</span><span class="n">BaseCase</span><span class="p">,</span> <span class="n">CronMixinCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TestIrCronConcurrent.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCronConcurrent.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="c1"># Keep a reference on the real cron methods, those without patch</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span> <span class="o">=</span> <span class="n">odoo</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span><span class="n">get_db_name</span><span class="p">())</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron_process_job</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_job</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron_process_jobs</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_jobs</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron_get_all_ready_jobs</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_get_all_ready_jobs</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron_acquire_one_job</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_acquire_one_job</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">cron_callback</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_callback</span></div>
+
+
+<div class="viewcode-block" id="TestIrCronConcurrent.setUp">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCronConcurrent.setUp">[docs]</a>
+    <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUp</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron.trigger&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron1_data</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_cron_data</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">priority</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">load</span><span class="o">=</span><span class="kc">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron2_data</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_cron_data</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">priority</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">load</span><span class="o">=</span><span class="kc">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">partner_data</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_partner_data</span><span class="p">(</span><span class="n">env</span><span class="p">))</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">load</span><span class="o">=</span><span class="kc">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cron_ids</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cron1_data</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron2_data</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]]</span></div>
+
+
+<div class="viewcode-block" id="TestIrCronConcurrent.test_cron_concurrency_1">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.test_ir_cron.TestIrCronConcurrent.test_cron_concurrency_1">[docs]</a>
+    <span class="k">def</span> <span class="nf">test_cron_concurrency_1</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Two cron threads &quot;th1&quot; and &quot;th2&quot; wake up at the same time and</span>
+<span class="sd">        see two jobs &quot;job1&quot; and &quot;job2&quot; that are ready (setup).</span>
+
+<span class="sd">        Th1 acquire job1, before it can process and release its job, th2</span>
+<span class="sd">        acquire a job too (setup). Th2 shouldn&#39;t be able to acquire job1</span>
+<span class="sd">        as another thread is processing it, it should skips job1 and</span>
+<span class="sd">        should acquire job2 instead (test). Both thread then process</span>
+<span class="sd">        their job, update its `nextcall` and release it (setup).</span>
+
+<span class="sd">        All the threads update and release their job before any thread</span>
+<span class="sd">        attempt to acquire another job. (setup)</span>
+
+<span class="sd">        The two thread each attempt to acquire a new job (setup), they</span>
+<span class="sd">        should both fail to acquire any as each job&#39;s nextcall is in the</span>
+<span class="sd">        future* (test).</span>
+
+<span class="sd">        *actually, in their own transaction, the other job&#39;s nextcall is</span>
+<span class="sd">        still &quot;in the past&quot; but any attempt to use that information</span>
+<span class="sd">        would result in a serialization error. This tests ensure that</span>
+<span class="sd">        that serialization error is correctly handled and ignored.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+        <span class="n">barrier</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Barrier</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1">###</span>
+        <span class="c1"># Setup</span>
+        <span class="c1">###</span>
+
+        <span class="c1"># Watchdog, if a thread was waiting at the barrier when the</span>
+        <span class="c1"># other exited, it receives a BrokenBarrierError and exits too.</span>
+        <span class="k">def</span> <span class="nf">process_jobs</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron_process_jobs</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">barrier</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="c1"># The two threads get the same list of jobs</span>
+        <span class="k">def</span> <span class="nf">get_all_ready_jobs</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron_get_all_ready_jobs</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">barrier</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">jobs</span>
+
+        <span class="c1"># When a thread acquire a job, it processes it till the end</span>
+        <span class="c1"># before another thread can acquire one.</span>
+        <span class="k">def</span> <span class="nf">acquire_one_job</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">mute_logger</span><span class="p">(</span><span class="s1">&#39;odoo.sql_db&#39;</span><span class="p">):</span>
+                    <span class="n">job</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron_acquire_one_job</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+                <span class="k">raise</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">job</span><span class="p">:</span>
+                <span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">job</span>
+
+        <span class="c1"># When a thread is done processing its job, it waits for the</span>
+        <span class="c1"># other thread to catch up.</span>
+        <span class="k">def</span> <span class="nf">process_job</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">return_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cron_process_job</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+            <span class="n">barrier</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">return_value</span>
+
+        <span class="c1"># Set 2 jobs ready, process them in 2 different threads.</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cr</span><span class="p">:</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">cr</span><span class="p">,</span> <span class="n">odoo</span><span class="o">.</span><span class="n">SUPERUSER_ID</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">browse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cron_ids</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span>
+                <span class="s1">&#39;nextcall&#39;</span><span class="p">:</span> <span class="n">fields</span><span class="o">.</span><span class="n">Datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="p">})</span>
+
+        <span class="c1">###</span>
+        <span class="c1"># Run</span>
+        <span class="c1">###</span>
+        <span class="k">with</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_process_jobs&#39;</span><span class="p">,</span> <span class="n">process_jobs</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_get_all_ready_jobs&#39;</span><span class="p">,</span> <span class="n">get_all_ready_jobs</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_acquire_one_job&#39;</span><span class="p">,</span> <span class="n">acquire_one_job</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_process_job&#39;</span><span class="p">,</span> <span class="n">process_job</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">],</span> <span class="s1">&#39;_callback&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">callback</span><span class="p">,</span> \
+             <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="n">fut1</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_jobs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">db_name</span><span class="p">)</span>
+            <span class="n">fut2</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">[</span><span class="s1">&#39;ir.cron&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_process_jobs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">db_name</span><span class="p">)</span>
+            <span class="n">fut1</span><span class="o">.</span><span class="n">result</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">fut2</span><span class="o">.</span><span class="n">result</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1">###</span>
+        <span class="c1"># Validation</span>
+        <span class="c1">###</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">callback</span><span class="o">.</span><span class="n">call_args_list</span><span class="p">),</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Two jobs must have been processed.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">callback</span><span class="o">.</span><span class="n">call_args_list</span><span class="p">,</span> <span class="p">[</span>
+            <span class="n">call</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron1_data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron1_data</span><span class="p">[</span><span class="s1">&#39;ir_actions_server_id&#39;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron1_data</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">call</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron2_data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron2_data</span><span class="p">[</span><span class="s1">&#39;ir_actions_server_id&#39;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cron2_data</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span>
+            <span class="p">),</span>
+        <span class="p">])</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

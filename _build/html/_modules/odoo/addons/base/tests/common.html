@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.addons.base.tests.common &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../../../odoo.html">odoo</a></li>
+          <li class="breadcrumb-item"><a href="../../base.html">odoo.addons.base</a></li>
+      <li class="breadcrumb-item active">odoo.addons.base.tests.common</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.addons.base.tests.common</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">threading</span>
+
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">unittest.mock</span> <span class="kn">import</span> <span class="n">patch</span><span class="p">,</span> <span class="n">Mock</span>
+
+<span class="kn">from</span> <span class="nn">odoo.tests.common</span> <span class="kn">import</span> <span class="n">TransactionCase</span><span class="p">,</span> <span class="n">HttpCase</span>
+<span class="kn">from</span> <span class="nn">odoo</span> <span class="kn">import</span> <span class="n">Command</span>
+
+<span class="n">DISABLED_MAIL_CONTEXT</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;tracking_disable&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s1">&#39;mail_create_nolog&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s1">&#39;mail_create_nosubscribe&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s1">&#39;mail_notrack&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s1">&#39;no_reset_password&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="BaseCommon">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.BaseCommon">[docs]</a>
+<span class="k">class</span> <span class="nc">BaseCommon</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="BaseCommon.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.BaseCommon.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="c1"># Mail logic won&#39;t be tested by default in other modules.</span>
+        <span class="c1"># Mail API overrides should be tested with dedicated tests on purpose</span>
+        <span class="c1"># Hack to use with_context and avoid manual context dict modification</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="o">**</span><span class="n">DISABLED_MAIL_CONTEXT</span><span class="p">)</span><span class="o">.</span><span class="n">env</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Partner&#39;</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">currency</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">currency_id</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_enable_currency</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">currency_code</span><span class="p">):</span>
+        <span class="n">currency</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.currency&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">active_test</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+            <span class="p">[(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="n">currency_code</span><span class="o">.</span><span class="n">upper</span><span class="p">())]</span>
+        <span class="p">)</span>
+        <span class="n">currency</span><span class="o">.</span><span class="n">action_unarchive</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">currency</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_use_currency</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">currency_code</span><span class="p">):</span>
+        <span class="c1"># Enforce constant currency</span>
+        <span class="n">currency</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_enable_currency</span><span class="p">(</span><span class="n">currency_code</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="o">.</span><span class="n">currency_id</span> <span class="o">==</span> <span class="n">currency</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">transaction</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">company</span><span class="p">)</span><span class="o">.</span><span class="n">currency_id</span><span class="p">,</span> <span class="n">currency</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">dirty</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+            <span class="c1"># this is equivalent to cls.env.company.currency_id = currency but without triggering buisness code checks.</span>
+            <span class="c1"># The value is added in cache, and the cache value is set as dirty so that that</span>
+            <span class="c1"># the value will be written to the database on next flush.</span>
+            <span class="c1"># this was needed because some journal entries may exist when running tests, especially l10n demo data.</span>
+
+<div class="viewcode-block" id="BaseUsersCommon">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.BaseUsersCommon">[docs]</a>
+<span class="k">class</span> <span class="nc">BaseUsersCommon</span><span class="p">(</span><span class="n">BaseCommon</span><span class="p">):</span>
+
+<div class="viewcode-block" id="BaseUsersCommon.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.BaseUsersCommon.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">group_user</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Portal User&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;portal_user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;portal_user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;portal_user@gladys.portal&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_portal</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+        <span class="p">})</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_internal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Test Internal User&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;internal_user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;internal_user&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;mark.brown23@example.com&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">group_user</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+        <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TransactionCaseWithUserDemo">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.TransactionCaseWithUserDemo">[docs]</a>
+<span class="k">class</span> <span class="nc">TransactionCaseWithUserDemo</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TransactionCaseWithUserDemo.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.TransactionCaseWithUserDemo.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.partner_admin&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Mitchell Admin&#39;</span><span class="p">})</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;auth_password_policy.minlength&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Marc Demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;mark.brown23@example.com&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_partner_manager&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+            <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="HttpCaseWithUserDemo">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.HttpCaseWithUserDemo">[docs]</a>
+<span class="k">class</span> <span class="nc">HttpCaseWithUserDemo</span><span class="p">(</span><span class="n">HttpCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="HttpCaseWithUserDemo.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.HttpCaseWithUserDemo.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_admin</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.user_admin&#39;</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_admin</span><span class="o">.</span><span class="n">write</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Mitchell Admin&#39;</span><span class="p">})</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_admin</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_admin</span><span class="o">.</span><span class="n">partner_id</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;auth_password_policy.minlength&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Marc Demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;mark.brown23@example.com&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_partner_manager&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+            <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SavepointCaseWithUserDemo">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.SavepointCaseWithUserDemo">[docs]</a>
+<span class="k">class</span> <span class="nc">SavepointCaseWithUserDemo</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="SavepointCaseWithUserDemo.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.SavepointCaseWithUserDemo.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;demo&#39;</span><span class="p">)])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;auth_password_policy.minlength&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Marc Demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;mark.brown23@example.com&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">user_demo</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;demo&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_demo</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_partner_manager&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+            <span class="p">})</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_load_partners_set</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Sellers&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_1</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Office Supplies&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_2</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner.category&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Desk Manufacturers&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">})</span>
+
+        <span class="c1"># Load all the demo partners</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partners</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Inner Works&#39;</span><span class="p">,</span> <span class="c1"># Wood Corner</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_1&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_2</span><span class="o">.</span><span class="n">id</span><span class="p">,])],</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Sheila Ruiz&#39;</span><span class="p">,</span> <span class="c1"># &#39;Willie Burke&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Wyatt Howard&#39;</span><span class="p">,</span> <span class="c1"># &#39;Ron Gibson&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Austin Kennedy&#39;</span><span class="p">,</span> <span class="c1"># Tom Ruiz</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Pepper Street&#39;</span><span class="p">,</span> <span class="c1"># &#39;Deco Addict&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_2&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Liam King&#39;</span><span class="p">,</span> <span class="c1"># &#39;Douglas Fletcher&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Craig Richardson&#39;</span><span class="p">,</span> <span class="c1"># &#39;Floyd Steward&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Adam Cox&#39;</span><span class="p">,</span> <span class="c1"># &#39;Addison Olson&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;AnalytIQ&#39;</span><span class="p">,</span> <span class="c1">#&#39;Gemini Furniture&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_3&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Pedro Boyd&#39;</span><span class="p">,</span> <span class="c1"># Edwin Hansen</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Landon Roberts&#39;</span><span class="p">,</span> <span class="c1"># &#39;Jesse Brown&#39;,</span>
+                    <span class="s1">&#39;company_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.main_company&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Leona Shelton&#39;</span><span class="p">,</span> <span class="c1"># &#39;Soham Palmer&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Scott Kim&#39;</span><span class="p">,</span> <span class="c1"># &#39;Oscar Morgan&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Urban Trends&#39;</span><span class="p">,</span> <span class="c1"># &#39;Ready Mat&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_4&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;category_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_1</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_category_child_2</span><span class="o">.</span><span class="n">id</span><span class="p">,])],</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Louella Jacobs&#39;</span><span class="p">,</span> <span class="c1"># &#39;Billy Fox&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Albert Alexander&#39;</span><span class="p">,</span> <span class="c1"># &#39;Kim Snyder&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Brad Castillo&#39;</span><span class="p">,</span> <span class="c1"># &#39;Edith Sanchez&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Sophie Montgomery&#39;</span><span class="p">,</span> <span class="c1"># &#39;Sandra Neal&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Chloe Bates&#39;</span><span class="p">,</span> <span class="c1"># &#39;Julie Richards&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Mason Crawford&#39;</span><span class="p">,</span> <span class="c1"># &#39;Travis Mendoza&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Elsie Kennedy&#39;</span><span class="p">,</span> <span class="c1"># &#39;Theodore Gardner&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Ctrl-Alt-Fix&#39;</span><span class="p">,</span> <span class="c1"># &#39;The Jackson Group&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_5&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;carole miller&#39;</span><span class="p">,</span> <span class="c1"># &#39;Toni Rhodes&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Cecil Holmes&#39;</span><span class="p">,</span> <span class="c1"># &#39;Gordon Owens&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Ignitive Labs&#39;</span><span class="p">,</span> <span class="c1"># &#39;Azure Interior&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_6&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Jonathan Webb&#39;</span><span class="p">,</span> <span class="c1"># &#39;Brandon Freeman&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Clinton Clark&#39;</span><span class="p">,</span> <span class="c1"># &#39;Nicole Ford&#39;,</span>
+                <span class="p">}),</span> <span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Howard Bryant&#39;</span><span class="p">,</span> <span class="c1"># &#39;Colleen Diaz&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Amber &amp; Forge&#39;</span><span class="p">,</span> <span class="c1"># &#39;Lumber Inc&#39;,</span>
+                <span class="s1">&#39;state_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.state_us_7&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;child_ids&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Mark Webb&#39;</span><span class="p">,</span> <span class="c1"># &#39;Lorraine Douglas&#39;,</span>
+                <span class="p">})],</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Rebecca Day&#39;</span><span class="p">,</span> <span class="c1"># &#39;Chester Reed&#39;,</span>
+                <span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.main_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Gabriella Jennings&#39;</span><span class="p">,</span> <span class="c1"># &#39;Dwayne Newman&#39;,</span>
+                <span class="s1">&#39;parent_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.main_partner&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">])</span></div>
+
+
+
+<div class="viewcode-block" id="TransactionCaseWithUserPortal">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.TransactionCaseWithUserPortal">[docs]</a>
+<span class="k">class</span> <span class="nc">TransactionCaseWithUserPortal</span><span class="p">(</span><span class="n">TransactionCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="TransactionCaseWithUserPortal.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.TransactionCaseWithUserPortal.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;portal&#39;</span><span class="p">)])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;auth_password_policy.minlength&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Joel Willis&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;joel.willis63@example.com&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">no_reset_password</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;portal&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;portal&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+            <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="HttpCaseWithUserPortal">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.HttpCaseWithUserPortal">[docs]</a>
+<span class="k">class</span> <span class="nc">HttpCaseWithUserPortal</span><span class="p">(</span><span class="n">HttpCase</span><span class="p">):</span>
+
+<div class="viewcode-block" id="HttpCaseWithUserPortal.setUpClass">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.HttpCaseWithUserPortal.setUpClass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">setUpClass</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setUpClass</span><span class="p">()</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">search</span><span class="p">([(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="s1">&#39;portal&#39;</span><span class="p">)])</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span><span class="o">.</span><span class="n">partner_id</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;auth_password_policy.minlength&#39;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Joel Willis&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="s1">&#39;joel.willis63@example.com&#39;</span><span class="p">,</span>
+            <span class="p">})</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">user_portal</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;res.users&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">with_context</span><span class="p">(</span><span class="n">no_reset_password</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">({</span>
+                <span class="s1">&#39;login&#39;</span><span class="p">:</span> <span class="s1">&#39;portal&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="s1">&#39;portal&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;partner_id&#39;</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">partner_portal</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;groups_id&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">Command</span><span class="o">.</span><span class="n">set</span><span class="p">([</span><span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="s1">&#39;base.group_portal&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">id</span><span class="p">])],</span>
+            <span class="p">})</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MockSmtplibCase">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.MockSmtplibCase">[docs]</a>
+<span class="k">class</span> <span class="nc">MockSmtplibCase</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class which allows you to mock the smtplib feature, to be able to test in depth the</span>
+<span class="sd">    sending of emails. Unlike &quot;MockEmail&quot; which mocks mainly the &lt;ir.mail_server&gt; methods,</span>
+<span class="sd">    here we mainly mock the smtplib to be able to test the &lt;ir.mail_server&gt; model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="MockSmtplibCase.mock_smtplib_connection">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.MockSmtplibCase.mock_smtplib_connection">[docs]</a>
+    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">mock_smtplib_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emails</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">origin</span> <span class="o">=</span> <span class="bp">self</span>
+
+        <span class="k">class</span> <span class="nc">TestingSMTPSession</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;SMTP session object returned during the testing.</span>
+
+<span class="sd">            So we do not connect to real SMTP server. Store the mail</span>
+<span class="sd">            server id used for the SMTP connection and other information.</span>
+
+<span class="sd">            Can be mocked for testing to know which with arguments the email was sent.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">def</span> <span class="nf">quit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="k">pass</span>
+
+            <span class="k">def</span> <span class="nf">send_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">):</span>
+                <span class="n">origin</span><span class="o">.</span><span class="n">emails</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;smtp_from&#39;</span><span class="p">:</span> <span class="n">smtp_from</span><span class="p">,</span>
+                    <span class="s1">&#39;smtp_to_list&#39;</span><span class="p">:</span> <span class="n">smtp_to_list</span><span class="p">,</span>
+                    <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">(),</span>
+                    <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_filter</span><span class="p">,</span>
+                <span class="p">})</span>
+
+            <span class="k">def</span> <span class="nf">sendmail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smtp_from</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="p">,</span> <span class="n">message_str</span><span class="p">,</span> <span class="n">mail_options</span><span class="p">):</span>
+                <span class="n">origin</span><span class="o">.</span><span class="n">emails</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;smtp_from&#39;</span><span class="p">:</span> <span class="n">smtp_from</span><span class="p">,</span>
+                    <span class="s1">&#39;smtp_to_list&#39;</span><span class="p">:</span> <span class="n">smtp_to_list</span><span class="p">,</span>
+                    <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="n">message_str</span><span class="p">,</span>
+                    <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_filter</span><span class="p">,</span>
+                <span class="p">})</span>
+
+            <span class="k">def</span> <span class="nf">set_debuglevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smtp_debug</span><span class="p">):</span>
+                <span class="k">pass</span>
+
+            <span class="k">def</span> <span class="nf">ehlo_or_helo_if_needed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="k">pass</span>
+
+            <span class="k">def</span> <span class="nf">login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+                <span class="k">pass</span>
+
+            <span class="k">def</span> <span class="nf">starttls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">keyfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">certfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+                <span class="k">pass</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">testing_smtp_session</span> <span class="o">=</span> <span class="n">TestingSMTPSession</span><span class="p">()</span>
+
+        <span class="n">IrMailServer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span>
+        <span class="n">connect_origin</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">IrMailServer</span><span class="p">)</span><span class="o">.</span><span class="n">connect</span>
+        <span class="n">find_mail_server_origin</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">IrMailServer</span><span class="p">)</span><span class="o">.</span><span class="n">_find_mail_server</span>
+
+        <span class="c1"># custom mock to avoid losing context</span>
+        <span class="k">def</span> <span class="nf">mock_function</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="n">mock</span> <span class="o">=</span> <span class="n">Mock</span><span class="p">()</span>
+
+            <span class="k">def</span> <span class="nf">_call</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">mock</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="n">_call</span><span class="o">.</span><span class="n">mock</span> <span class="o">=</span> <span class="n">mock</span>
+            <span class="k">return</span> <span class="n">_call</span>
+
+        <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;smtplib.SMTP_SSL&#39;</span><span class="p">,</span> <span class="n">side_effect</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">testing_smtp_session</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="p">(</span><span class="s1">&#39;smtplib.SMTP&#39;</span><span class="p">,</span> <span class="n">side_effect</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">testing_smtp_session</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">IrMailServer</span><span class="p">),</span> <span class="s1">&#39;_is_test_mode&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="bp">self</span><span class="p">:</span> <span class="kc">False</span><span class="p">),</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">IrMailServer</span><span class="p">),</span> <span class="s1">&#39;connect&#39;</span><span class="p">,</span> <span class="n">mock_function</span><span class="p">(</span><span class="n">connect_origin</span><span class="p">))</span> <span class="k">as</span> <span class="n">connect_mocked</span><span class="p">,</span> \
+             <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">IrMailServer</span><span class="p">),</span> <span class="s1">&#39;_find_mail_server&#39;</span><span class="p">,</span> <span class="n">mock_function</span><span class="p">(</span><span class="n">find_mail_server_origin</span><span class="p">))</span> <span class="k">as</span> <span class="n">find_mail_server_mocked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connect_mocked</span> <span class="o">=</span> <span class="n">connect_mocked</span><span class="o">.</span><span class="n">mock</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">find_mail_server_mocked</span> <span class="o">=</span> <span class="n">find_mail_server_mocked</span><span class="o">.</span><span class="n">mock</span>
+            <span class="k">yield</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_build_email</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_from</span><span class="p">,</span> <span class="n">return_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">build_email</span><span class="p">(</span>
+            <span class="n">mail_from</span><span class="p">,</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;email_to&#39;</span><span class="p">,</span> <span class="s1">&#39;dest@example-é.com&#39;</span><span class="p">),</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;subject&#39;</span><span class="p">),</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;body&#39;</span><span class="p">,</span> <span class="s1">&#39;body&#39;</span><span class="p">),</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;Return-Path&#39;</span><span class="p">:</span> <span class="n">return_path</span><span class="p">}</span> <span class="k">if</span> <span class="n">return_path</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_send_email</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">smtp_session</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">current_thread</span><span class="p">(),</span> <span class="s1">&#39;testing&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">send_email</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">smtp_session</span><span class="o">=</span><span class="n">smtp_session</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">smtp_session</span><span class="o">.</span><span class="n">messages</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+<div class="viewcode-block" id="MockSmtplibCase.assertSMTPEmailsSent">
+<a class="viewcode-back" href="../../../../../odoo.addons.base.tests.html#odoo.addons.base.tests.common.MockSmtplibCase.assertSMTPEmailsSent">[docs]</a>
+    <span class="k">def</span> <span class="nf">assertSMTPEmailsSent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">smtp_from</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smtp_to_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">message_from</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                             <span class="n">mail_server</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">from_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                             <span class="n">emails_count</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check that the given email has been sent. If one of the parameter is</span>
+<span class="sd">        None it is just ignored and not used to retrieve the email.</span>
+
+<span class="sd">        :param smtp_from: FROM used for the authentication to the mail server</span>
+<span class="sd">        :param smtp_to_list: List of destination email address</span>
+<span class="sd">        :param message_from: FROM used in the SMTP headers</span>
+<span class="sd">        :arap mail_server: used to compare the &#39;from_filter&#39; as an alternative</span>
+<span class="sd">          to using the from_filter parameter</span>
+<span class="sd">        :param from_filter: from_filter of the &lt;ir.mail_server&gt; used to send the</span>
+<span class="sd">          email. False means &#39;match everything&#39;;&#39;</span>
+<span class="sd">        :param emails_count: the number of emails which should match the condition</span>
+<span class="sd">        :return: True if at least one email has been found with those parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">from_filter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">mail_server</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid usage: use either from_filter either mail_server&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">from_filter</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">mail_server</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">from_filter</span> <span class="o">=</span> <span class="n">mail_server</span><span class="o">.</span><span class="n">from_filter</span>
+        <span class="n">matching_emails</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">email</span><span class="p">:</span>
+                <span class="p">(</span><span class="n">smtp_from</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">smtp_from</span> <span class="o">==</span> <span class="n">email</span><span class="p">[</span><span class="s1">&#39;smtp_from&#39;</span><span class="p">])</span>
+                <span class="ow">and</span> <span class="p">(</span><span class="n">smtp_to_list</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">smtp_to_list</span> <span class="o">==</span> <span class="n">email</span><span class="p">[</span><span class="s1">&#39;smtp_to_list&#39;</span><span class="p">])</span>
+                <span class="ow">and</span> <span class="p">(</span><span class="n">message_from</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s1">&#39;From: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">message_from</span> <span class="ow">in</span> <span class="n">email</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+                <span class="ow">and</span> <span class="p">(</span><span class="n">from_filter</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">from_filter</span> <span class="o">==</span> <span class="n">email</span><span class="p">[</span><span class="s1">&#39;from_filter&#39;</span><span class="p">]),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">debug_info</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">matching_emails_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">matching_emails</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">matching_emails_count</span> <span class="o">!=</span> <span class="n">emails_count</span><span class="p">:</span>
+            <span class="n">emails_from</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">:</span>
+                <span class="n">from_found</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span>
+                    <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;From:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">email</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;From:&#39;</span><span class="p">)),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+                <span class="n">emails_from</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">from_found</span><span class="p">)</span>
+            <span class="n">debug_info</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;SMTP-From: </span><span class="si">{</span><span class="n">email</span><span class="p">[</span><span class="s1">&#39;smtp_from&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, SMTP-To: </span><span class="si">{</span><span class="n">email</span><span class="p">[</span><span class="s1">&#39;smtp_to_list&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, Msg-From: </span><span class="si">{</span><span class="n">email_msg_from</span><span class="si">}</span><span class="s2">, From_filter: </span><span class="si">{</span><span class="n">email</span><span class="p">[</span><span class="s1">&#39;from_filter&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="k">for</span> <span class="n">email</span><span class="p">,</span> <span class="n">email_msg_from</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emails</span><span class="p">,</span> <span class="n">emails_from</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span>
+            <span class="n">matching_emails_count</span><span class="p">,</span> <span class="n">emails_count</span><span class="p">,</span>
+            <span class="n">msg</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Incorrect emails sent: </span><span class="si">{</span><span class="n">matching_emails_count</span><span class="si">}</span><span class="s1"> found, </span><span class="si">{</span><span class="n">emails_count</span><span class="si">}</span><span class="s1"> expected&#39;</span>
+                <span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Conditions</span><span class="se">\n</span><span class="s1">SMTP-From: </span><span class="si">{</span><span class="n">smtp_from</span><span class="si">}</span><span class="s1">, SMTP-To: </span><span class="si">{</span><span class="n">smtp_to_list</span><span class="si">}</span><span class="s1">, Msg-From: </span><span class="si">{</span><span class="n">message_from</span><span class="si">}</span><span class="s1">, From_filter: </span><span class="si">{</span><span class="n">from_filter</span><span class="si">}</span><span class="s1">&#39;</span>
+                <span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Not found in</span><span class="se">\n</span><span class="si">{</span><span class="n">debug_info</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_init_mail_gateway</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">default_from_filter</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.config_parameter&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sudo</span><span class="p">()</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;mail.default.from_filter&#39;</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">default_from_filter</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_init_mail_servers</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">search</span><span class="p">([])</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+        <span class="n">ir_mail_server_values</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;smtp_host&#39;</span><span class="p">:</span> <span class="s1">&#39;smtp_host&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;smtp_encryption&#39;</span><span class="p">:</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">mail_servers</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">env</span><span class="p">[</span><span class="s1">&#39;ir.mail_server&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create</span><span class="p">([</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Domain based server&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="o">**</span> <span class="n">ir_mail_server_values</span><span class="p">,</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;User specific server&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;specific_user@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="o">**</span> <span class="n">ir_mail_server_values</span><span class="p">,</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Server Notifications&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="s1">&#39;notifications.test@test.mycompany.com&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="o">**</span> <span class="n">ir_mail_server_values</span><span class="p">,</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Server No From Filter&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;from_filter&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;sequence&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+                <span class="o">**</span> <span class="n">ir_mail_server_values</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">])</span>
+        <span class="p">(</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">mail_server_domain</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">mail_server_user</span><span class="p">,</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">mail_server_notification</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">mail_server_default</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">mail_servers</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

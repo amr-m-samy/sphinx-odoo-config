@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>odoo.tools.mail &mdash; Amr  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Amr
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">odoo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Amr</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../odoo.html">odoo</a></li>
+      <li class="breadcrumb-item active">odoo.tools.mail</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for odoo.tools.mail</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Part of Odoo. See LICENSE file for full copyright and licensing details.</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">email.utils</span> <span class="kn">import</span> <span class="n">getaddresses</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">import</span> <span class="nn">html</span> <span class="k">as</span> <span class="nn">htmllib</span>
+
+<span class="kn">import</span> <span class="nn">idna</span>
+<span class="kn">import</span> <span class="nn">markupsafe</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="kn">import</span> <span class="n">etree</span><span class="p">,</span> <span class="n">html</span>
+<span class="kn">from</span> <span class="nn">lxml.html</span> <span class="kn">import</span> <span class="n">clean</span>
+<span class="kn">from</span> <span class="nn">werkzeug</span> <span class="kn">import</span> <span class="n">urls</span>
+
+<span class="kn">import</span> <span class="nn">odoo</span>
+<span class="kn">from</span> <span class="nn">odoo.loglevels</span> <span class="kn">import</span> <span class="n">ustr</span>
+<span class="kn">from</span> <span class="nn">odoo.tools</span> <span class="kn">import</span> <span class="n">misc</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1">#----------------------------------------------------------</span>
+<span class="c1"># HTML Sanitizer</span>
+<span class="c1">#----------------------------------------------------------</span>
+
+<span class="n">safe_attrs</span> <span class="o">=</span> <span class="n">clean</span><span class="o">.</span><span class="n">defs</span><span class="o">.</span><span class="n">safe_attrs</span> <span class="o">|</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">[</span><span class="s1">&#39;style&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;data-o-mail-quote-node&#39;</span><span class="p">,</span>  <span class="c1"># quote detection</span>
+     <span class="s1">&#39;data-oe-model&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-id&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-field&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-type&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-expression&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-translation-initial-sha&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-nodeid&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-last-history-steps&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-protected&#39;</span><span class="p">,</span> <span class="s1">&#39;data-oe-transient-content&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-publish&#39;</span><span class="p">,</span> <span class="s1">&#39;data-id&#39;</span><span class="p">,</span> <span class="s1">&#39;data-res_id&#39;</span><span class="p">,</span> <span class="s1">&#39;data-interval&#39;</span><span class="p">,</span> <span class="s1">&#39;data-member_id&#39;</span><span class="p">,</span> <span class="s1">&#39;data-scroll-background-ratio&#39;</span><span class="p">,</span> <span class="s1">&#39;data-view-id&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-class&#39;</span><span class="p">,</span> <span class="s1">&#39;data-mimetype&#39;</span><span class="p">,</span> <span class="s1">&#39;data-original-src&#39;</span><span class="p">,</span> <span class="s1">&#39;data-original-id&#39;</span><span class="p">,</span> <span class="s1">&#39;data-gl-filter&#39;</span><span class="p">,</span> <span class="s1">&#39;data-quality&#39;</span><span class="p">,</span> <span class="s1">&#39;data-resize-width&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-shape&#39;</span><span class="p">,</span> <span class="s1">&#39;data-shape-colors&#39;</span><span class="p">,</span> <span class="s1">&#39;data-file-name&#39;</span><span class="p">,</span> <span class="s1">&#39;data-original-mimetype&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;data-behavior-props&#39;</span><span class="p">,</span> <span class="s1">&#39;data-prop-name&#39;</span><span class="p">,</span>  <span class="c1"># knowledge commands</span>
+     <span class="s1">&#39;data-mimetype-before-conversion&#39;</span><span class="p">,</span>
+     <span class="p">])</span>
+<span class="n">SANITIZE_TAGS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="c1"># allow new semantic HTML5 tags</span>
+    <span class="s1">&#39;allow_tags&#39;</span><span class="p">:</span> <span class="n">clean</span><span class="o">.</span><span class="n">defs</span><span class="o">.</span><span class="n">tags</span> <span class="o">|</span> <span class="nb">frozenset</span><span class="p">(</span><span class="s1">&#39;article bdi section header footer hgroup nav aside figure main&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="o">+</span> <span class="p">[</span><span class="n">etree</span><span class="o">.</span><span class="n">Comment</span><span class="p">]),</span>
+    <span class="s1">&#39;kill_tags&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">,</span> <span class="s1">&#39;embed&#39;</span><span class="p">,</span> <span class="s1">&#39;frame&#39;</span><span class="p">,</span> <span class="s1">&#39;head&#39;</span><span class="p">,</span> <span class="s1">&#39;iframe&#39;</span><span class="p">,</span> <span class="s1">&#39;link&#39;</span><span class="p">,</span> <span class="s1">&#39;meta&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;noscript&#39;</span><span class="p">,</span> <span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="s1">&#39;script&#39;</span><span class="p">,</span> <span class="s1">&#39;style&#39;</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;remove_tags&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;html&#39;</span><span class="p">,</span> <span class="s1">&#39;body&#39;</span><span class="p">],</span>
+<span class="p">}</span>
+
+
+<span class="k">class</span> <span class="nc">_Cleaner</span><span class="p">(</span><span class="n">clean</span><span class="o">.</span><span class="n">Cleaner</span><span class="p">):</span>
+
+    <span class="n">_style_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&#39;&#39;([\w-]+)\s*:\s*((?:[^;&quot;&#39;]|&quot;[^&quot;;]*&quot;|&#39;[^&#39;;]*&#39;)+)&#39;&#39;&#39;</span><span class="p">)</span>
+
+    <span class="n">_style_whitelist</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s1">&#39;font-size&#39;</span><span class="p">,</span> <span class="s1">&#39;font-family&#39;</span><span class="p">,</span> <span class="s1">&#39;font-weight&#39;</span><span class="p">,</span> <span class="s1">&#39;font-style&#39;</span><span class="p">,</span> <span class="s1">&#39;background-color&#39;</span><span class="p">,</span> <span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="s1">&#39;text-align&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;line-height&#39;</span><span class="p">,</span> <span class="s1">&#39;letter-spacing&#39;</span><span class="p">,</span> <span class="s1">&#39;text-transform&#39;</span><span class="p">,</span> <span class="s1">&#39;text-decoration&#39;</span><span class="p">,</span> <span class="s1">&#39;text-decoration&#39;</span><span class="p">,</span> <span class="s1">&#39;opacity&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="s1">&#39;vertical-align&#39;</span><span class="p">,</span> <span class="s1">&#39;display&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;padding&#39;</span><span class="p">,</span> <span class="s1">&#39;padding-top&#39;</span><span class="p">,</span> <span class="s1">&#39;padding-left&#39;</span><span class="p">,</span> <span class="s1">&#39;padding-bottom&#39;</span><span class="p">,</span> <span class="s1">&#39;padding-right&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;margin&#39;</span><span class="p">,</span> <span class="s1">&#39;margin-top&#39;</span><span class="p">,</span> <span class="s1">&#39;margin-left&#39;</span><span class="p">,</span> <span class="s1">&#39;margin-bottom&#39;</span><span class="p">,</span> <span class="s1">&#39;margin-right&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;white-space&#39;</span><span class="p">,</span>
+        <span class="c1"># box model</span>
+        <span class="s1">&#39;border&#39;</span><span class="p">,</span> <span class="s1">&#39;border-color&#39;</span><span class="p">,</span> <span class="s1">&#39;border-radius&#39;</span><span class="p">,</span> <span class="s1">&#39;border-style&#39;</span><span class="p">,</span> <span class="s1">&#39;border-width&#39;</span><span class="p">,</span> <span class="s1">&#39;border-top&#39;</span><span class="p">,</span> <span class="s1">&#39;border-bottom&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;height&#39;</span><span class="p">,</span> <span class="s1">&#39;width&#39;</span><span class="p">,</span> <span class="s1">&#39;max-width&#39;</span><span class="p">,</span> <span class="s1">&#39;min-width&#39;</span><span class="p">,</span> <span class="s1">&#39;min-height&#39;</span><span class="p">,</span>
+        <span class="c1"># tables</span>
+        <span class="s1">&#39;border-collapse&#39;</span><span class="p">,</span> <span class="s1">&#39;border-spacing&#39;</span><span class="p">,</span> <span class="s1">&#39;caption-side&#39;</span><span class="p">,</span> <span class="s1">&#39;empty-cells&#39;</span><span class="p">,</span> <span class="s1">&#39;table-layout&#39;</span><span class="p">]</span>
+
+    <span class="n">_style_whitelist</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+        <span class="p">[</span><span class="s1">&#39;border-</span><span class="si">%s</span><span class="s1">-</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">position</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;top&#39;</span><span class="p">,</span> <span class="s1">&#39;bottom&#39;</span><span class="p">,</span> <span class="s1">&#39;left&#39;</span><span class="p">,</span> <span class="s1">&#39;right&#39;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;style&#39;</span><span class="p">,</span> <span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="s1">&#39;width&#39;</span><span class="p">,</span> <span class="s1">&#39;left-radius&#39;</span><span class="p">,</span> <span class="s1">&#39;right-radius&#39;</span><span class="p">)]</span>
+    <span class="p">)</span>
+
+    <span class="n">strip_classes</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">sanitize_style</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">doc</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">_Cleaner</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+
+        <span class="c1"># if we keep attributes but still remove classes</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;safe_attrs_only&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">strip_classes</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">doc</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">strip_class</span><span class="p">(</span><span class="n">el</span><span class="p">)</span>
+
+        <span class="c1"># if we keep style attribute, sanitize them</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">style</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">sanitize_style</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">doc</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parse_style</span><span class="p">(</span><span class="n">el</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">strip_class</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;class&#39;</span><span class="p">):</span>
+            <span class="k">del</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;class&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">parse_style</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">el</span><span class="p">):</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span>
+        <span class="n">styling</span> <span class="o">=</span> <span class="n">attributes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;style&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">styling</span><span class="p">:</span>
+            <span class="n">valid_styles</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+            <span class="n">styles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_style_re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">styling</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">style</span> <span class="ow">in</span> <span class="n">styles</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">style</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_style_whitelist</span><span class="p">:</span>
+                    <span class="n">valid_styles</span><span class="p">[</span><span class="n">style</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span> <span class="o">=</span> <span class="n">style</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">valid_styles</span><span class="p">:</span>
+                <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;style&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="ow">in</span> <span class="n">valid_styles</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">el</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;style&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="tag_quote">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.tag_quote">[docs]</a>
+<span class="k">def</span> <span class="nf">tag_quote</span><span class="p">(</span><span class="n">el</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_create_new_node</span><span class="p">(</span><span class="n">tag</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">tail</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">new_node</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+        <span class="n">new_node</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">text</span>
+        <span class="n">new_node</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="n">tail</span>
+        <span class="k">if</span> <span class="n">attrs</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">attrs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">new_node</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_node</span>
+
+    <span class="k">def</span> <span class="nf">_tag_matching_regex_in_text</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="s1">&#39;span&#39;</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">child_node</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">idx</span><span class="p">,</span> <span class="n">node_idx</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+            <span class="n">new_node</span> <span class="o">=</span> <span class="n">_create_new_node</span><span class="p">(</span><span class="n">tag</span><span class="p">,</span> <span class="n">text</span><span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">start</span><span class="p">():</span><span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">()],</span> <span class="kc">None</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">child_node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">item</span><span class="o">.</span><span class="n">start</span><span class="p">()]</span>
+                <span class="n">new_node</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">():]</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">node_idx</span><span class="p">,</span> <span class="n">new_node</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">child_node</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">item</span><span class="o">.</span><span class="n">start</span><span class="p">()]</span>
+                <span class="n">new_node</span><span class="o">.</span><span class="n">tail</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">():]</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">node_idx</span><span class="p">,</span> <span class="n">new_node</span><span class="p">)</span>
+            <span class="n">child_node</span> <span class="o">=</span> <span class="n">new_node</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+            <span class="n">node_idx</span> <span class="o">=</span> <span class="n">node_idx</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="n">el_class</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;class&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">el_id</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="c1"># gmail or yahoo // # outlook, html // # msoffice</span>
+    <span class="k">if</span> <span class="s1">&#39;gmail_extra&#39;</span> <span class="ow">in</span> <span class="n">el_class</span> <span class="ow">or</span> \
+            <span class="s1">&#39;divRplyFwdMsg&#39;</span> <span class="ow">in</span> <span class="n">el_id</span> <span class="ow">or</span> \
+            <span class="p">(</span><span class="s1">&#39;SkyDrivePlaceholder&#39;</span> <span class="ow">in</span> <span class="n">el_class</span> <span class="ow">or</span> <span class="s1">&#39;SkyDrivePlaceholder&#39;</span> <span class="ow">in</span> <span class="n">el_class</span><span class="p">):</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote-container&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;hr&#39;</span> <span class="ow">and</span> <span class="p">(</span><span class="s1">&#39;stopSpelling&#39;</span> <span class="ow">in</span> <span class="n">el_class</span> <span class="ow">or</span> <span class="s1">&#39;stopSpelling&#39;</span> <span class="ow">in</span> <span class="n">el_id</span><span class="p">))</span> <span class="ow">or</span> \
+       <span class="s1">&#39;yahoo_quoted&#39;</span> <span class="ow">in</span> <span class="n">el_class</span><span class="p">:</span>
+        <span class="c1"># Quote all elements after this one</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sibling</span> <span class="ow">in</span> <span class="n">el</span><span class="o">.</span><span class="n">itersiblings</span><span class="p">(</span><span class="n">preceding</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">sibling</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+
+    <span class="c1"># html signature (-- &lt;br /&gt;blah)</span>
+    <span class="n">signature_begin</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;((?:(?:^|\n)[-]</span><span class="si">{2}</span><span class="s2">[\s]?$))&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">text</span> <span class="ow">and</span> <span class="n">el</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;br&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">signature_begin</span><span class="p">,</span> <span class="n">el</span><span class="o">.</span><span class="n">text</span><span class="p">):</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote-container&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+
+    <span class="c1"># text-based quotes (&gt;, &gt;&gt;) and signatures (-- Signature)</span>
+    <span class="n">text_complete_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;((?:\n[&gt;]+[^\n\r]*)+|(?:(?:^|\n)[-]</span><span class="si">{2}</span><span class="s2">[\s]?[\r\n]{1,2}[\s\S]+))&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">el</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">):</span>
+        <span class="n">_tag_matching_regex_in_text</span><span class="p">(</span><span class="n">text_complete_regex</span><span class="p">,</span> <span class="n">el</span><span class="p">,</span> <span class="s1">&#39;span&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;blockquote&#39;</span><span class="p">:</span>
+        <span class="c1"># remove single node</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote-node&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote-container&#39;</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">el</span><span class="o">.</span><span class="n">getparent</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote-node&#39;</span><span class="p">):</span>
+        <span class="n">el</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;data-o-mail-quote&#39;</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="html_normalize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.html_normalize">[docs]</a>
+<span class="k">def</span> <span class="nf">html_normalize</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">filter_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Normalize `src` for storage as an html field value.</span>
+
+<span class="sd">    The string is parsed as an html tag soup, made valid, then decorated for</span>
+<span class="sd">    &quot;email quote&quot; detection, and prepared for an optional filtering.</span>
+<span class="sd">    The filtering step (e.g. sanitization) should be performed by the</span>
+<span class="sd">    `filter_callback` function (to avoid multiple parsing operations, and</span>
+<span class="sd">    normalize the result).</span>
+
+<span class="sd">    :param src: the html string to normalize</span>
+<span class="sd">    :param filter_callback: optional callable taking a single `etree._Element`</span>
+<span class="sd">        document parameter, to be called during normalization in order to</span>
+<span class="sd">        filter the output document</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">src</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">src</span>
+
+    <span class="n">src</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;replace&#39;</span><span class="p">)</span>
+    <span class="c1"># html: remove encoding attribute inside tags</span>
+    <span class="n">doctype</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(&lt;[^&gt;]*\s)(encoding=([&quot;</span><span class="se">\&#39;</span><span class="s1">][^&quot;</span><span class="se">\&#39;</span><span class="s1">]*?[&quot;</span><span class="se">\&#39;</span><span class="s1">]|[^\s\n\r&gt;]+)(\s[^&gt;]*|/)?&gt;)&#39;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+    <span class="n">src</span> <span class="o">=</span> <span class="n">doctype</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;--!&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;--&gt;&#39;</span><span class="p">)</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(&lt;!--&gt;|&lt;!---&gt;)&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;!-- --&gt;&#39;</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+        <span class="c1"># On the specific case of Outlook desktop it adds unnecessary &#39;&lt;o:.*&gt;&lt;/o:.*&gt;&#39; tags which are parsed</span>
+        <span class="c1"># in &#39;&lt;p&gt;&lt;/p&gt;&#39; which may alter the appearance (eg. spacing) of the mail body</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&lt;/?o:.*?&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">etree</span><span class="o">.</span><span class="n">ParserError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># HTML comment only string, whitespace only..</span>
+        <span class="k">if</span> <span class="s1">&#39;empty&#39;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+            <span class="k">return</span> <span class="sa">u</span><span class="s2">&quot;&quot;</span>
+        <span class="k">raise</span>
+
+    <span class="c1"># perform quote detection before cleaning and class removal</span>
+    <span class="k">if</span> <span class="n">doc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">doc</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="n">etree</span><span class="o">.</span><span class="n">Element</span><span class="p">):</span>
+            <span class="n">tag_quote</span><span class="p">(</span><span class="n">el</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">filter_callback</span><span class="p">:</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">filter_callback</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+
+    <span class="n">src</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;unicode&#39;</span><span class="p">)</span>
+
+    <span class="c1"># this is ugly, but lxml/etree tostring want to put everything in a</span>
+    <span class="c1"># &#39;div&#39; that breaks the editor -&gt; remove that</span>
+    <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;&lt;div&gt;&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">src</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;&lt;/div&gt;&#39;</span><span class="p">):</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">src</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="o">-</span><span class="mi">6</span><span class="p">]</span>
+
+    <span class="c1"># html considerations so real html content match database value</span>
+    <span class="n">src</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;</span><span class="se">\xa0</span><span class="s1">&#39;</span><span class="p">,</span> <span class="sa">u</span><span class="s1">&#39;&amp;nbsp;&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">src</span></div>
+
+
+
+<div class="viewcode-block" id="html_sanitize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.html_sanitize">[docs]</a>
+<span class="k">def</span> <span class="nf">html_sanitize</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">silent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sanitize_tags</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sanitize_attributes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sanitize_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sanitize_form</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strip_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strip_classes</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">src</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">src</span>
+
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;.html_sanitize&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">sanitize_handler</span><span class="p">(</span><span class="n">doc</span><span class="p">):</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;page_structure&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;style&#39;</span><span class="p">:</span> <span class="n">strip_style</span><span class="p">,</span>              <span class="c1"># True = remove style tags/attrs</span>
+            <span class="s1">&#39;sanitize_style&#39;</span><span class="p">:</span> <span class="n">sanitize_style</span><span class="p">,</span>  <span class="c1"># True = sanitize styling</span>
+            <span class="s1">&#39;forms&#39;</span><span class="p">:</span> <span class="n">sanitize_form</span><span class="p">,</span>            <span class="c1"># True = remove form tags</span>
+            <span class="s1">&#39;remove_unknown_tags&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;comments&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;processing_instructions&#39;</span><span class="p">:</span> <span class="kc">False</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">sanitize_tags</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">SANITIZE_TAGS</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sanitize_attributes</span><span class="p">:</span>  <span class="c1"># We keep all attributes in order to keep &quot;style&quot;</span>
+            <span class="k">if</span> <span class="n">strip_classes</span><span class="p">:</span>
+                <span class="n">current_safe_attrs</span> <span class="o">=</span> <span class="n">safe_attrs</span> <span class="o">-</span> <span class="nb">frozenset</span><span class="p">([</span><span class="s1">&#39;class&#39;</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">current_safe_attrs</span> <span class="o">=</span> <span class="n">safe_attrs</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;safe_attrs_only&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s1">&#39;safe_attrs&#39;</span><span class="p">:</span> <span class="n">current_safe_attrs</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;safe_attrs_only&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>  <span class="c1"># keep oe-data attributes + style</span>
+                <span class="s1">&#39;strip_classes&#39;</span><span class="p">:</span> <span class="n">strip_classes</span><span class="p">,</span>  <span class="c1"># remove classes, even when keeping other attributes</span>
+            <span class="p">})</span>
+
+        <span class="n">cleaner</span> <span class="o">=</span> <span class="n">_Cleaner</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">cleaner</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">doc</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sanitized</span> <span class="o">=</span> <span class="n">html_normalize</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">filter_callback</span><span class="o">=</span><span class="n">sanitize_handler</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">etree</span><span class="o">.</span><span class="n">ParserError</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">silent</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;ParserError obtained when sanitizing </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sanitized</span> <span class="o">=</span> <span class="s1">&#39;&lt;p&gt;ParserError when sanitizing&lt;/p&gt;&#39;</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">silent</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">u</span><span class="s1">&#39;unknown error obtained when sanitizing </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sanitized</span> <span class="o">=</span> <span class="s1">&#39;&lt;p&gt;Unknown error when sanitizing&lt;/p&gt;&#39;</span>
+
+    <span class="k">return</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="n">sanitized</span><span class="p">)</span></div>
+
+
+<span class="c1"># ----------------------------------------------------------</span>
+<span class="c1"># HTML/Text management</span>
+<span class="c1"># ----------------------------------------------------------</span>
+
+<span class="n">URL_REGEX</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;(\bhref=[</span><span class="se">\&#39;</span><span class="s1">&quot;](?!mailto:|tel:|sms:)([^</span><span class="se">\&#39;</span><span class="s1">&quot;]+)[</span><span class="se">\&#39;</span><span class="s1">&quot;])&#39;</span>
+<span class="n">TEXT_URL_REGEX</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;https?://[\w@:%.+&amp;~#=/-]+(?:\?\S+)?&#39;</span>
+<span class="c1"># retrieve inner content of the link</span>
+<span class="n">HTML_TAG_URL_REGEX</span> <span class="o">=</span> <span class="n">URL_REGEX</span> <span class="o">+</span> <span class="sa">r</span><span class="s1">&#39;([^&lt;&gt;]*&gt;([^&lt;&gt;]+)&lt;\/)?&#39;</span>
+<span class="n">HTML_TAGS_REGEX</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;&lt;.*?&gt;&#39;</span><span class="p">)</span>
+<span class="n">HTML_NEWLINES_REGEX</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;&lt;(div|p|br|tr)[^&gt;]*&gt;|</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="validate_url">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.validate_url">[docs]</a>
+<span class="k">def</span> <span class="nf">validate_url</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">urls</span><span class="o">.</span><span class="n">url_parse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;http&#39;</span><span class="p">,</span> <span class="s1">&#39;https&#39;</span><span class="p">,</span> <span class="s1">&#39;ftp&#39;</span><span class="p">,</span> <span class="s1">&#39;ftps&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;http://&#39;</span> <span class="o">+</span> <span class="n">url</span>
+
+    <span class="k">return</span> <span class="n">url</span></div>
+
+
+
+<div class="viewcode-block" id="is_html_empty">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.is_html_empty">[docs]</a>
+<span class="k">def</span> <span class="nf">is_html_empty</span><span class="p">(</span><span class="n">html_content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if a html content is empty. If there are only formatting tags with style</span>
+<span class="sd">    attributes or a void content  return True. Famous use case if a</span>
+<span class="sd">    &#39;&lt;p style=&quot;...&quot;&gt;&lt;br&gt;&lt;/p&gt;&#39; added by some web editor.</span>
+
+<span class="sd">    :param str html_content: html content, coming from example from an HTML field</span>
+<span class="sd">    :returns: bool, True if no content found or if containing only void formatting tags</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">html_content</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="n">tag_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\&lt;\s*\/?(?:p|div|section|span|br|b|i|font)(?:(?=\s+\w*)[^/&gt;]*|\s*)/?\s*\&gt;&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">tag_re</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">html_content</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="html_keep_url">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.html_keep_url">[docs]</a>
+<span class="k">def</span> <span class="nf">html_keep_url</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Transform the url into clickable link with &lt;a/&gt; tag &quot;&quot;&quot;</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">final</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">link_tags</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;(?&lt;![&quot;&#39;])((ftp|http|https):\/\/(\w+:{0,1}\w*@)?([^\s&lt;&quot;&#39;]+)(:[0-9]+)?(\/|\/([^\s&lt;&quot;&#39;]))?)(?![^\s&lt;&quot;&#39;]*[&quot;&#39;]|[^\s&lt;&quot;&#39;]*&lt;/a&gt;)&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">link_tags</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+        <span class="n">final</span> <span class="o">+=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">item</span><span class="o">.</span><span class="n">start</span><span class="p">()]</span>
+        <span class="n">final</span> <span class="o">+=</span> <span class="s1">&#39;&lt;a href=&quot;</span><span class="si">%s</span><span class="s1">&quot; target=&quot;_blank&quot; rel=&quot;noreferrer noopener&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/a&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">item</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+    <span class="n">final</span> <span class="o">+=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">final</span></div>
+
+
+
+<div class="viewcode-block" id="html_to_inner_content">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.html_to_inner_content">[docs]</a>
+<span class="k">def</span> <span class="nf">html_to_inner_content</span><span class="p">(</span><span class="n">html</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns unformatted text after removing html tags and excessive whitespace from a</span>
+<span class="sd">    string/Markup. Passed strings will first be sanitized.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_html_empty</span><span class="p">(</span><span class="n">html</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">html_sanitize</span><span class="p">(</span><span class="n">html</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">HTML_NEWLINES_REGEX</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">HTML_TAGS_REGEX</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">processed</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39; {2,}|\t&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">processed</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">htmllib</span><span class="o">.</span><span class="n">unescape</span><span class="p">(</span><span class="n">processed</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">processed</span></div>
+
+
+
+<div class="viewcode-block" id="html2plaintext">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.html2plaintext">[docs]</a>
+<span class="k">def</span> <span class="nf">html2plaintext</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">body_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; From an HTML text, convert the HTML to plain text.</span>
+<span class="sd">    If @param body_id is provided then this is the tag where the</span>
+<span class="sd">    body (not necessarily &lt;body&gt;) starts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">## (c) Fry-IT, www.fry-it.com, 2007</span>
+    <span class="c1">## &lt;peter@fry-it.com&gt;</span>
+    <span class="c1">## download here: http://www.peterbe.com/plog/html2plaintext</span>
+
+    <span class="n">html</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">html</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">html</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="n">etree</span><span class="o">.</span><span class="n">HTMLParser</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">body_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//*[@id=</span><span class="si">%s</span><span class="s1">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">body_id</span><span class="p">,))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s1">&#39;//body&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+        <span class="n">tree</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">url_index</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">link</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;.//a&#39;</span><span class="p">):</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="n">link</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;href&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">url</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">link</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="s1">&#39;span&#39;</span>
+            <span class="n">link</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> [</span><span class="si">%s</span><span class="s1">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">link</span><span class="o">.</span><span class="n">text</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="n">url_index</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+    <span class="n">html</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">etree</span><span class="o">.</span><span class="n">tostring</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">))</span>
+    <span class="c1"># \r char is converted into &amp;#13;, must remove it</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;#13;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;strong&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/strong&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;b&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/b&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;h3&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/h3&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;h2&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;**&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/h2&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;**&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;h1&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;**&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/h1&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;**&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;em&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;/&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/em&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;/&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;tr&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/p&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&lt;br\s*/?&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;&lt;.*?&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">html</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; &#39;</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&gt;&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;lt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;amp;&#39;</span><span class="p">,</span> <span class="s1">&#39;&amp;&#39;</span><span class="p">)</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&amp;nbsp;&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\N{NO-BREAK SPACE}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># strip all lines</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">html</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()])</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">url</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">url_index</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\n\n</span><span class="s1">&#39;</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="n">ustr</span><span class="p">(</span><span class="s1">&#39;[</span><span class="si">%s</span><span class="s1">] </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">html</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="plaintext2html">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.plaintext2html">[docs]</a>
+<span class="k">def</span> <span class="nf">plaintext2html</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">container_tag</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Convert plaintext into html. Content of the text is escaped to manage</span>
+<span class="sd">    html entities, using :func:`~odoo.tools.misc.html_escape`.</span>
+
+<span class="sd">    - all ``\n``, ``\r`` are replaced by ``&lt;br/&gt;``</span>
+<span class="sd">    - enclose content into ``&lt;p&gt;``</span>
+<span class="sd">    - convert url into clickable link</span>
+<span class="sd">    - 2 or more consecutive ``&lt;br/&gt;`` are considered as paragraph breaks</span>
+
+<span class="sd">    :param str text: plaintext to convert</span>
+<span class="sd">    :param str container_tag: container of the html; by default the content is</span>
+<span class="sd">        embedded into a ``&lt;div&gt;``</span>
+<span class="sd">    :rtype: markupsafe.Markup</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+    <span class="c1"># 1. replace \n and \r</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(\r\n|\r|\n)&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;br/&gt;&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+
+    <span class="c1"># 2. clickable links</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="n">html_keep_url</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="c1"># 3-4: form paragraphs</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">final</span> <span class="o">=</span> <span class="s1">&#39;&lt;p&gt;&#39;</span>
+    <span class="n">br_tags</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(([&lt;]\s*[bB][rR]\s*/?[&gt;]\s*){2,})&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">br_tags</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+        <span class="n">final</span> <span class="o">+=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">item</span><span class="o">.</span><span class="n">start</span><span class="p">()]</span> <span class="o">+</span> <span class="s1">&#39;&lt;/p&gt;&lt;p&gt;&#39;</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+    <span class="n">final</span> <span class="o">+=</span> <span class="n">text</span><span class="p">[</span><span class="n">idx</span><span class="p">:]</span> <span class="o">+</span> <span class="s1">&#39;&lt;/p&gt;&#39;</span>
+
+    <span class="c1"># 5. container</span>
+    <span class="k">if</span> <span class="n">container_tag</span><span class="p">:</span> <span class="c1"># FIXME: validate that container_tag is just a simple tag?</span>
+        <span class="n">final</span> <span class="o">=</span> <span class="s1">&#39;&lt;</span><span class="si">%s</span><span class="s1">&gt;</span><span class="si">%s</span><span class="s1">&lt;/</span><span class="si">%s</span><span class="s1">&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">container_tag</span><span class="p">,</span> <span class="n">final</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="n">final</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="append_content_to_html">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.append_content_to_html">[docs]</a>
+<span class="k">def</span> <span class="nf">append_content_to_html</span><span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">content</span><span class="p">,</span> <span class="n">plaintext</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">preserve</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">container_tag</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Append extra content at the end of an HTML snippet, trying</span>
+<span class="sd">        to locate the end of the HTML document (&lt;/body&gt;, &lt;/html&gt;, or</span>
+<span class="sd">        EOF), and converting the provided content in html unless ``plaintext``</span>
+<span class="sd">        is False.</span>
+
+<span class="sd">        Content conversion can be done in two ways:</span>
+
+<span class="sd">        - wrapping it into a pre (``preserve=True``)</span>
+<span class="sd">        - use plaintext2html (``preserve=False``, using ``container_tag`` to</span>
+<span class="sd">          wrap the whole content)</span>
+
+<span class="sd">        A side-effect of this method is to coerce all HTML tags to</span>
+<span class="sd">        lowercase in ``html``, and strip enclosing &lt;html&gt; or &lt;body&gt; tags in</span>
+<span class="sd">        content if ``plaintext`` is False.</span>
+
+<span class="sd">        :param str html: html tagsoup (doesn&#39;t have to be XHTML)</span>
+<span class="sd">        :param str content: extra content to append</span>
+<span class="sd">        :param bool plaintext: whether content is plaintext and should</span>
+<span class="sd">            be wrapped in a &lt;pre/&gt; tag.</span>
+<span class="sd">        :param bool preserve: if content is plaintext, wrap it into a &lt;pre&gt;</span>
+<span class="sd">            instead of converting it into html</span>
+<span class="sd">        :param str container_tag: tag to wrap the content into, defaults to `div`.</span>
+<span class="sd">        :rtype: markupsafe.Markup</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">ustr</span><span class="p">(</span><span class="n">html</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plaintext</span> <span class="ow">and</span> <span class="n">preserve</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="sa">u</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&lt;pre&gt;</span><span class="si">%s</span><span class="s1">&lt;/pre&gt;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">misc</span><span class="o">.</span><span class="n">html_escape</span><span class="p">(</span><span class="n">ustr</span><span class="p">(</span><span class="n">content</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">plaintext</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">plaintext2html</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">container_tag</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?i)(&lt;/?(?:html|body|head|!\s*DOCTYPE)[^&gt;]*&gt;)&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="sa">u</span><span class="s1">&#39;</span><span class="se">\n</span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">ustr</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+    <span class="c1"># Force all tags to lowercase</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(&lt;/?)(\w+)([ &gt;])&#39;</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="s1">&#39;</span><span class="si">%s%s%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">3</span><span class="p">)),</span> <span class="n">html</span><span class="p">)</span>
+    <span class="n">insert_location</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;&lt;/body&gt;&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">insert_location</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="n">insert_location</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;&lt;/html&gt;&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">insert_location</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">html</span><span class="p">,</span> <span class="n">content</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s%s%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">html</span><span class="p">[:</span><span class="n">insert_location</span><span class="p">],</span> <span class="n">content</span><span class="p">,</span> <span class="n">html</span><span class="p">[</span><span class="n">insert_location</span><span class="p">:]))</span></div>
+
+
+
+<div class="viewcode-block" id="prepend_html_content">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.prepend_html_content">[docs]</a>
+<span class="k">def</span> <span class="nf">prepend_html_content</span><span class="p">(</span><span class="n">html_body</span><span class="p">,</span> <span class="n">html_content</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepend some HTML content at the beginning of an other HTML content.&quot;&quot;&quot;</span>
+    <span class="n">replacement</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?i)(&lt;/?(?:html|body|head|!\s*DOCTYPE)[^&gt;]*&gt;)&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">html_content</span><span class="p">)</span>
+    <span class="n">html_content</span> <span class="o">=</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">(</span><span class="n">replacement</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">html_content</span><span class="p">,</span> <span class="n">markupsafe</span><span class="o">.</span><span class="n">Markup</span><span class="p">)</span> <span class="k">else</span> <span class="n">replacement</span>
+    <span class="n">html_content</span> <span class="o">=</span> <span class="n">html_content</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="n">body_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&lt;body[^&gt;]*&gt;&#39;</span><span class="p">,</span> <span class="n">html_body</span><span class="p">)</span> <span class="ow">or</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&lt;html[^&gt;]*&gt;&#39;</span><span class="p">,</span> <span class="n">html_body</span><span class="p">)</span>
+    <span class="n">insert_index</span> <span class="o">=</span> <span class="n">body_match</span><span class="o">.</span><span class="n">end</span><span class="p">()</span> <span class="k">if</span> <span class="n">body_match</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="k">return</span> <span class="n">html_body</span><span class="p">[:</span><span class="n">insert_index</span><span class="p">]</span> <span class="o">+</span> <span class="n">html_content</span> <span class="o">+</span> <span class="n">html_body</span><span class="p">[</span><span class="n">insert_index</span><span class="p">:]</span></div>
+
+
+<span class="c1">#----------------------------------------------------------</span>
+<span class="c1"># Emails</span>
+<span class="c1">#----------------------------------------------------------</span>
+
+<span class="c1"># matches any email in a body of text</span>
+<span class="n">email_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+<span class="c1"># matches a string containing only one email</span>
+<span class="n">single_email_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$&quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+<span class="n">mail_header_msgid_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;&lt;[^&lt;&gt;]+&gt;&#39;</span><span class="p">)</span>
+
+<span class="n">email_addr_escapes_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[</span><span class="se">\\</span><span class="s1">&quot;]&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="generate_tracking_message_id">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.generate_tracking_message_id">[docs]</a>
+<span class="k">def</span> <span class="nf">generate_tracking_message_id</span><span class="p">(</span><span class="n">res_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a string that can be used in the Message-ID RFC822 header field</span>
+
+<span class="sd">       Used to track the replies related to a given object thanks to the &quot;In-Reply-To&quot;</span>
+<span class="sd">       or &quot;References&quot; fields that Mail User Agents will set.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">rnd</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">SystemRandom</span><span class="p">()</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
+        <span class="n">rnd</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+    <span class="n">rndstr</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%.15f</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">rnd</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%.15f</span><span class="s2">-openerp-</span><span class="si">%s</span><span class="s2">@</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">rndstr</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="n">res_id</span><span class="p">,</span> <span class="n">socket</span><span class="o">.</span><span class="n">gethostname</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="email_split_tuples">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_split_tuples">[docs]</a>
+<span class="k">def</span> <span class="nf">email_split_tuples</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a list of (name, email) address tuples found in ``text`` . Note</span>
+<span class="sd">    that text should be an email header or a stringified email list as it may</span>
+<span class="sd">    give broader results than expected on actual text. &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_parse_based_on_spaces</span><span class="p">(</span><span class="n">pair</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; With input &#39;name email@domain.com&#39; (missing quotes for a formatting)</span>
+<span class="sd">        getaddresses returns (&#39;&#39;, &#39;name email@domain.com). This when having no</span>
+<span class="sd">        name and an email a fallback to enhance parsing is to redo a getaddresses</span>
+<span class="sd">        by replacing spaces by commas. The new email will be split into sub pairs</span>
+<span class="sd">        allowing to find the email and name parts, allowing to make a new name /</span>
+<span class="sd">        email pair. Emails should not contain spaces thus this is coherent with</span>
+<span class="sd">        email formation. &quot;&quot;&quot;</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">email</span> <span class="o">=</span> <span class="n">pair</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">and</span> <span class="n">email</span> <span class="ow">and</span> <span class="s1">&#39; &#39;</span> <span class="ow">in</span> <span class="n">email</span><span class="p">:</span>
+            <span class="n">inside_pairs</span> <span class="o">=</span> <span class="n">getaddresses</span><span class="p">([</span><span class="n">email</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="p">)])</span>
+            <span class="n">name_parts</span><span class="p">,</span> <span class="n">found_email</span> <span class="o">=</span> <span class="p">[],</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">inside_pairs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;@&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">name_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">found_email</span> <span class="o">=</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">name</span><span class="p">,</span> <span class="n">email</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">name_parts</span><span class="p">),</span> <span class="n">found_email</span><span class="p">)</span> <span class="k">if</span> <span class="n">found_email</span> <span class="k">else</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">email</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">email</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="c1"># found valid pairs, filtering out failed parsing</span>
+    <span class="n">valid_pairs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">addr</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">addr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">getaddresses</span><span class="p">([</span><span class="n">text</span><span class="p">])</span>
+        <span class="c1"># getaddresses() returns &#39;&#39; when email parsing fails, and</span>
+        <span class="c1"># sometimes returns emails without at least &#39;@&#39;. The &#39;@&#39;</span>
+        <span class="c1"># is strictly required in RFC2822&#39;s `addr-spec`.</span>
+        <span class="k">if</span> <span class="n">addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">]</span>
+    <span class="c1"># corner case: returning &#39;@gmail.com&#39;-like email (see test_email_split)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">valid_pairs</span><span class="p">):</span>
+        <span class="n">filtered</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">found_email</span> <span class="k">for</span> <span class="n">found_email</span> <span class="ow">in</span> <span class="n">email_re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">found_email</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">found_email</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">filtered</span><span class="p">:</span>
+            <span class="n">valid_pairs</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">found_email</span><span class="p">)</span> <span class="k">for</span> <span class="n">found_email</span> <span class="ow">in</span> <span class="n">filtered</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">_parse_based_on_spaces</span><span class="p">,</span> <span class="n">valid_pairs</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="email_split">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_split">[docs]</a>
+<span class="k">def</span> <span class="nf">email_split</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a list of the email addresses found in ``text`` &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">email</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">email</span><span class="p">)</span> <span class="ow">in</span> <span class="n">email_split_tuples</span><span class="p">(</span><span class="n">text</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="email_split_and_format">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_split_and_format">[docs]</a>
+<span class="k">def</span> <span class="nf">email_split_and_format</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a list of email addresses found in ``text``, formatted using</span>
+<span class="sd">    formataddr. &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">formataddr</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">email</span><span class="p">))</span> <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">email</span><span class="p">)</span> <span class="ow">in</span> <span class="n">email_split_tuples</span><span class="p">(</span><span class="n">text</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="email_normalize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_normalize">[docs]</a>
+<span class="k">def</span> <span class="nf">email_normalize</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Sanitize and standardize email address entries. As of rfc5322 section</span>
+<span class="sd">    3.4.1 local-part is case-sensitive. However most main providers do consider</span>
+<span class="sd">    the local-part as case insensitive. With the introduction of smtp-utf8</span>
+<span class="sd">    within odoo, this assumption is certain to fall short for international</span>
+<span class="sd">    emails. We now consider that</span>
+
+<span class="sd">      * if local part is ascii: normalize still &#39;lower&#39; ;</span>
+<span class="sd">      * else: use as it, SMTP-UF8 is made for non-ascii local parts;</span>
+
+<span class="sd">    Concerning domain part of the address, as of v14 international domain (IDNA)</span>
+<span class="sd">    are handled fine. The domain is always lowercase, lowering it is fine as it</span>
+<span class="sd">    is probably an error. With the introduction of IDNA, there is an encoding</span>
+<span class="sd">    that allow non-ascii characters to be encoded to ascii ones, using &#39;idna.encode&#39;.</span>
+
+<span class="sd">    A normalized email is considered as :</span>
+<span class="sd">    - having a left part + @ + a right part (the domain can be without &#39;.something&#39;)</span>
+<span class="sd">    - having no name before the address. Typically, having no &#39;Name &lt;&gt;&#39;</span>
+<span class="sd">    Ex:</span>
+<span class="sd">    - Possible Input Email : &#39;Name &lt;NaMe@DoMaIn.CoM&gt;&#39;</span>
+<span class="sd">    - Normalized Output Email : &#39;name@domain.com&#39;</span>
+
+<span class="sd">    :param boolean strict: if True, text should contain a single email</span>
+<span class="sd">      (default behavior in stable 14+). If more than one email is found no</span>
+<span class="sd">      normalized email is returned. If False the first found candidate is used</span>
+<span class="sd">      e.g. if email is &#39;tony@e.com, &quot;Tony2&quot; &lt;tony2@e.com&gt;&#39;, result is either</span>
+<span class="sd">      False (strict=True), either &#39;tony@e.com&#39; (strict=False).</span>
+
+<span class="sd">    :return: False if no email found (or if more than 1 email found when being</span>
+<span class="sd">      in strict mode); normalized email otherwise;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">emails</span> <span class="o">=</span> <span class="n">email_split</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">emails</span> <span class="ow">or</span> <span class="p">(</span><span class="n">strict</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">emails</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">local_part</span><span class="p">,</span> <span class="n">at</span><span class="p">,</span> <span class="n">domain</span> <span class="o">=</span> <span class="n">emails</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">local_part</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">UnicodeEncodeError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">local_part</span> <span class="o">=</span> <span class="n">local_part</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">local_part</span> <span class="o">+</span> <span class="n">at</span> <span class="o">+</span> <span class="n">domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="email_normalize_all">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_normalize_all">[docs]</a>
+<span class="k">def</span> <span class="nf">email_normalize_all</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Tool method allowing to extract email addresses from a text input and returning</span>
+<span class="sd">    normalized version of all found emails. If no email is found, a void list</span>
+<span class="sd">    is returned.</span>
+
+<span class="sd">    e.g. if email is &#39;tony@e.com, &quot;Tony2&quot; &lt;tony2@e.com&#39; returned result is [&#39;tony@e.com, tony2@e.com&#39;]</span>
+
+<span class="sd">    :return list: list of normalized emails found in text</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">emails</span> <span class="o">=</span> <span class="n">email_split</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="p">[</span><span class="n">email_normalize</span><span class="p">(</span><span class="n">email</span><span class="p">)</span> <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="n">emails</span><span class="p">]))</span></div>
+
+
+<div class="viewcode-block" id="email_domain_extract">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_domain_extract">[docs]</a>
+<span class="k">def</span> <span class="nf">email_domain_extract</span><span class="p">(</span><span class="n">email</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Extract the company domain to be used by IAP services notably. Domain</span>
+<span class="sd">    is extracted from email information e.g:</span>
+
+<span class="sd">    - info@proximus.be -&gt; proximus.be</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">normalized_email</span> <span class="o">=</span> <span class="n">email_normalize</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">normalized_email</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">normalized_email</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="email_domain_normalize">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_domain_normalize">[docs]</a>
+<span class="k">def</span> <span class="nf">email_domain_normalize</span><span class="p">(</span><span class="n">domain</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the domain normalized or False if the domain is invalid.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">domain</span> <span class="ow">or</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">domain</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="url_domain_extract">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.url_domain_extract">[docs]</a>
+<span class="k">def</span> <span class="nf">url_domain_extract</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Extract the company domain to be used by IAP services notably. Domain</span>
+<span class="sd">    is extracted from an URL e.g:</span>
+
+<span class="sd">    - www.info.proximus.be -&gt; proximus.be</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parser_results</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">company_hostname</span> <span class="o">=</span> <span class="n">parser_results</span><span class="o">.</span><span class="n">hostname</span>
+    <span class="k">if</span> <span class="n">company_hostname</span> <span class="ow">and</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">company_hostname</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">company_hostname</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">2</span><span class="p">:])</span>  <span class="c1"># remove subdomains</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="email_escape_char">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.email_escape_char">[docs]</a>
+<span class="k">def</span> <span class="nf">email_escape_char</span><span class="p">(</span><span class="n">email_address</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Escape problematic characters in the given email address string&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">email_address</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\\\\</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\\</span><span class="s1">%&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\\</span><span class="s1">_&#39;</span><span class="p">)</span></div>
+
+
+<span class="c1"># was mail_thread.decode_header()</span>
+<div class="viewcode-block" id="decode_message_header">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.decode_message_header">[docs]</a>
+<span class="k">def</span> <span class="nf">decode_message_header</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">separator</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">h</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">message</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="p">[])</span> <span class="k">if</span> <span class="n">h</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="formataddr">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.formataddr">[docs]</a>
+<span class="k">def</span> <span class="nf">formataddr</span><span class="p">(</span><span class="n">pair</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pretty format a 2-tuple of the form (realname, email_address).</span>
+
+<span class="sd">    If the first element of pair is falsy then only the email address</span>
+<span class="sd">    is returned.</span>
+
+<span class="sd">    Set the charset to ascii to get a RFC-2822 compliant email. The</span>
+<span class="sd">    realname will be base64 encoded (if necessary) and the domain part</span>
+<span class="sd">    of the email will be punycode encoded (if necessary). The local part</span>
+<span class="sd">    is left unchanged thus require the SMTPUTF8 extension when there are</span>
+<span class="sd">    non-ascii characters.</span>
+
+<span class="sd">    &gt;&gt;&gt; formataddr((&#39;John Doe&#39;, &#39;johndoe@example.com&#39;))</span>
+<span class="sd">    &#39;&quot;John Doe&quot; &lt;johndoe@example.com&gt;&#39;</span>
+
+<span class="sd">    &gt;&gt;&gt; formataddr((&#39;&#39;, &#39;johndoe@example.com&#39;))</span>
+<span class="sd">    &#39;johndoe@example.com&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span><span class="p">,</span> <span class="n">address</span> <span class="o">=</span> <span class="n">pair</span>
+    <span class="n">local</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">domain</span> <span class="o">=</span> <span class="n">address</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">domain</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">charset</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">UnicodeEncodeError</span><span class="p">:</span>
+        <span class="c1"># rfc5890 - Internationalized Domain Names for Applications (IDNA)</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">idna</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">name</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">charset</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">UnicodeEncodeError</span><span class="p">:</span>
+            <span class="c1"># charset mismatch, encode as utf-8/base64</span>
+            <span class="c1"># rfc2047 - MIME Message Header Extensions for Non-ASCII Text</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;=?utf-8?b?</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">?= &lt;</span><span class="si">{</span><span class="n">local</span><span class="si">}</span><span class="s2">@</span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># ascii name, escape it if needed</span>
+            <span class="c1"># rfc2822 - Internet Message Format</span>
+            <span class="c1">#   #section-3.4 - Address Specification</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">email_addr_escapes_re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">\g&lt;0&gt;&#39;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot; &lt;</span><span class="si">{</span><span class="n">local</span><span class="si">}</span><span class="s1">@</span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s1">&gt;&#39;</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">local</span><span class="si">}</span><span class="s2">@</span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="encapsulate_email">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.encapsulate_email">[docs]</a>
+<span class="k">def</span> <span class="nf">encapsulate_email</span><span class="p">(</span><span class="n">old_email</span><span class="p">,</span> <span class="n">new_email</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Change the FROM of the message and use the old one as name.</span>
+
+<span class="sd">    e.g.</span>
+<span class="sd">    * Old From: &quot;Admin&quot; &lt;admin@gmail.com&gt;</span>
+<span class="sd">    * New From: notifications@odoo.com</span>
+<span class="sd">    * Output: &quot;Admin&quot; &lt;notifications@odoo.com&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">old_email_split</span> <span class="o">=</span> <span class="n">getaddresses</span><span class="p">([</span><span class="n">old_email</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">old_email_split</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">old_email_split</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">old_email</span>
+
+    <span class="n">new_email_split</span> <span class="o">=</span> <span class="n">getaddresses</span><span class="p">([</span><span class="n">new_email</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">new_email_split</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">new_email_split</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="k">return</span>
+
+    <span class="n">old_name</span><span class="p">,</span> <span class="n">old_email</span> <span class="o">=</span> <span class="n">old_email_split</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">old_name</span><span class="p">:</span>
+        <span class="n">name_part</span> <span class="o">=</span> <span class="n">old_name</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">name_part</span> <span class="o">=</span> <span class="n">old_email</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">formataddr</span><span class="p">((</span>
+        <span class="n">name_part</span><span class="p">,</span>
+        <span class="n">new_email_split</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+    <span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="parse_contact_from_email">
+<a class="viewcode-back" href="../../../odoo.tools.html#odoo.tools.mail.parse_contact_from_email">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_contact_from_email</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Parse contact name and email (given by text) in order to find contact</span>
+<span class="sd">    information, able to populate records like partners, leads, ...</span>
+<span class="sd">    Supported syntax:</span>
+
+<span class="sd">      * Raoul &lt;raoul@grosbedon.fr&gt;</span>
+<span class="sd">      * &quot;Raoul le Grand&quot; &lt;raoul@grosbedon.fr&gt;</span>
+<span class="sd">      * Raoul raoul@grosbedon.fr (strange fault tolerant support from</span>
+<span class="sd">        df40926d2a57c101a3e2d221ecfd08fbb4fea30e now supported directly</span>
+<span class="sd">        in &#39;email_split_tuples&#39;;</span>
+
+<span class="sd">    Otherwise: default, text is set as name.</span>
+
+<span class="sd">    :return: name, email (normalized if possible)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">split_results</span> <span class="o">=</span> <span class="n">email_split_tuples</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="n">name</span><span class="p">,</span> <span class="n">email</span> <span class="o">=</span> <span class="n">split_results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">split_results</span> <span class="k">else</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">email</span><span class="p">:</span>
+        <span class="n">email_normalized</span> <span class="o">=</span> <span class="n">email_normalize</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="ow">or</span> <span class="n">email</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">email_normalized</span> <span class="o">=</span> <span class="n">text</span><span class="p">,</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">return</span> <span class="n">name</span><span class="p">,</span> <span class="n">email_normalized</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Amr.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
